@@ -7,6 +7,7 @@ use crate::SQLSMALLINT;
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/return-codes-odbc
 /// https://github.com/microsoft/ODBC-Specification/blob/ODBC%204.0.md
+#[derive(PartialEq, Eq)]
 #[repr(transparent)]
 pub struct SQLRETURN(SQLSMALLINT);
 
@@ -54,17 +55,17 @@ pub const SQL_STILL_EXECUTING: SQLRETURN = SQLRETURN(2);
 
 /// Indicates that there are streamed output parameters available for the next set of
 /// parameters to retrieve.
-#[cfg(feature = "odbc_version_3_8")]
+#[cfg(feature = "v3_8")]
 pub const SQL_PARAM_DATA_AVAILABLE: SQLRETURN = SQLRETURN(101);
 
 /// Signals data-at-fetch columns are available.
-#[cfg(feature = "odbc_version_4")]
+#[cfg(feature = "v4")]
 pub const SQL_DATA_AVAILABLE: SQLRETURN = SQLRETURN(102);
 
 /// The descriptor is changed by the driver when reading a column.
-#[cfg(feature = "odbc_version_4")]
+#[cfg(feature = "v4")]
 pub const SQL_METADATA_CHANGED: SQLRETURN = SQLRETURN(103);
 
 /// The driver does not know how much additional data is to be written.
-#[cfg(feature = "odbc_version_4")]
+#[cfg(feature = "v4")]
 pub const SQL_MORE_DATA: SQLRETURN = SQLRETURN(104);

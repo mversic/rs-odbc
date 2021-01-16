@@ -14,7 +14,12 @@ impl SqlTypeIdentifier {
     }
 }
 
-const SQL_UNKNOWN_TYPE: SqlTypeIdentifier = SqlTypeIdentifier(0);
+/// Data type cannot be determined
+pub const SQL_UNKNOWN_TYPE: SqlTypeIdentifier = SqlTypeIdentifier(0);
+
+/// Column whose type may vary across rows
+#[cfg(feature = "v4")]
+pub use SQL_UNKNOWN_TYPE as SQL_VARIANT_TYPE;
 
 /// Character string of fixed string length n.
 ///
@@ -111,6 +116,12 @@ pub const SQL_VARBINARY: SqlTypeIdentifier = SqlTypeIdentifier(-3);
 /// SQL data type: LONG VARBINARY
 pub const SQL_LONGVARBINARY: SqlTypeIdentifier = SqlTypeIdentifier(-4);
 
+/// Fixed length GUID.
+///
+/// SQL data type: GUID
+#[cfg(feature = "v3_5")]
+pub const SQL_GUID: SqlTypeIdentifier = SqlTypeIdentifier(-11);
+
 /// Year, month, and day fields, conforming to the rules of the Gregorian calendar. (See Constraints of the Gregorian Calendar, later in this appendix.)
 ///
 /// SQL data type: DATE
@@ -126,7 +137,13 @@ pub const SQL_TYPE_TIME: SqlTypeIdentifier = SqlTypeIdentifier(92);
 /// SQL data type: TIMESTAMP(p)
 pub const SQL_TYPE_TIMESTAMP: SqlTypeIdentifier = SqlTypeIdentifier(93);
 
-// TODO: These are not found in the reference implementation
+#[cfg(feature = "v4")]
+pub const SQL_TYPE_TIME_WITH_TIMEZONE: SqlTypeIdentifier = SqlTypeIdentifier(94);
+
+#[cfg(feature = "v4")]
+pub const SQL_TYPE_TIMESTAMP_WITH_TIMEZONE: SqlTypeIdentifier = SqlTypeIdentifier(95);
+
+// TODO: These are not found in the reference implementation but exist in documentation
 //    /// Year, month, day, hour, minute, second, utchour, and utcminute fields. The utchour and utcminute fields have 1/10 microsecond precision.
 //    ///
 //    /// SQL data type: UTCDATETIME
@@ -140,7 +157,8 @@ pub const SQL_TYPE_TIMESTAMP: SqlTypeIdentifier = SqlTypeIdentifier(93);
 /// Number of months between two dates; p is the interval leading precision.
 ///
 /// SQL data type: INTERVAL MONTH(p)
-pub const SQL_INTERVAL_MONTH: SqlTypeIdentifier = SqlTypeIdentifier(100 + SQL_CODE_MONTH.raw_value());
+pub const SQL_INTERVAL_MONTH: SqlTypeIdentifier =
+    SqlTypeIdentifier(100 + SQL_CODE_MONTH.raw_value());
 
 /// Number of years between two dates; p is the interval leading precision.
 ///
@@ -150,7 +168,8 @@ pub const SQL_INTERVAL_YEAR: SqlTypeIdentifier = SqlTypeIdentifier(100 + SQL_COD
 /// Number of years and months between two dates; p is the interval leading precision.
 ///
 /// SQL data type: INTERVAL YEAR(p) TO MONTH
-pub const SQL_INTERVAL_YEAR_TO_MONTH: SqlTypeIdentifier = SqlTypeIdentifier(100 + SQL_CODE_YEAR_TO_MONTH.raw_value());
+pub const SQL_INTERVAL_YEAR_TO_MONTH: SqlTypeIdentifier =
+    SqlTypeIdentifier(100 + SQL_CODE_YEAR_TO_MONTH.raw_value());
 
 /// Number of days between two dates; p is the interval leading precision.
 ///
@@ -165,91 +184,89 @@ pub const SQL_INTERVAL_HOUR: SqlTypeIdentifier = SqlTypeIdentifier(100 + SQL_COD
 /// Number of minutes between two date/times; p is the interval leading precision.
 ///
 /// SQL data type: INTERVAL MINUTE(p)
-pub const SQL_INTERVAL_MINUTE: SqlTypeIdentifier = SqlTypeIdentifier(100 + SQL_CODE_MINUTE.raw_value());
+pub const SQL_INTERVAL_MINUTE: SqlTypeIdentifier =
+    SqlTypeIdentifier(100 + SQL_CODE_MINUTE.raw_value());
 
 /// Number of seconds between two date/times; p is the interval leading precision and q is the interval seconds precision.
 ///
 /// SQL data type: INTERVAL SECOND(p,q)
-pub const SQL_INTERVAL_SECOND: SqlTypeIdentifier = SqlTypeIdentifier(100 + SQL_CODE_SECOND.raw_value());
+pub const SQL_INTERVAL_SECOND: SqlTypeIdentifier =
+    SqlTypeIdentifier(100 + SQL_CODE_SECOND.raw_value());
 
 /// Number of days/hours between two date/times; p is the interval leading precision.
 ///
 /// SQL data type: INTERVAL DAY(p) TO HOUR
-pub const SQL_INTERVAL_DAY_TO_HOUR: SqlTypeIdentifier = SqlTypeIdentifier(100 + SQL_CODE_DAY_TO_HOUR.raw_value());
+pub const SQL_INTERVAL_DAY_TO_HOUR: SqlTypeIdentifier =
+    SqlTypeIdentifier(100 + SQL_CODE_DAY_TO_HOUR.raw_value());
 
 /// Number of days/hours/minutes between two date/times; p is the interval leading precision.
 ///
 /// SQL data type: INTERVAL DAY(p) TO MINUTE
-pub const SQL_INTERVAL_DAY_TO_MINUTE: SqlTypeIdentifier = SqlTypeIdentifier(100 + SQL_CODE_DAY_TO_MINUTE.raw_value());
+pub const SQL_INTERVAL_DAY_TO_MINUTE: SqlTypeIdentifier =
+    SqlTypeIdentifier(100 + SQL_CODE_DAY_TO_MINUTE.raw_value());
 
 /// Number of days/hours/minutes/seconds between two date/times; p is the interval leading precision and q is the interval seconds precision.
 ///
 /// SQL data type: INTERVAL DAY(p) TO SECOND(q)
-pub const SQL_INTERVAL_DAY_TO_SECOND: SqlTypeIdentifier = SqlTypeIdentifier(100 + SQL_CODE_DAY_TO_SECOND.raw_value());
+pub const SQL_INTERVAL_DAY_TO_SECOND: SqlTypeIdentifier =
+    SqlTypeIdentifier(100 + SQL_CODE_DAY_TO_SECOND.raw_value());
 
 /// Number of hours/minutes between two date/times; p is the interval leading precision.
 ///
 /// SQL data type: INTERVAL HOUR(p) TO MINUTE
-pub const SQL_INTERVAL_HOUR_TO_MINUTE: SqlTypeIdentifier = SqlTypeIdentifier(100 + SQL_CODE_HOUR_TO_MINUTE.raw_value());
+pub const SQL_INTERVAL_HOUR_TO_MINUTE: SqlTypeIdentifier =
+    SqlTypeIdentifier(100 + SQL_CODE_HOUR_TO_MINUTE.raw_value());
 
 /// Number of hours/minutes/seconds between two date/times; p is the interval leading precision and q is the interval seconds precision.
 ///
 /// SQL data type: INTERVAL HOUR(p) TO SECOND(q)
-pub const SQL_INTERVAL_HOUR_TO_SECOND: SqlTypeIdentifier = SqlTypeIdentifier(100 + SQL_CODE_HOUR_TO_SECOND.raw_value());
+pub const SQL_INTERVAL_HOUR_TO_SECOND: SqlTypeIdentifier =
+    SqlTypeIdentifier(100 + SQL_CODE_HOUR_TO_SECOND.raw_value());
 
 /// Number of minutes/seconds between two date/times; p is the interval leading precision and q is the interval seconds precision.
 ///
 /// SQL data type: INTERVAL MINUTE(p) TO SECOND(q)
-pub const SQL_INTERVAL_MINUTE_TO_SECOND: SqlTypeIdentifier = SqlTypeIdentifier(100 + SQL_CODE_MINUTE_TO_SECOND.raw_value());
+pub const SQL_INTERVAL_MINUTE_TO_SECOND: SqlTypeIdentifier =
+    SqlTypeIdentifier(100 + SQL_CODE_MINUTE_TO_SECOND.raw_value());
 
-/// Fixed length GUID.
-///
-/// SQL data type: GUID
-#[cfg(feature = "odbc_version_3_5")]
-pub const SQL_GUID: SqlTypeIdentifier = SqlTypeIdentifier(-11);
-
-#[cfg(feature = "odbc_version_4")]
-pub use SQL_UNKNOWN_TYPE as SQL_VARIANT_TYPE;
-
-#[cfg(feature = "odbc_version_4")]
+#[cfg(feature = "v4")]
 pub const SQL_UDT: SqlTypeIdentifier = SqlTypeIdentifier(17);
 
-#[cfg(feature = "odbc_version_4")]
+#[cfg(feature = "v4")]
 pub const SQL_ROW: SqlTypeIdentifier = SqlTypeIdentifier(19);
 
-#[cfg(feature = "odbc_version_4")]
+#[cfg(feature = "v4")]
 pub const SQL_ARRAY: SqlTypeIdentifier = SqlTypeIdentifier(50);
 
-#[cfg(feature = "odbc_version_4")]
+#[cfg(feature = "v4")]
 pub const SQL_MULTISET: SqlTypeIdentifier = SqlTypeIdentifier(55);
 
-#[cfg(feature = "odbc_version_4")]
-pub const SQL_TYPE_TIME_WITH_TIMEZONE: SqlTypeIdentifier = SqlTypeIdentifier(94);
-
-#[cfg(feature = "odbc_version_4")]
-pub const SQL_TYPE_TIMESTAMP_WITH_TIMEZONE: SqlTypeIdentifier = SqlTypeIdentifier(95);
-
-// TODO: These are verbose types, not exact types
-/// SQL_DESC_CONCISE_TYPE cannot use these values, neither can DATA_TYPE in SQLGetTypeInfo
+// TODO: Should this be SqlTypeIdentifier?
+/// Datetime verbose type identifier.
 pub const SQL_DATETIME: SQLSMALLINT = 9;
+
+// TODO: Should this be SqlTypeIdentifier?
+/// Interval verbose type identifier.
 pub const SQL_INTERVAL: SQLSMALLINT = 10;
 
+// =================================================================================== //
+
 // Subcodes for the specific verbose datetime data type
-const SQL_CODE_DATE: SqlTypeIdentifier = SqlTypeIdentifier(1);
-const SQL_CODE_TIME: SqlTypeIdentifier = SqlTypeIdentifier(2);
-const SQL_CODE_TIMESTAMP: SqlTypeIdentifier = SqlTypeIdentifier(3);
+pub const SQL_CODE_DATE: SqlTypeIdentifier = SqlTypeIdentifier(1);
+pub const SQL_CODE_TIME: SqlTypeIdentifier = SqlTypeIdentifier(2);
+pub const SQL_CODE_TIMESTAMP: SqlTypeIdentifier = SqlTypeIdentifier(3);
 
 // Subcode for the specific verbose interval data type
-const SQL_CODE_YEAR: SqlTypeIdentifier = SqlTypeIdentifier(1);
-const SQL_CODE_MONTH: SqlTypeIdentifier = SqlTypeIdentifier(2);
-const SQL_CODE_DAY: SqlTypeIdentifier = SqlTypeIdentifier(3);
-const SQL_CODE_HOUR: SqlTypeIdentifier = SqlTypeIdentifier(4);
-const SQL_CODE_MINUTE: SqlTypeIdentifier = SqlTypeIdentifier(5);
-const SQL_CODE_SECOND: SqlTypeIdentifier = SqlTypeIdentifier(6);
-const SQL_CODE_YEAR_TO_MONTH: SqlTypeIdentifier = SqlTypeIdentifier(7);
-const SQL_CODE_DAY_TO_HOUR: SqlTypeIdentifier = SqlTypeIdentifier(8);
-const SQL_CODE_DAY_TO_MINUTE: SqlTypeIdentifier = SqlTypeIdentifier(9);
-const SQL_CODE_DAY_TO_SECOND: SqlTypeIdentifier = SqlTypeIdentifier(10);
-const SQL_CODE_HOUR_TO_MINUTE: SqlTypeIdentifier = SqlTypeIdentifier(11);
-const SQL_CODE_HOUR_TO_SECOND: SqlTypeIdentifier = SqlTypeIdentifier(12);
-const SQL_CODE_MINUTE_TO_SECOND: SqlTypeIdentifier = SqlTypeIdentifier(13);
+pub const SQL_CODE_YEAR: SqlTypeIdentifier = SqlTypeIdentifier(1);
+pub const SQL_CODE_MONTH: SqlTypeIdentifier = SqlTypeIdentifier(2);
+pub const SQL_CODE_DAY: SqlTypeIdentifier = SqlTypeIdentifier(3);
+pub const SQL_CODE_HOUR: SqlTypeIdentifier = SqlTypeIdentifier(4);
+pub const SQL_CODE_MINUTE: SqlTypeIdentifier = SqlTypeIdentifier(5);
+pub const SQL_CODE_SECOND: SqlTypeIdentifier = SqlTypeIdentifier(6);
+pub const SQL_CODE_YEAR_TO_MONTH: SqlTypeIdentifier = SqlTypeIdentifier(7);
+pub const SQL_CODE_DAY_TO_HOUR: SqlTypeIdentifier = SqlTypeIdentifier(8);
+pub const SQL_CODE_DAY_TO_MINUTE: SqlTypeIdentifier = SqlTypeIdentifier(9);
+pub const SQL_CODE_DAY_TO_SECOND: SqlTypeIdentifier = SqlTypeIdentifier(10);
+pub const SQL_CODE_HOUR_TO_MINUTE: SqlTypeIdentifier = SqlTypeIdentifier(11);
+pub const SQL_CODE_HOUR_TO_SECOND: SqlTypeIdentifier = SqlTypeIdentifier(12);
+pub const SQL_CODE_MINUTE_TO_SECOND: SqlTypeIdentifier = SqlTypeIdentifier(13);
