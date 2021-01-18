@@ -1,0 +1,22 @@
+[package]
+name = "rs-odbc-sys"
+version = "0.1.0"
+authors = ["Marin Veršić <marin.versic101@gmail.com>"]
+build = "build.rs"
+edition = "2018"
+
+[build-dependencies]
+rustc_version = "*"
+
+[dependencies]
+odbc_derive = {path = "./odbc_derive", version = "*"}
+ucs2 = "0.3.2"
+
+[features]
+default = ["v3_8"]
+static = []
+
+v3_5 = []
+v3_8 = ["v3_5"]
+v4 = ["v3_8"]
+

@@ -7,7 +7,7 @@ use crate::SQLSMALLINT;
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/return-codes-odbc
 /// https://github.com/microsoft/ODBC-Specification/blob/ODBC%204.0.md
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 #[repr(transparent)]
 pub struct SQLRETURN(SQLSMALLINT);
 
