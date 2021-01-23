@@ -1,5 +1,5 @@
 [package]
-name = "rs-odbc-sys"
+name = "rs-odbc"
 version = "0.1.0"
 authors = ["Marin Veršić <marin.versic101@gmail.com>"]
 build = "build.rs"
@@ -9,7 +9,7 @@ edition = "2018"
 rustc_version = "*"
 
 [dependencies]
-odbc_derive = {path = "./odbc_derive", version = "*"}
+rs_odbc_derive = {path = "./rs_odbc_derive", version = "*"}
 ucs2 = "0.3.2"
 
 [features]

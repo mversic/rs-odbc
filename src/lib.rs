@@ -1,33 +1,32 @@
-#![allow(non_camel_case_types)]
-
 pub mod api;
 pub mod c_types;
+pub mod handle;
 pub mod sql_types;
+pub mod sqlchar_str;
 pub mod sqlreturn;
 
-use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
 
 pub use env::{OdbcVersion::*, SQL_ATTR_ODBC_VERSION};
-pub use handle::{SQLHANDLE, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE}; // TODO: SQLHWND
+pub use handle::{
+    SQLHANDLE, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT, SQL_HANDLE_DBC, SQL_HANDLE_DESC,
+    SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE,
+}; // TODO: SQLHWND
+pub use sqlchar_str::SQLCHARString;
 pub use {api::*, c_types::*, sql_types::*, sqlreturn::*};
 
-// TODO: Think about making it newtype with private field for both
-type MutSQLPOINTER = *mut std::ffi::c_void;
-type ConstSQLPOINTER = *const std::ffi::c_void;
+type SQLPOINTER = *mut std::ffi::c_void;
 
 pub trait AsMutPtr<T> {
     fn as_mut_ptr(&mut self) -> *mut T;
 }
-pub trait AsSlice<P, LEN> {
-    // TODO: Could return Self::StrLen instead of LEN???
-    fn as_slice(&self) -> (*const UnsafeCell<Self>, LEN);
+pub trait AsRawParts<P, LEN> {
+    fn as_raw_parts(&self) -> (SQLPOINTER, LEN);
 }
-pub trait AsMutSlice<P, LEN> {
+pub trait AsMutRawSlice<P, LEN> {
     // TODO: Consider extracting StrLen to a separate trait
     type StrLen;
-    // TODO: Could return Self::StrLen instead of LEN???
-    fn as_mut_slice(&mut self) -> (*mut Self, LEN);
+    fn as_mut_raw_slice(&mut self) -> (SQLPOINTER, LEN);
 }
 
 impl AsMutPtr<SQLINTEGER> for MaybeUninit<SQLINTEGER> {
@@ -35,28 +34,23 @@ impl AsMutPtr<SQLINTEGER> for MaybeUninit<SQLINTEGER> {
         self.as_mut_ptr()
     }
 }
-impl AsMutPtr<SQLINTEGER> for MaybeUninit<()> {
-    fn as_mut_ptr(&mut self) -> *mut SQLINTEGER {
+impl<T> AsMutPtr<T> for MaybeUninit<()> {
+    fn as_mut_ptr(&mut self) -> *mut T {
+        // TODO: Is this dangling pointer of?
+        // std::ptr::NonNull::dangling().as_ptr()
         std::ptr::null_mut()
     }
 }
 
 impl AnsiType for SQLUINTEGER {}
 impl UnicodeType for SQLUINTEGER {}
-impl<T> AsMutSlice<T, SQLINTEGER> for SQLUINTEGER {
+impl<T> AsMutRawSlice<T, SQLINTEGER> for SQLUINTEGER {
     type StrLen = ();
-    fn as_mut_slice(&mut self) -> (*mut Self, SQLINTEGER) {
-        (self as *mut _ as *mut _, 0)
+    fn as_mut_raw_slice(&mut self) -> (SQLPOINTER, SQLINTEGER) {
+        (self as *mut _ as SQLPOINTER, 0)
     }
 }
-pub trait AsMutSQLINTEGER {
-    fn as_mut(&mut self) -> &mut SQLINTEGER;
-}
-//impl AsMutSlice for () {
-//    fn as_mut(&mut self) -> &mut SQLINTEGER {
-//        &mut 0
-//    }
-//}
+
 pub trait Attribute {
     type AttributeType;
     type IdentifierType;
@@ -74,346 +68,53 @@ pub trait AsOdbcChar {}
 pub trait AsAscii: AsOdbcChar {}
 pub trait AsUnicode: AsOdbcChar {}
 
+pub trait AsSQLCHARRawSlice<LEN> {
+    #[allow(non_snake_case)]
+    fn as_SQLCHAR_raw_slice(&self) -> (*const SQLCHAR, LEN);
+}
+pub trait AsMutSQLCHARRawSlice<LEN> {
+    //type InitializedType;
+    #[allow(non_snake_case)]
+    fn as_mut_SQLCHAR_raw_slice(&mut self) -> (*mut SQLCHAR, LEN);
+    //unsafe fn assume_init(self) -> Self::InitializedType;
+}
+impl AsSQLCHARRawSlice<SQLSMALLINT> for str {
+    #[allow(non_snake_case)]
+    fn as_SQLCHAR_raw_slice(&self) -> (*const SQLCHAR, SQLSMALLINT) {
+        (self.as_ptr(), self.len() as SQLSMALLINT)
+    }
+}
+
+// TODO: Maybe implement something like this?
+//impl<const M: usize> AsMutSQLCHARRawSlice<SQLSMALLINT> for [MaybeUninit<SQLCHAR>; M] {
+//    type InitializedType = [SQLCHAR; M];
+//
+//    fn as_mut_SQLCHAR_raw_slice(&mut self) -> (*mut SQLCHAR, SQLSMALLINT) {
+//        unimplemented!()
+//    }
+//    unsafe fn assume_init(self) -> Self::InitializedType {
+//        let mut nul_mark_found = false;
+//
+//        self.iter_mut().for_each(|x| {
+//            if nul_mark_found {
+//                if *x.as_mut_ptr() == 0 {
+//                    nul_mark_found = true;
+//                }
+//            } else {
+//                std::ptr::write(x.as_mut_ptr(), 0);
+//            }
+//        });
+//
+//        std::mem::transmute::<_, Self::InitializedType>(self)
+//    }
+//}
+
 // TODO: Comapare attribute types: <attribute>(type, default)
 // SQL_ATTR_OUTPUT_NTS(i32, true)
+#[allow(non_camel_case_types)]
 pub enum OdbcBool {
     SQL_FALSE = 0,
     SQL_TRUE = 1,
-}
-
-pub mod handle {
-    use super::conn::{ConnState, C1, C4};
-    use super::desc::{DescState, D1};
-    use super::env::{EnvState, E1};
-    use super::stmt::{StmtState, S1};
-    use crate::api::FreeHandle;
-    use crate::{SQLSMALLINT, SQL_SUCCESS};
-    use std::marker::PhantomData;
-    use std::mem::MaybeUninit;
-    use std::thread::panicking;
-
-    pub trait Version {}
-    pub trait KnownVersion: Version {}
-    pub enum V_UNDEFINED {}
-    impl Version for V_UNDEFINED {}
-
-    pub enum V3 {}
-    impl Version for V3 {}
-    impl KnownVersion for V3 {}
-
-    pub enum V3_8 {}
-    impl Version for V3_8 {}
-    impl KnownVersion for V3_8 {}
-
-    pub enum V4 {}
-    impl Version for V4 {}
-    impl KnownVersion for V4 {}
-
-    pub trait AsSQLHANDLE {
-        fn as_SQLHANDLE(&mut self) -> SQLHANDLE;
-    }
-
-    pub trait Handle: AsSQLHANDLE {
-        fn identifier() -> SQLSMALLINT;
-    }
-
-    pub trait Allocate<'env: 'conn, 'conn>: Handle {
-        type SrcHandle: Handle;
-    }
-
-    pub trait SQLCancelHandle: Handle {}
-    pub trait SQLCompleteAsyncHandle: Handle {}
-    pub trait SQLEndTranHandle: Handle {}
-
-    //pub struct SQL_HANDLE_ENV;
-    //impl HandleIdentifier for SQL_HANDLE_ENV {
-    //    fn identifier() -> SQLSMALLINT { 1 }
-    //}
-
-    //pub struct SQL_HANDLE_DBC;
-    //impl HandleIdentifier for SQL_HANDLE_DBC {
-    //    fn identifier() -> SQLSMALLINT { 2 }
-    //}
-
-    //pub struct SQL_HANDLE_STMT;
-    //impl HandleIdentifier for SQL_HANDLE_STMT {
-    //    fn identifier() -> SQLSMALLINT { 3 }
-    //}
-
-    //pub struct SQL_HANDLE_DESC;
-    //impl HandleIdentifier for SQL_HANDLE_DESC {
-    //    fn identifier() -> SQLSMALLINT { 4 }
-    //}
-
-    // TODO: But must it not be a void* in the end? It is void* in unixODBC
-    // TODO: Check https://github.com/microsoft/ODBC-Specification/blob/b7ef71fba508ed010cd979428efae3091b732d75/Windows/inc/sqltypes.h
-    #[repr(C)]
-    //#[cfg(feature = "RUSTC_IS_STABLE")]
-    pub struct RawHandle {
-        _private: [u8; 0],
-    }
-    //#[cfg(feature = "RUSTC_IS_NIGHTLY")]
-    //pub extern type RawHandle;
-
-    // TODO: Think about making it newtype with private field
-    // This type must not be public ever because of the issues around Drop
-    pub type SQLHANDLE = *mut RawHandle;
-
-    pub type HENV = SQLHANDLE;
-    type HDBC = SQLHANDLE;
-    type HSTMT = SQLHANDLE;
-    type HDESC = SQLHANDLE;
-
-    /// An environment is a global context which holds information such as:
-    /// * The environment's state
-    /// * The current environment-level diagnostics
-    /// * The handles of connections currently allocated on the environment
-    /// * The current settings of each environment attribute
-    ///
-    /// Environment handle is always used in calls to SQLDataSources and SQLDrivers and
-    /// sometimes in calls to SQLAllocHandle, SQLEndTran, SQLFreeHandle, SQLGetDiagField, and
-    /// SQLGetDiagRec.
-    ///
-    /// # Documentation
-    /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/environment-handles
-    #[repr(transparent)]
-    pub struct SQLHENV<V: Version, E: EnvState> {
-        pub handle: SQLHANDLE,
-        version: PhantomData<V>,
-        state: PhantomData<E>,
-    }
-    impl SQLHENV<V_UNDEFINED, E1> {
-        pub fn new() -> MaybeUninit<Self> {
-            MaybeUninit::uninit()
-        }
-    }
-    impl<T: KnownVersion> From<SQLHENV<V_UNDEFINED, E1>> for SQLHENV<T, E1> {
-        fn from(source: SQLHENV<V_UNDEFINED, E1>) -> Self {
-            let source = std::mem::ManuallyDrop::new(source);
-            Self {
-                handle: source.handle,
-                version: PhantomData,
-                state: PhantomData,
-            }
-        }
-    }
-    impl<V: Version, E: EnvState> Handle for SQLHENV<V, E> {
-        fn identifier() -> SQLSMALLINT {
-            1
-        }
-    }
-    impl<'env: 'conn, 'conn> Allocate<'env, 'conn> for SQLHENV<V_UNDEFINED, E1> {
-        type SrcHandle = SQL_NULL_HANDLE;
-    }
-    impl<V: KnownVersion> SQLEndTranHandle for SQLHENV<V, E1> {}
-    impl<V: Version, E: EnvState> AsSQLHANDLE for SQLHENV<V, E> {
-        #[allow(non_snake_case)]
-        fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
-            self.handle
-        }
-    }
-    impl<V: Version, E: EnvState> Drop for SQLHENV<V, E> {
-        fn drop(&mut self) {
-            let ret = unsafe { FreeHandle(Self::identifier(), self.as_SQLHANDLE()) };
-
-            if ret != SQL_SUCCESS && !panicking() {
-                panic!("SQLFreeHandle returned: {:?}", ret)
-            }
-        }
-    }
-
-    /// Connection handle identifies a structure that contains connection information, such as the following:
-    /// * The state of the connection
-    /// * The current connection-level diagnostics
-    /// * The handles of statements and descriptors currently allocated on the connection
-    /// * The current settings of each connection attribute
-    ///
-    /// Connection handle is used when:
-    /// * Connecting to the data source (SQLConnect, SQLDriverConnect, or SQLBrowseConnect)
-    /// * Disconnecting from the data source (SQLDisconnect)
-    /// * Getting information about the driver and data source (SQLGetInfo)
-    /// * Retrieving diagnostics (SQLGetDiagField and SQLGetDiagRec) * Performing transactions (SQLEndTran)
-    /// * Setting and getting connection attributes (SQLSetConnectAttr and SQLGetConnectAttr)
-    /// * Getting the native format of an SQL statement (SQLNativeSql)
-    ///
-    /// Connection handles are allocated with SQLAllocHandle and freed with SQLFreeHandle.
-    ///
-    /// # Documentation
-    /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/connection-handles
-    #[repr(transparent)]
-    pub struct SQLHDBC<'env, V: KnownVersion, C: ConnState> {
-        handle: SQLHANDLE,
-        version: PhantomData<V>,
-        state: PhantomData<C>,
-        parent: PhantomData<&'env SQLHENV<V, E1>>,
-    }
-    impl<'env: 'conn, 'conn, V: KnownVersion> Allocate<'env, 'conn> for SQLHDBC<'env, V, C1> {
-        type SrcHandle = SQLHENV<V, E1>;
-    }
-    impl<V: KnownVersion, C: ConnState> Handle for SQLHDBC<'_, V, C> {
-        fn identifier() -> SQLSMALLINT {
-            2
-        }
-    }
-    impl<V: KnownVersion> SQLHDBC<'_, V, C1> {
-        pub fn new() -> MaybeUninit<Self> {
-            MaybeUninit::uninit()
-        }
-    }
-    impl<V: KnownVersion, C: ConnState> SQLCancelHandle for SQLHDBC<'_, V, C> {}
-    impl<V: KnownVersion, C: ConnState> SQLCompleteAsyncHandle for SQLHDBC<'_, V, C> {}
-    impl<V: KnownVersion, C: ConnState> SQLEndTranHandle for SQLHDBC<'_, V, C> {}
-    impl<V: KnownVersion, C: ConnState> AsSQLHANDLE for SQLHDBC<'_, V, C> {
-        #[allow(non_snake_case)]
-        fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
-            self.handle
-        }
-    }
-    impl<V: KnownVersion, C: ConnState> Drop for SQLHDBC<'_, V, C> {
-        fn drop(&mut self) {
-            let ret = unsafe { FreeHandle(Self::identifier(), self.as_SQLHANDLE()) };
-
-            if ret != SQL_SUCCESS && !panicking() {
-                panic!("SQLFreeHandle -> {:?}", ret)
-            }
-        }
-    }
-
-    /// Statement handle consists of all of the information associated with a SQL statement,
-    /// such as any result sets created by the statement and parameters used in the execution
-    /// of the statement. A statement is associated with a single connection, and there can be
-    /// multiple statements on that connection. The statement handle contains statement
-    /// information, such as:
-    /// * The statement's state
-    /// * The current statement-level diagnostics
-    /// * The addresses of the application variables bound to the statement's parameters and result set columns
-    /// * The current settings of each statement attribute
-    ///
-    /// Statement handles are used in most ODBC functions. Notably, they are used:
-    /// * to bind parameters and result set columns (SQLBindParameter and SQLBindCol)
-    /// * to prepare and execute statements (SQLPrepare, SQLExecute, and SQLExecDirect)
-    /// * to retrieve metadata (SQLColAttribute and SQLDescribeCol)
-    /// * to fetch results (SQLFetch), and retrieve diagnostics (SQLGetDiagField and SQLGetDiagRec)
-    /// * in catalog functions (SQLColumns, SQLTables, ...)
-    /// * in number of other functions.
-    ///
-    /// Statement handles are allocated with SQLAllocHandle and freed with SQLFreeHandle.
-    ///
-    /// # Documentation
-    /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/statement-handles
-    #[repr(transparent)]
-    pub struct SQLHSTMT<'env: 'conn, 'conn, V: KnownVersion, S: StmtState> {
-        handle: SQLHANDLE,
-        version: PhantomData<V>,
-        state: PhantomData<S>,
-        parent: PhantomData<&'conn SQLHDBC<'env, V, C4>>,
-    }
-    impl<V: KnownVersion> SQLHSTMT<'_, '_, V, S1> {
-        pub fn new() -> MaybeUninit<Self> {
-            MaybeUninit::uninit()
-        }
-    }
-    // TODO: Why is this 'env + bound required here on Version?
-    impl<'env: 'conn, 'conn, V: 'env + KnownVersion> Allocate<'env, 'conn> for SQLHSTMT<'_, '_, V, S1> {
-        type SrcHandle = SQLHDBC<'env, V, C4>;
-    }
-    impl<V: KnownVersion, S: StmtState> Handle for SQLHSTMT<'_, '_, V, S> {
-        fn identifier() -> SQLSMALLINT {
-            3
-        }
-    }
-    impl<V: KnownVersion, S: StmtState> SQLCancelHandle for SQLHSTMT<'_, '_, V, S> {}
-    impl<V: KnownVersion, S: StmtState> SQLCompleteAsyncHandle for SQLHSTMT<'_, '_, V, S> {}
-    impl<V: KnownVersion, S: StmtState> AsSQLHANDLE for SQLHSTMT<'_, '_, V, S> {
-        #[allow(non_snake_case)]
-        fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
-            self.handle
-        }
-    }
-    impl<V: KnownVersion, S: StmtState> Drop for SQLHSTMT<'_, '_, V, S> {
-        fn drop(&mut self) {
-            let ret = unsafe { FreeHandle(Self::identifier(), self.as_SQLHANDLE()) };
-
-            if ret != SQL_SUCCESS && !panicking() {
-                panic!("SQLFreeHandle returned: {:?}", ret)
-            }
-        }
-    }
-
-    /// A descriptor is a collection of metadata that describes the parameters of an SQL
-    /// statement or the columns of a result set. Thus, a descriptor can fill four roles:
-    /// * (APD)Application Parameter Descriptor:
-    ///     Contains information about the application buffers bound to the parameters in an
-    ///     SQL statement, such as their addresses, lengths, and C data types.
-    /// * (IPD)Implementation Parameter Descriptor:
-    ///     Contains information about the parameters in an SQL statement, such as their SQL
-    ///     data types, lengths, and nullability.
-    /// * (ARD)Application Row Descriptor:
-    ///     Contains information about the application buffers bound to the columns in a
-    ///     result set, such as their addresses, lengths, and C data types.
-    /// * (IRD)Implementation Row Descriptor:
-    ///     Contains information about the columns in a result set, such as their SQL data
-    ///     types, lengths, and nullability.
-    ///
-    /// Four descriptors are allocated automatically when a statement is allocated, but
-    /// applications can also allocate descriptors with SQLAllocHandle. They are allocated on
-    /// a connection and can be associated with one or more statements on that connection to
-    /// fulfill the role of an APD or ARD on those statements.
-    ///
-    /// # Documentation
-    /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/descriptor-handles
-    #[repr(transparent)]
-    pub struct SQLHDESC<'env: 'conn, 'conn, V: KnownVersion, D: DescState> {
-        handle: SQLHANDLE,
-        version: PhantomData<V>,
-        state: PhantomData<D>,
-        parent: PhantomData<&'conn SQLHDBC<'env, V, C4>>,
-    }
-    impl<V: KnownVersion> SQLHDESC<'_, '_, V, D1> {
-        pub fn new() -> MaybeUninit<Self> {
-            MaybeUninit::uninit()
-        }
-    }
-    impl<'env: 'conn, 'conn, V: KnownVersion> Allocate<'env, 'conn> for SQLHDESC<'env, 'conn, V, D1> {
-        type SrcHandle = SQLHDBC<'env, V, C4>;
-    }
-    impl<V: KnownVersion, D: DescState> Handle for SQLHDESC<'_, '_, V, D> {
-        fn identifier() -> SQLSMALLINT {
-            4
-        }
-    }
-    impl<V: KnownVersion, D: DescState> AsSQLHANDLE for SQLHDESC<'_, '_, V, D> {
-        #[allow(non_snake_case)]
-        fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
-            self.handle
-        }
-    }
-    impl<V: KnownVersion, D: DescState> Drop for SQLHDESC<'_, '_, V, D> {
-        fn drop(&mut self) {
-            let ret = unsafe { FreeHandle(Self::identifier(), self.as_SQLHANDLE()) };
-
-            if ret != SQL_SUCCESS && !panicking() {
-                panic!("SQLFreeHandle returned: {:?}", ret)
-            }
-        }
-    }
-
-    pub struct SQL_NULL_HANDLE;
-    impl Handle for SQL_NULL_HANDLE {
-        fn identifier() -> SQLSMALLINT {
-            0
-        }
-    }
-    impl AsSQLHANDLE for SQL_NULL_HANDLE {
-        #[allow(non_snake_case)]
-        fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
-            std::ptr::null_mut()
-        }
-    }
-
-    // TODO: Check https://github.com/microsoft/ODBC-Specification/blob/b7ef71fba508ed010cd979428efae3091b732d75/Windows/inc/sqltypes.h
-    // This is unixOBDC value
-    //type SQLHWND = MutSQLPOINTER;
 }
 
 // TODO
@@ -422,27 +123,22 @@ pub mod handle {
 // SQL_NO_TOTAL = -4,
 
 pub mod env {
-    use super::{
-        AnsiType, AsMutSlice, AsSlice, Attribute, GetAttr, OdbcAttribute, OdbcBool, SetAttr,
-        UnsafeCell, SQLINTEGER, SQLUINTEGER,
-    };
-    use odbc_derive::{AnsiType, EnvAttribute};
-    use std::convert::TryFrom;
+    use super::{AnsiType, AsRawParts, Attribute, GetAttr, OdbcAttribute, OdbcBool, SetAttr};
+    use crate::{SQLINTEGER, SQLPOINTER, SQLUINTEGER};
+    use rs_odbc_derive::{AnsiType, EnvAttribute, EqSQLUINTEGER};
 
     // TODO: ValuePtr must be a null-terminated string for EnvAttr
     pub trait EnvAttribute: Attribute<IdentifierType = SQLINTEGER> {}
 
-    pub trait EnvState {}
-    pub struct E1;
-    impl EnvState for E1 {}
-
     #[identifier(200)]
     #[derive(EnvAttribute)]
+    #[allow(non_camel_case_types)]
     pub struct SQL_ATTR_ODBC_VERSION;
     impl SetAttr<OdbcVersion> for SQL_ATTR_ODBC_VERSION {}
     impl GetAttr<SQLUINTEGER> for SQL_ATTR_ODBC_VERSION {}
 
-    #[derive(AnsiType, Clone, Copy)]
+    #[allow(non_camel_case_types)]
+    #[derive(EqSQLUINTEGER, AnsiType, Debug, PartialEq, Eq, Clone, Copy)]
     pub enum OdbcVersion {
         SQL_OV_ODBC3 = 3,
         #[cfg(feature = "v3_8")]
@@ -450,108 +146,63 @@ pub mod env {
         #[cfg(feature = "v4")]
         SQL_OV_ODBC4 = 400,
     }
-
-    impl AsSlice<OdbcAttribute, SQLINTEGER> for OdbcVersion {
-        fn as_slice(&self) -> (*const UnsafeCell<Self>, SQLINTEGER) {
-            // TODO: What is len type?
-            (*self as SQLUINTEGER as *const _, 0)
-        }
-    }
-    impl TryFrom<SQLUINTEGER> for OdbcVersion {
-        type Error = SQLUINTEGER;
-
-        fn try_from(source: SQLUINTEGER) -> Result<Self, Self::Error> {
-            unimplemented!()
-        }
-    }
-    impl PartialEq<SQLUINTEGER> for OdbcVersion {
-        fn eq(&self, other: &SQLUINTEGER) -> bool {
-            *self as SQLUINTEGER == *other
-        }
-    }
-    impl PartialEq<OdbcVersion> for SQLUINTEGER {
-        fn eq(&self, other: &OdbcVersion) -> bool {
-            other == self
+    impl AsRawParts<OdbcAttribute, SQLINTEGER> for OdbcVersion {
+        fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
+            (*self as SQLUINTEGER as SQLPOINTER, 0)
         }
     }
 
     #[identifier(201)]
     #[derive(EnvAttribute)]
     #[cfg(feature = "v3_8")]
+    #[allow(non_camel_case_types)]
     pub struct SQL_ATTR_CONNECTION_POOLING;
+    #[cfg(feature = "v3_8")]
     impl SetAttr<ConnectionPooling> for SQL_ATTR_CONNECTION_POOLING {}
+    #[cfg(feature = "v3_8")]
     impl GetAttr<SQLUINTEGER> for SQL_ATTR_CONNECTION_POOLING {}
 
-    #[derive(AnsiType, Clone, Copy)]
+    #[cfg(feature = "v3_8")]
+    #[allow(non_camel_case_types)]
+    #[derive(EqSQLUINTEGER, AnsiType, Debug, PartialEq, Eq, Clone, Copy)]
     pub enum ConnectionPooling {
         SQL_CP_OFF = 0,
         SQL_CP_ONE_PER_DRIVER = 1,
         SQL_CP_ONE_PER_HENV = 2,
         SQL_CP_DRIVER_AWARE = 3,
     }
+    #[cfg(feature = "v3_8")]
     pub use ConnectionPooling::SQL_CP_OFF as SQL_CP_DEFAULT;
 
-    impl AsSlice<OdbcAttribute, SQLINTEGER> for ConnectionPooling {
-        fn as_slice(&self) -> (*const UnsafeCell<Self>, SQLINTEGER) {
-            // TODO: What is len type?
-            (*self as SQLUINTEGER as *mut _, 0)
-        }
-    }
-    impl TryFrom<SQLUINTEGER> for ConnectionPooling {
-        type Error = SQLUINTEGER;
-
-        fn try_from(source: SQLUINTEGER) -> Result<Self, Self::Error> {
-            unimplemented!()
-        }
-    }
-    impl PartialEq<SQLUINTEGER> for ConnectionPooling {
-        fn eq(&self, other: &SQLUINTEGER) -> bool {
-            *self as SQLUINTEGER == *other
-        }
-    }
-    impl PartialEq<ConnectionPooling> for SQLUINTEGER {
-        fn eq(&self, other: &ConnectionPooling) -> bool {
-            other == self
+    #[cfg(feature = "v3_8")]
+    impl AsRawParts<OdbcAttribute, SQLINTEGER> for ConnectionPooling {
+        fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
+            (*self as SQLUINTEGER as SQLPOINTER, 0)
         }
     }
 
     #[identifier(202)]
     #[derive(EnvAttribute)]
+    #[allow(non_camel_case_types)]
     pub struct SQL_ATTR_CP_MATCH;
     impl SetAttr<CpMatch> for SQL_ATTR_CP_MATCH {}
     impl GetAttr<SQLUINTEGER> for SQL_ATTR_CP_MATCH {}
 
-    #[derive(AnsiType, Clone, Copy)]
+    #[allow(non_camel_case_types)]
+    #[derive(EqSQLUINTEGER, AnsiType, Debug, PartialEq, Eq, Clone, Copy)]
     pub enum CpMatch {
         SQL_CP_STRICT_MATCH = 0,
         SQL_CP_RELAXED_MATCH = 1,
     }
     pub use CpMatch::SQL_CP_STRICT_MATCH as SQL_CP_MATCH_DEFAULT;
 
-    impl AsSlice<OdbcAttribute, SQLINTEGER> for CpMatch {
-        fn as_slice(&self) -> (*const UnsafeCell<Self>, SQLINTEGER) {
-            // TODO: What is len type?
-            (*self as SQLUINTEGER as *mut _, 0)
-        }
-    }
-    impl TryFrom<SQLUINTEGER> for CpMatch {
-        type Error = SQLUINTEGER;
-
-        fn try_from(source: SQLUINTEGER) -> Result<Self, Self::Error> {
-            unimplemented!()
-        }
-    }
-    impl PartialEq<SQLUINTEGER> for CpMatch {
-        fn eq(&self, other: &SQLUINTEGER) -> bool {
-            *self as SQLUINTEGER == *other
-        }
-    }
-    impl PartialEq<CpMatch> for SQLUINTEGER {
-        fn eq(&self, other: &CpMatch) -> bool {
-            other == self
+    impl AsRawParts<OdbcAttribute, SQLINTEGER> for CpMatch {
+        fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
+            (*self as SQLUINTEGER as SQLPOINTER, 0)
         }
     }
 
+    // TODO:
     // For private driver manager
     // #[identifier(203)]
     // #[derive(EnvAttribute)]
@@ -564,6 +215,7 @@ pub mod env {
 
     #[identifier(1001)]
     #[derive(EnvAttribute)]
+    #[allow(non_camel_case_types)]
     pub struct SQL_ATTR_OUTPUT_NTS;
     impl SetAttr<OdbcBool> for SQL_ATTR_OUTPUT_NTS {}
     impl GetAttr<SQLINTEGER> for SQL_ATTR_OUTPUT_NTS {}
@@ -574,11 +226,19 @@ pub mod conn {
     //    pub use super::{GetAttr, AsAscii, AsUnicode};
     //    pub trait ConnAttribute: Attribute<IdentifierType=SQLINTEGER> {}
 
-    pub trait ConnState {}
-    pub enum C1 {}
-    impl ConnState for C1 {}
+    pub trait ConnState {
+        fn connected() -> bool {
+            false
+        }
+    }
+    pub enum C2 {}
+    impl ConnState for C2 {}
     pub enum C4 {}
-    impl ConnState for C4 {}
+    impl ConnState for C4 {
+        fn connected() -> bool {
+            true
+        }
+    }
 
     //    #[deprecated]
     //    enum ConnectionAttr {
@@ -681,8 +341,8 @@ pub mod conn {
     //    #[identifier(1207)]
     //    #[derive(ConnAttribute)]
     //    pub struct SQL_ATTR_ENLIST_IN_DTC;
-    //    impl GetAttr<MutSQLPOINTER> for SQL_ATTR_ENLIST_IN_DTC {}
-    //    impl SetAttr<ConstSQLPOINTER> for SQL_ATTR_ENLIST_IN_DTC {}
+    //    impl GetAttr<SQLPOINTER> for SQL_ATTR_ENLIST_IN_DTC {}
+    //    impl SetAttr<SQLPOINTER> for SQL_ATTR_ENLIST_IN_DTC {}
     //
     //    pub enum EnlistInDtc {
     //        SQL_DTC_DONE = 0,
@@ -834,14 +494,14 @@ pub mod conn {
     //    #[derive(ConnAttribute)]
     //    pub struct SQL_ATTR_DBC_INFO_TOKEN;
     //    // This is set-only attribute
-    //    impl SetAttr<ConstSQLPOINTER> for SQL_ATTR_DBC_INFO_TOKEN {}
+    //    impl SetAttr<SQLPOINTER> for SQL_ATTR_DBC_INFO_TOKEN {}
     //
     //    #[identifier(119)]
     //    #[cfg(feature = "v3_8")]
     //    #[derive(ConnAttribute)]
     //    pub struct SQL_ATTR_ASYNC_DBC_EVENT;
     //    // TODO: It's an Event handle. Should probably implement event handle
-    //    impl GetAttr<MutSQLPOINTER> for SQL_ATTR_ASYNC_DBC_EVENT {}
+    //    impl GetAttr<SQLPOINTER> for SQL_ATTR_ASYNC_DBC_EVENT {}
     //
     //    // TODO: It is not 3.5 in implementation ???
     //    // but it says that drivers conforming to earlier versions can support this field. HMMMMMMMMMMM

@@ -1,5 +1,5 @@
 [package]
-name = "odbc_derive"
+name = "rs_odbc_derive"
 version = "0.1.0"
 authors = ["Marin Veršić <marin.versic101@gmail.com>"]
 edition = "2018"

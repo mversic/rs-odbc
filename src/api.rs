@@ -1,12 +1,13 @@
 use crate::{
     env::EnvAttribute,
-    handle::Allocate,
-    handle::{AsSQLHANDLE, Version, HENV, V3_8},
-    AnsiType, AsMutPtr, AsMutSQLINTEGER, AsMutSlice, AsSlice, ConstSQLPOINTER, GetAttr,
-    MutSQLPOINTER, OdbcAttribute, SetAttr, SQLHANDLE, SQLHENV, SQLINTEGER, SQLRETURN, SQLSMALLINT,
+    handle::{HandleIdentifier, Allocate, AsSQLHANDLE, KnownVersion, HDBC, HENV, SQLHDBC},
+    AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLCHARRawSlice, AsRawParts, AsSQLCHARRawSlice,
+    GetAttr, OdbcAttribute, SetAttr, SQLCHAR, SQLHANDLE, SQLHENV, SQLINTEGER, SQLPOINTER,
+    SQLRETURN, SQLSMALLINT, SQLUSMALLINT,
 };
 use std::mem::MaybeUninit;
 
+// TODO: Fix linking
 // static linking is not currently supported here for windows
 #[cfg_attr(windows, link(name = "odbc32"))]
 #[cfg_attr(all(not(windows), not(r#static)), link(name = "odbc"))]
@@ -26,7 +27,7 @@ extern "system" {
     fn SetEnvAttr(
         EnvironmentHandle: HENV,
         Attribute: SQLINTEGER,
-        ValuePtr: ConstSQLPOINTER,
+        ValuePtr: SQLPOINTER,
         StringLength: SQLINTEGER,
     ) -> SQLRETURN;
 
@@ -34,72 +35,116 @@ extern "system" {
     fn GetEnvAttr(
         EnvironmentHandle: HENV,
         Attribute: SQLINTEGER,
-        ValuePtr: MutSQLPOINTER,
+        ValuePtr: SQLPOINTER,
         BufferLength: SQLINTEGER,
         StringLengthPtr: *mut SQLINTEGER,
     ) -> SQLRETURN;
+
+    #[link_name = "SQLDriverConnectA"]
+    fn DriverConnectA(
+        ConnectionHandle: HDBC,
+        WindowHandle: SQLHANDLE,
+        InConnectionString: *const SQLCHAR,
+        StringLength1: SQLSMALLINT,
+        OutConnectionString: *mut SQLCHAR,
+        BufferLength: SQLSMALLINT,
+        StringLength2Ptr: *mut SQLSMALLINT,
+        DriverCompletion: SQLUSMALLINT,
+    ) -> SQLRETURN;
+
+    #[link_name = "SQLDisconnect"]
+    pub(crate) fn Disconnect(ConnectionHandle: HDBC) -> SQLRETURN;
 }
 
 #[inline]
-pub fn SQLAllocHandle<'a: 'src, 'src, OH: Allocate<'a, 'src>>(
+pub fn SQLAllocHandle<'a, 'src, OH: Allocate<'a, 'src>>(
+    HandleType: OH::Identifier,
     InputHandle: &'src mut OH::SrcHandle,
-    mut OutputHandlePtr: MaybeUninit<OH>,
-) -> (OH, SQLRETURN) {
+    OutputHandlePtr: &mut MaybeUninit<OH>,
+) -> SQLRETURN {
     unsafe {
-        let ret = AllocHandle(
-            OH::identifier(),
+        AllocHandle(
+            OH::Identifier::identifier(),
             InputHandle.as_SQLHANDLE(),
             OutputHandlePtr.as_mut_ptr().cast(),
-        );
-        (OutputHandlePtr.assume_init(), ret)
+        )
     }
 }
 
 #[inline]
 pub fn SQLSetEnvAttr<A: EnvAttribute, T: AnsiType>(
-    mut EnvironmentHandle: SQLHENV<crate::handle::V_UNDEFINED, crate::env::E1>,
+    EnvironmentHandle: &mut SQLHENV<crate::handle::V_UNDEFINED>,
     Attribute: A,
     ValuePtr: &T,
-) -> (SQLHENV<V3_8, crate::env::E1>, SQLRETURN)
+) -> SQLRETURN
 where
     A: SetAttr<T>,
-    T: AsSlice<OdbcAttribute, SQLINTEGER>,
+    T: AsRawParts<OdbcAttribute, SQLINTEGER>,
 {
-    let ValuePtr = ValuePtr.as_slice();
+    let ValuePtr = ValuePtr.as_raw_parts();
 
-    let ret = unsafe {
+    unsafe {
         SetEnvAttr(
             EnvironmentHandle.as_SQLHANDLE(),
             A::identifier(),
-            ValuePtr.0.cast(),
+            ValuePtr.0,
             ValuePtr.1,
         )
-    };
-
-    (EnvironmentHandle.into(), ret)
+    }
 }
 
 #[inline]
-pub fn SQLGetEnvAttr<V: Version, A: EnvAttribute, T: AnsiType>(
-    EnvironmentHandle: &mut SQLHENV<V, crate::env::E1>,
+pub fn SQLGetEnvAttr<V: KnownVersion, A: EnvAttribute, T: AnsiType>(
+    EnvironmentHandle: &mut SQLHENV<V>,
     Attribute: A,
     ValuePtr: &mut T,
     StringLengthPtr: &mut MaybeUninit<T::StrLen>,
 ) -> SQLRETURN
 where
     A: GetAttr<T>,
-    T: AsMutSlice<OdbcAttribute, SQLINTEGER>,
+    T: AsMutRawSlice<OdbcAttribute, SQLINTEGER>,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
-    let ValuePtr = ValuePtr.as_mut_slice();
+    let ValuePtr = ValuePtr.as_mut_raw_slice();
 
     unsafe {
         GetEnvAttr(
             EnvironmentHandle.as_SQLHANDLE(),
             A::identifier(),
-            ValuePtr.0.cast(),
+            ValuePtr.0,
             ValuePtr.1,
             StringLengthPtr.as_mut_ptr().cast(),
         )
+    }
+}
+
+pub fn SQLDriverConnectA<
+    V: crate::handle::KnownVersion,
+    C: AsSQLCHARRawSlice<SQLSMALLINT> + ?Sized,
+    MC: AsMutSQLCHARRawSlice<SQLSMALLINT>,
+>(
+    ConnectionHandle: &mut SQLHDBC<V, crate::conn::C2>,
+    WindowHandle: Option<SQLHANDLE>,
+    InConnectionString: &C,
+    OutConnectionString: &mut MC,
+    StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
+    DriverCompletion: SQLUSMALLINT,
+) -> SQLRETURN {
+    let InConnectionString = InConnectionString.as_SQLCHAR_raw_slice();
+    let OutConnectionString = OutConnectionString.as_mut_SQLCHAR_raw_slice();
+
+    unsafe {
+        let res = DriverConnectA(
+            ConnectionHandle.as_SQLHANDLE(),
+            std::ptr::null_mut(),
+            InConnectionString.0,
+            InConnectionString.1,
+            OutConnectionString.0,
+            OutConnectionString.1,
+            StringLength2Ptr.as_mut_ptr(),
+            DriverCompletion,
+        );
+
+        res
     }
 }
