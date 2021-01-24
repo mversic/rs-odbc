@@ -5,6 +5,7 @@ use crate::{
     DriverCompletion, GetAttr, OdbcAttribute, SetAttr, SQLCHAR, SQLHANDLE, SQLHENV, SQLINTEGER,
     SQLPOINTER, SQLRETURN, SQLSMALLINT, SQLUSMALLINT,
 };
+use crate::handle::AsMutSQLHANDLE;
 use std::mem::MaybeUninit;
 
 // TODO: Fix linking
@@ -59,7 +60,7 @@ extern "system" {
 #[inline]
 pub fn SQLAllocHandle<'src, OH: Allocate<'src>>(
     HandleType: OH::Identifier,
-    InputHandle: &'src mut OH::SrcHandle,
+    InputHandle: &'src OH::SrcHandle,
     OutputHandlePtr: &mut MaybeUninit<OH>,
 ) -> SQLRETURN
 where
@@ -67,7 +68,13 @@ where
 {
     unsafe {
         AllocHandle(
-            OH::Identifier::identifier(),
+            OH::Identifier::IDENTIFIER,
+            // TODO: Is this UB? Handle will be modified on the extern C side but it's passed
+            // here from shared reference. It has to be shared reference to be able to allocate
+            // multiple children. To resolve the issue RefCell with PhantomData<Ref<'src, T>>
+            // can be used, but it's hard to implement
+            //
+            // Also, what about multithreaded code?
             InputHandle.as_SQLHANDLE(),
             OutputHandlePtr.as_mut_ptr().cast(),
         )
@@ -88,8 +95,8 @@ where
 
     unsafe {
         SetEnvAttr(
-            EnvironmentHandle.as_SQLHANDLE(),
-            A::identifier(),
+            EnvironmentHandle.as_mut_SQLHANDLE(),
+            A::IDENTIFIER,
             ValuePtr.0,
             ValuePtr.1,
         )
@@ -97,7 +104,7 @@ where
 }
 
 pub fn SQLGetEnvAttr<A: EnvAttribute, T: AnsiType>(
-    EnvironmentHandle: &mut SQLHENV,
+    EnvironmentHandle: &SQLHENV,
     Attribute: A,
     ValuePtr: &mut T,
     StringLengthPtr: &mut MaybeUninit<T::StrLen>,
@@ -112,7 +119,7 @@ where
     unsafe {
         GetEnvAttr(
             EnvironmentHandle.as_SQLHANDLE(),
-            A::identifier(),
+            A::IDENTIFIER,
             ValuePtr.0,
             ValuePtr.1,
             StringLengthPtr.as_mut_ptr().cast(),
@@ -136,7 +143,7 @@ pub fn SQLDriverConnectA<
 
     unsafe {
         let res = DriverConnectA(
-            ConnectionHandle.as_SQLHANDLE(),
+            ConnectionHandle.as_mut_SQLHANDLE(),
             std::ptr::null_mut(),
             InConnectionString.0,
             InConnectionString.1,
@@ -148,4 +155,8 @@ pub fn SQLDriverConnectA<
 
         res
     }
+}
+
+pub fn SQLDisconnect(ConnectionHandle: &mut SQLHDBC) -> SQLRETURN {
+    unsafe{ Disconnect(ConnectionHandle.as_mut_SQLHANDLE()) }
 }

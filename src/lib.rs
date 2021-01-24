@@ -9,10 +9,9 @@ use std::mem::MaybeUninit;
 
 pub use conn::{
     AccessMode::*, AsyncDbcFunctionsEnable::*, AutoCommit::*, ConnectionDead::*, Trace::*,
-    SQL_ASYNC_DBC_ENABLE_DEFAULT, SQL_ATTR_ACCESS_MODE, SQL_ATTR_ASYNC_DBC_EVENT,
-    SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE, SQL_ATTR_AUTOCOMMIT, SQL_ATTR_AUTO_IPD,
-    SQL_ATTR_CONNECTION_DEAD, SQL_ATTR_CONNECTION_TIMEOUT, SQL_ATTR_CURRENT_CATALOG,
-    SQL_ATTR_DBC_INFO_TOKEN, SQL_ATTR_LOGIN_TIMEOUT, SQL_ATTR_PACKET_SIZE, SQL_ATTR_TRACE,
+    SQL_ASYNC_DBC_ENABLE_DEFAULT, SQL_ATTR_ACCESS_MODE, SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE,
+    SQL_ATTR_AUTOCOMMIT, SQL_ATTR_AUTO_IPD, SQL_ATTR_CONNECTION_DEAD, SQL_ATTR_CONNECTION_TIMEOUT,
+    SQL_ATTR_CURRENT_CATALOG, SQL_ATTR_LOGIN_TIMEOUT, SQL_ATTR_PACKET_SIZE, SQL_ATTR_TRACE,
     SQL_ATTR_TRACEFILE, SQL_ATTR_TRANSLATE_LIB, SQL_AUTOCOMMIT_DEFAULT, SQL_MODE_DEFAULT,
     SQL_OPT_TRACE_DEFAULT,
 };
@@ -72,7 +71,7 @@ pub trait Attribute {
     type AttributeType;
     type IdentifierType;
 
-    fn identifier() -> Self::IdentifierType;
+    const IDENTIFIER: Self::IdentifierType;
 }
 pub enum OdbcAttribute {}
 pub enum DriverAttribute {}
@@ -458,9 +457,9 @@ pub mod conn {
     //#[derive(ConnAttribute)]
     //pub struct SQL_ATTR_TXN_ISOLATION;
 
-    // TODO: Can only be used with `SQLGetConnectAttr`
     #[identifier(10001)]
     #[derive(ConnAttribute)]
+    // This is read-only attribute
     pub struct SQL_ATTR_AUTO_IPD;
     impl GetAttr<SQLUINTEGER> for SQL_ATTR_AUTO_IPD {}
 
@@ -484,27 +483,27 @@ pub mod conn {
         }
     }
 
-    #[identifier(118)]
-    #[cfg(feature = "v3_8")]
-    #[derive(ConnAttribute)]
-    pub struct SQL_ATTR_DBC_INFO_TOKEN;
-    // This is set-only attribute
-    impl SetAttr<SQLPOINTER> for SQL_ATTR_DBC_INFO_TOKEN {}
+    //#[identifier(118)]
+    //#[cfg(feature = "v3_8")]
+    //#[derive(ConnAttribute)]
+    //// This is set-only attribute
+    //pub struct SQL_ATTR_DBC_INFO_TOKEN;
+    //impl SetAttr<SQLPOINTER> for SQL_ATTR_DBC_INFO_TOKEN {}
 
-    #[identifier(119)]
-    #[cfg(feature = "v3_8")]
-    #[derive(ConnAttribute)]
-    pub struct SQL_ATTR_ASYNC_DBC_EVENT;
-    // TODO: It's an Event handle. Should probably implement event handle
-    impl GetAttr<SQLPOINTER> for SQL_ATTR_ASYNC_DBC_EVENT {}
+    //#[identifier(119)]
+    //#[cfg(feature = "v3_8")]
+    //#[derive(ConnAttribute)]
+    //pub struct SQL_ATTR_ASYNC_DBC_EVENT;
+    //// TODO: It's an Event handle. Should probably implement event handle
+    //impl GetAttr<SQLPOINTER> for SQL_ATTR_ASYNC_DBC_EVENT {}
 
     // TODO: It is not 3.5 in implementation ???
     // but it says that drivers conforming to earlier versions can support this field. HMMMMMMMMMMM
     #[identifier(1209)]
     #[cfg(feature = "v3_5")]
     #[derive(ConnAttribute)]
+    // This is read-only attribute
     pub struct SQL_ATTR_CONNECTION_DEAD;
-    // Can only be used with `SQLGetConnectAttr`
     impl GetAttr<SQLUINTEGER> for SQL_ATTR_CONNECTION_DEAD {}
 
     #[derive(EqSQLUINTEGER, AnsiType, UnicodeType, Debug, PartialEq, Eq, Clone, Copy)]

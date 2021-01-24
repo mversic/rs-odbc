@@ -6,11 +6,15 @@ use std::thread::panicking;
 
 pub trait AsSQLHANDLE {
     #[allow(non_snake_case)]
-    fn as_SQLHANDLE(&mut self) -> SQLHANDLE;
+    fn as_SQLHANDLE(&self) -> SQLHANDLE;
+}
+pub trait AsMutSQLHANDLE {
+    #[allow(non_snake_case)]
+    fn as_mut_SQLHANDLE(&mut self) -> SQLHANDLE;
 }
 
 pub trait HandleIdentifier {
-    fn identifier() -> SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT;
 }
 
 pub trait Handle: AsSQLHANDLE {
@@ -29,33 +33,25 @@ pub trait SQLEndTranHandle: Handle {}
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_ENV;
 impl HandleIdentifier for SQL_HANDLE_ENV {
-    fn identifier() -> SQLSMALLINT {
-        1
-    }
+    const IDENTIFIER: SQLSMALLINT = 1;
 }
 
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_DBC;
 impl HandleIdentifier for SQL_HANDLE_DBC {
-    fn identifier() -> SQLSMALLINT {
-        2
-    }
+    const IDENTIFIER: SQLSMALLINT = 2;
 }
 
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_STMT;
 impl HandleIdentifier for SQL_HANDLE_STMT {
-    fn identifier() -> SQLSMALLINT {
-        3
-    }
+    const IDENTIFIER: SQLSMALLINT = 3;
 }
 
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_DESC;
 impl HandleIdentifier for SQL_HANDLE_DESC {
-    fn identifier() -> SQLSMALLINT {
-        4
-    }
+    const IDENTIFIER: SQLSMALLINT = 4;
 }
 
 // TODO: But must it not be a void* in the end? It is void* in unixODBC
@@ -109,13 +105,19 @@ impl<'a> Allocate<'a> for SQLHENV {
 impl SQLEndTranHandle for SQLHENV {}
 impl AsSQLHANDLE for SQLHENV {
     #[allow(non_snake_case)]
-    fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.handle
+    }
+}
+impl AsMutSQLHANDLE for SQLHENV {
+    #[allow(non_snake_case)]
+    fn as_mut_SQLHANDLE(&mut self) -> SQLHANDLE {
         self.handle
     }
 }
 impl Drop for SQLHENV {
     fn drop(&mut self) {
-        let ret = unsafe { FreeHandle(SQL_HANDLE_ENV::identifier(), self.as_SQLHANDLE()) };
+        let ret = unsafe { FreeHandle(SQL_HANDLE_ENV::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if ret != SQL_SUCCESS && !panicking() {
             panic!("SQLFreeHandle returned: {:?}", ret)
@@ -162,25 +164,22 @@ impl SQLCompleteAsyncHandle for SQLHDBC<'_> {}
 impl SQLEndTranHandle for SQLHDBC<'_> {}
 impl AsSQLHANDLE for SQLHDBC<'_> {
     #[allow(non_snake_case)]
-    fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.handle
+    }
+}
+impl AsMutSQLHANDLE for SQLHDBC<'_> {
+    #[allow(non_snake_case)]
+    fn as_mut_SQLHANDLE(&mut self) -> SQLHANDLE {
         self.handle
     }
 }
 impl Drop for SQLHDBC<'_> {
     fn drop(&mut self) {
-        let ret = unsafe { FreeHandle(SQL_HANDLE_DBC::identifier(), self.as_SQLHANDLE()) };
+        let ret = unsafe { FreeHandle(SQL_HANDLE_DBC::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if ret != SQL_SUCCESS && !panicking() {
-            let ret = unsafe { Disconnect(self.as_SQLHANDLE()) };
-            if ret != SQL_SUCCESS && !panicking() {
-                // TODO: Improve this scenario by checking the reason for failure
-                panic!("SQLDisconnect -> {:?}", ret)
-            }
-
-            let ret = unsafe { FreeHandle(SQL_HANDLE_DBC::identifier(), self.as_SQLHANDLE()) };
-            if ret != SQL_SUCCESS && !panicking() {
-                panic!("SQLFreeHandle -> {:?}", ret)
-            }
+            panic!("SQLFreeHandle -> {:?}", ret)
         }
     }
 }
@@ -227,13 +226,19 @@ impl SQLCancelHandle for SQLHSTMT<'_, '_> {}
 impl SQLCompleteAsyncHandle for SQLHSTMT<'_, '_> {}
 impl AsSQLHANDLE for SQLHSTMT<'_, '_> {
     #[allow(non_snake_case)]
-    fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.handle
+    }
+}
+impl AsMutSQLHANDLE for SQLHSTMT<'_, '_> {
+    #[allow(non_snake_case)]
+    fn as_mut_SQLHANDLE(&mut self) -> SQLHANDLE {
         self.handle
     }
 }
 impl Drop for SQLHSTMT<'_, '_> {
     fn drop(&mut self) {
-        let ret = unsafe { FreeHandle(SQL_HANDLE_STMT::identifier(), self.as_SQLHANDLE()) };
+        let ret = unsafe { FreeHandle(SQL_HANDLE_STMT::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if ret != SQL_SUCCESS && !panicking() {
             panic!("SQLFreeHandle returned: {:?}", ret)
@@ -281,13 +286,19 @@ impl Handle for SQLHDESC<'_, '_> {
 }
 impl AsSQLHANDLE for SQLHDESC<'_, '_> {
     #[allow(non_snake_case)]
-    fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.handle
+    }
+}
+impl AsMutSQLHANDLE for SQLHDESC<'_, '_> {
+    #[allow(non_snake_case)]
+    fn as_mut_SQLHANDLE(&mut self) -> SQLHANDLE {
         self.handle
     }
 }
 impl Drop for SQLHDESC<'_, '_> {
     fn drop(&mut self) {
-        let ret = unsafe { FreeHandle(SQL_HANDLE_DESC::identifier(), self.as_SQLHANDLE()) };
+        let ret = unsafe { FreeHandle(SQL_HANDLE_DESC::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if ret != SQL_SUCCESS && !panicking() {
             panic!("SQLFreeHandle returned: {:?}", ret)
@@ -299,7 +310,7 @@ impl Drop for SQLHDESC<'_, '_> {
 pub struct SQL_NULL_HANDLE;
 impl AsSQLHANDLE for SQL_NULL_HANDLE {
     #[allow(non_snake_case)]
-    fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
         std::ptr::null_mut()
     }
 }

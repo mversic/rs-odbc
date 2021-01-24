@@ -81,10 +81,7 @@ fn into_attr(input: TokenStream, attr_name: Ident, identifier_type: Ident) -> To
         impl #impl_generics crate::Attribute for #type_name #ty_generics #where_clause {
             type AttributeType = crate::OdbcAttribute;
             type IdentifierType = crate::#identifier_type;
-
-            fn identifier() -> Self::IdentifierType {
-                #identifier
-            }
+            const IDENTIFIER: Self::IdentifierType = #identifier;
         }
 
         impl #impl_generics #attr_name for #type_name #ty_generics #where_clause {}
