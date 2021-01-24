@@ -7,12 +7,26 @@ pub mod sqlreturn;
 
 use std::mem::MaybeUninit;
 
-pub use env::{OdbcVersion::*, SQL_ATTR_ODBC_VERSION};
+pub use conn::{
+    AccessMode::*, AsyncDbcFunctionsEnable::*, AutoCommit::*, ConnectionDead::*, Trace::*,
+    SQL_ASYNC_DBC_ENABLE_DEFAULT, SQL_ATTR_ACCESS_MODE, SQL_ATTR_ASYNC_DBC_EVENT,
+    SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE, SQL_ATTR_AUTOCOMMIT, SQL_ATTR_AUTO_IPD,
+    SQL_ATTR_CONNECTION_DEAD, SQL_ATTR_CONNECTION_TIMEOUT, SQL_ATTR_CURRENT_CATALOG,
+    SQL_ATTR_DBC_INFO_TOKEN, SQL_ATTR_LOGIN_TIMEOUT, SQL_ATTR_PACKET_SIZE, SQL_ATTR_TRACE,
+    SQL_ATTR_TRACEFILE, SQL_ATTR_TRANSLATE_LIB, SQL_AUTOCOMMIT_DEFAULT, SQL_MODE_DEFAULT,
+    SQL_OPT_TRACE_DEFAULT,
+};
+pub use env::{
+    ConnectionPooling::*, CpMatch::*, OdbcVersion::*, SQL_ATTR_CONNECTION_POOLING,
+    SQL_ATTR_CP_MATCH, SQL_ATTR_ODBC_VERSION, SQL_ATTR_OUTPUT_NTS, SQL_CP_DEFAULT,
+    SQL_CP_MATCH_DEFAULT,
+};
 pub use handle::{
     SQLHANDLE, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT, SQL_HANDLE_DBC, SQL_HANDLE_DESC,
     SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE,
 }; // TODO: SQLHWND
 pub use sqlchar_str::SQLCHARString;
+pub use DriverCompletion::*;
 pub use {api::*, c_types::*, sql_types::*, sqlreturn::*};
 
 type SQLPOINTER = *mut std::ffi::c_void;
@@ -20,10 +34,13 @@ type SQLPOINTER = *mut std::ffi::c_void;
 pub trait AsMutPtr<T> {
     fn as_mut_ptr(&mut self) -> *mut T;
 }
+// TODO: Is it possible to derive this trait?
 pub trait AsRawParts<P, LEN> {
+    // TODO: Is it possible to not have P type?
     fn as_raw_parts(&self) -> (SQLPOINTER, LEN);
 }
 pub trait AsMutRawSlice<P, LEN> {
+    // TODO: Is it possible to not have P type?
     // TODO: Consider extracting StrLen to a separate trait
     type StrLen;
     fn as_mut_raw_slice(&mut self) -> (SQLPOINTER, LEN);
@@ -72,12 +89,25 @@ pub trait AsSQLCHARRawSlice<LEN> {
     #[allow(non_snake_case)]
     fn as_SQLCHAR_raw_slice(&self) -> (*const SQLCHAR, LEN);
 }
+pub trait AsSQLWCHARRawSlice<LEN> {
+    #[allow(non_snake_case)]
+    fn as_SQLCHAR_raw_slice(&self) -> (*const SQLCHAR, LEN);
+}
 pub trait AsMutSQLCHARRawSlice<LEN> {
     //type InitializedType;
     #[allow(non_snake_case)]
     fn as_mut_SQLCHAR_raw_slice(&mut self) -> (*mut SQLCHAR, LEN);
     //unsafe fn assume_init(self) -> Self::InitializedType;
 }
+pub trait AsMutSQLWCHARRawSlice<LEN> {
+    //type InitializedType;
+    #[allow(non_snake_case)]
+    fn as_mut_SQLCHAR_raw_slice(&mut self) -> (*mut SQLCHAR, LEN);
+    //unsafe fn assume_init(self) -> Self::InitializedType;
+}
+pub trait AsCharRawSlice<LEN>: AsSQLCHARRawSlice<LEN> + AsSQLWCHARRawSlice<LEN> {}
+pub trait AsMutCharRawSlice<LEN>: AsMutSQLCHARRawSlice<LEN> + AsMutSQLWCHARRawSlice<LEN> {}
+
 impl AsSQLCHARRawSlice<SQLSMALLINT> for str {
     #[allow(non_snake_case)]
     fn as_SQLCHAR_raw_slice(&self) -> (*const SQLCHAR, SQLSMALLINT) {
@@ -110,8 +140,10 @@ impl AsSQLCHARRawSlice<SQLSMALLINT> for str {
 //}
 
 // TODO: Comapare attribute types: <attribute>(type, default)
-// SQL_ATTR_OUTPUT_NTS(i32, true)
+// SQL_ATTR_OUTPUT_NTS(u32, true), SQL_ATTR_AUTO_IPD(u32, _)
 #[allow(non_camel_case_types)]
+// TODO: Type equality should be derived such as EqSQLUINTEGER
+#[derive(rs_odbc_derive::AnsiType, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum OdbcBool {
     SQL_FALSE = 0,
     SQL_TRUE = 1,
@@ -122,12 +154,19 @@ pub enum OdbcBool {
 // Special return values for SQLGetData
 // SQL_NO_TOTAL = -4,
 
+#[allow(non_camel_case_types)]
+pub enum DriverCompletion {
+    SQL_DRIVER_NOPROMPT = 0,
+    SQL_DRIVER_COMPLETE = 1,
+    SQL_DRIVER_PROMPT = 2,
+    SQL_DRIVER_COMPLETE_REQUIRED = 3,
+}
+
 pub mod env {
-    use super::{AnsiType, AsRawParts, Attribute, GetAttr, OdbcAttribute, OdbcBool, SetAttr};
+    use crate::{AsRawParts, Attribute, GetAttr, OdbcAttribute, OdbcBool, SetAttr};
     use crate::{SQLINTEGER, SQLPOINTER, SQLUINTEGER};
     use rs_odbc_derive::{AnsiType, EnvAttribute, EqSQLUINTEGER};
 
-    // TODO: ValuePtr must be a null-terminated string for EnvAttr
     pub trait EnvAttribute: Attribute<IdentifierType = SQLINTEGER> {}
 
     #[identifier(200)]
@@ -222,364 +261,325 @@ pub mod env {
 }
 
 pub mod conn {
-    //    pub use crate::{SQLLEN, SQLCHAR, SQLWCHAR, SQLINTEGER, SQLRETURN};
-    //    pub use super::{GetAttr, AsAscii, AsUnicode};
-    //    pub trait ConnAttribute: Attribute<IdentifierType=SQLINTEGER> {}
+    use crate::{
+        AsCharRawSlice, AsMutCharRawSlice, AsRawParts, Attribute, GetAttr, SetAttr, SQLINTEGER,
+        SQLPOINTER, SQLUINTEGER,
+    };
+    use rs_odbc_derive::{AnsiType, ConnAttribute, EqSQLUINTEGER, UnicodeType};
 
-    pub trait ConnState {
-        fn connected() -> bool {
-            false
+    pub trait ConnAttribute: Attribute<IdentifierType = SQLINTEGER> {}
+
+    #[identifier(101)]
+    #[derive(ConnAttribute)]
+    #[allow(non_camel_case_types)]
+    pub struct SQL_ATTR_ACCESS_MODE;
+    impl GetAttr<SQLUINTEGER> for SQL_ATTR_ACCESS_MODE {}
+    impl SetAttr<AccessMode> for SQL_ATTR_ACCESS_MODE {}
+
+    #[allow(non_camel_case_types)]
+    #[derive(EqSQLUINTEGER, AnsiType, UnicodeType, Debug, PartialEq, Eq, Clone, Copy)]
+    pub enum AccessMode {
+        SQL_MODE_READ_WRITE = 0,
+        SQL_MODE_READ_ONLY = 1,
+    }
+    pub use AccessMode::SQL_MODE_READ_WRITE as SQL_MODE_DEFAULT;
+    impl<T> AsRawParts<T, SQLINTEGER> for AccessMode {
+        fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
+            (*self as SQLUINTEGER as SQLPOINTER, 0)
         }
     }
-    pub enum C2 {}
-    impl ConnState for C2 {}
-    pub enum C4 {}
-    impl ConnState for C4 {
-        fn connected() -> bool {
-            true
+
+    #[identifier(102)]
+    #[derive(ConnAttribute)]
+    #[allow(non_camel_case_types)]
+    pub struct SQL_ATTR_AUTOCOMMIT;
+    impl GetAttr<SQLUINTEGER> for SQL_ATTR_AUTOCOMMIT {}
+    impl SetAttr<AutoCommit> for SQL_ATTR_AUTOCOMMIT {}
+
+    #[allow(non_camel_case_types)]
+    #[derive(EqSQLUINTEGER, AnsiType, UnicodeType, Debug, PartialEq, Eq, Clone, Copy)]
+    pub enum AutoCommit {
+        SQL_AUTOCOMMIT_OFF = 0,
+        SQL_AUTOCOMMIT_ON = 1,
+    }
+    pub use AutoCommit::SQL_AUTOCOMMIT_ON as SQL_AUTOCOMMIT_DEFAULT;
+    impl<T> AsRawParts<T, SQLINTEGER> for AutoCommit {
+        fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
+            (*self as SQLUINTEGER as SQLPOINTER, 0)
         }
     }
 
-    //    #[deprecated]
-    //    enum ConnectionAttr {
-    //        SQL_ACCESS_MODE = 101,
-    //        SQL_AUTOCOMMIT = 102,
-    //        SQL_LOGIN_TIMEOUT = 103,
-    //        SQL_OPT_TRACE = 104,
-    //        SQL_OPT_TRACEFILE = 105,
-    //        SQL_TRANSLATE_DLL = 106,
-    //        SQL_TRANSLATE_OPTION = 107,
-    //        SQL_TXN_ISOLATION = 108,
-    //        SQL_CURRENT_QUALIFIER = 109,
-    //        SQL_ODBC_CURSORS = 110,
-    //        SQL_QUIET_MODE = 111,
-    //        SQL_PACKET_SIZE = 112,
+    #[identifier(113)]
+    #[derive(ConnAttribute)]
+    #[allow(non_camel_case_types)]
+    pub struct SQL_ATTR_CONNECTION_TIMEOUT;
+    impl GetAttr<SQLUINTEGER> for SQL_ATTR_CONNECTION_TIMEOUT {}
+    impl SetAttr<SQLUINTEGER> for SQL_ATTR_CONNECTION_TIMEOUT {}
+
+    #[identifier(109)]
+    #[derive(ConnAttribute)]
+    #[allow(non_camel_case_types)]
+    pub struct SQL_ATTR_CURRENT_CATALOG;
+    impl<T: AsCharRawSlice<SQLINTEGER>> GetAttr<T> for SQL_ATTR_CURRENT_CATALOG {}
+    impl<T: AsMutCharRawSlice<SQLINTEGER>> SetAttr<T> for SQL_ATTR_CURRENT_CATALOG {}
+
+    // TODO: Not found in documentation, only in implementation
+    //#[identifier(114)]
+    //#[derive(ConnAttribute)]
+    //#[allow(non_camel_case_types)]
+    //pub struct SQL_ATTR_DISCONNECT_BEHAVIOR;
+
+    //#[allow(non_camel_case_types)]
+    //#[derive(AnsiType, UnicodeType, Debug, PartialEq, Eq, Clone, Copy)]
+    //pub enum DisconnectBehavior {
+    //    SQL_DB_RETURN_TO_POOL = 0,
+    //    SQL_DB_DISCONNECT = 1,
+    //}
+    //pub use DisconnectBehavior::SQL_DB_RETURN_TO_POOL as SQL_DB_DEFAULT;
+    //impl<T> AsRawParts<T, SQLINTEGER> for DisconnectBehavior {
+    //    fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
+    //        (*self as something as SQLPOINTER, 0)
     //    }
-    //
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_ACCESS_MODE;
-    //    impl Attribute for SQL_ATTR_ACCESS_MODE {
-    //        type AttributeType = OdbcAttribute;
-    //        type IdentifierType = SQLINTEGER;
-    //        fn identifier() -> Self::IdentifierType { ConnectionAttr::SQL_ACCESS_MODE as Self::IdentifierType }
+    //}
+
+    // TODO: Seems to be Microsoft related
+    //#[identifier(1207)]
+    //#[derive(ConnAttribute)]
+    //pub struct SQL_ATTR_ENLIST_IN_DTC;
+    //impl GetAttr<SQLPOINTER> for SQL_ATTR_ENLIST_IN_DTC {}
+    //impl SetAttr<SQLPOINTER> for SQL_ATTR_ENLIST_IN_DTC {}
+
+    //pub enum EnlistInDtc {
+    //    SQL_DTC_DONE = 0,
+    //}
+    //impl<T> AsRawParts<T, SQLINTEGER> for EnlistInDtc {
+    //    fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
+    //        (*self as something as SQLPOINTER, 0)
     //    }
-    //    impl<T: AccessMode> SetAttr<T> for SQL_ATTR_ACCESS_MODE {}
-    //    impl GetAttr<SQLUINTEGER> for SQL_ATTR_ACCESS_MODE {}
-    //
-    //    enum AccessMode {
-    //        SQL_MODE_READ_WRITE = 0,
-    //        SQL_MODE_READ_ONLY = 1,
+    //}
+
+    // TODO: Unknown
+    //#[identifier(1208)]
+    //#[derive(ConnAttribute)]
+    //pub struct SQL_ATTR_ENLIST_IN_XA;
+
+    #[identifier(103)]
+    #[derive(ConnAttribute)]
+    #[allow(non_camel_case_types)]
+    pub struct SQL_ATTR_LOGIN_TIMEOUT;
+    impl GetAttr<SQLUINTEGER> for SQL_ATTR_LOGIN_TIMEOUT {}
+    impl SetAttr<SQLUINTEGER> for SQL_ATTR_LOGIN_TIMEOUT {}
+
+    // TODO: Seems to be deprecated
+    //#[identifier(110)]
+    //#[derive(ConnAttribute)]
+    //#[allow(non_camel_case_types)]
+    //pub struct SQL_ATTR_ODBC_CURSORS;
+    //impl GetAttr<SQLULEN> for SQL_ATTR_ODBC_CURSORS {}
+    //impl SetAttr<OdbcCursors> for SQL_ATTR_ODBC_CURSORS {}
+
+    //#[allow(non_camel_case_types)]
+    //#[derive(EqSQLULEN, AnsiType, UnicodeType, Debug, PartialEq, Eq, Clone, Copy)]
+    //pub enum OdbcCursors {
+    //    SQL_CUR_USE_IF_NEEDED = 0,
+    //    SQL_CUR_USE_ODBC = 1,
+    //    SQL_CUR_USE_DRIVER = 2,
+    //}
+    //pub use OdbcCursors::SQL_CUR_USE_DRIVER as SQL_CUR_DEFAULT;
+    //impl<T> AsRawParts<T, SQLINTEGER> for OdbcCursors {
+    //    fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
+    //        (*self as SQLULEN as SQLPOINTER, 0)
     //    }
-    //    impl AsRef<SQLUINTEGER> for AccessMode {
-    //        fn as_ref(&self) -> &SQLUINTEGER {
-    //            &(*self as SQLUINTEGER)
-    //        }
-    //    }
-    //    impl TryFrom<SQLUINTEGER> for AccessMode {
-    //        type Error = SQLUINTEGER;
-    //        fn try_from(source: SQLUINTEGER) -> Result<Self, Self::Error> {
-    //            match SQLUINTEGER {
-    //                x => Ok(AccessMode::SQL_MODE_READ_WRITE),
-    //                y => Ok(AccessMode::SQL_MODE_READ_ONLY),
-    //                _ => Err(Error),
-    //            }
-    //        }
-    //    }
-    //    pub use AccessMode::SQL_MODE_READ_WRITE as SQL_MODE_DEFAULT;
-    //
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_AUTOCOMMIT;
-    //    impl Attribute for SQL_ATTR_AUTOCOMMIT {
-    //        type AttributeType = OdbcAttribute;
-    //        type IdentifierType = SQLINTEGER;
-    //        fn identifier() -> Self::IdentifierType {
-    //            ConnectionAttr::SQL_AUTOCOMMIT as Self::IdentifierType
-    //        }
-    //    }
-    //    impl GetAttr<SQLUINTEGER> for SQL_ATTR_AUTOCOMMIT {}
-    //
-    //    enum AutoCommit {
-    //        SQL_AUTOCOMMIT_OFF = 0,
-    //        SQL_AUTOCOMMIT_ON = 1,
-    //    }
-    //    pub use AutoCommit::SQL_AUTOCOMMIT_ON as SQL_AUTOCOMMIT_DEFAULT;
-    //
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_CONNECTION_TIMEOUT;
-    //    impl Attribute for SQL_ATTR_CONNECTION_TIMEOUT {
-    //        type AttributeType = OdbcAttribute;
-    //        type IdentifierType = SQLINTEGER;
-    //        fn identifier() -> Self::IdentifierType {
-    //            113
-    //        }
-    //    }
-    //    impl GetAttr<SQLUINTEGER> for SQL_ATTR_CONNECTION_TIMEOUT {}
-    //    impl SetAttr<SQLUINTEGER> for SQL_ATTR_CONNECTION_TIMEOUT {}
-    //
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_CURRENT_CATALOG;
-    //    impl Attribute for SQL_ATTR_CURRENT_CATALOG {
-    //        type AttributeType = OdbcAttribute;
-    //        type IdentifierType = SQLINTEGER;
-    //        fn identifier() -> Self::IdentifierType {
-    //            ConnectionAttr::SQL_CURRENT_QUALIFIER as Self::IdentifierType
-    //        }
-    //    }
-    //    impl<T: AsOdbcChar> GetAttr<T> for SQL_ATTR_CURRENT_CATALOG {}
-    //    impl<T: AsOdbcChar> SetAttr<T> for SQL_ATTR_CURRENT_CATALOG {}
-    //
-    //    #[identifier(114)]
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_DISCONNECT_BEHAVIOR;
-    //
-    //    pub enum DisconnectBehavior {
-    //        SQL_DB_RETURN_TO_POOL = 0,
-    //        SQL_DB_DISCONNECT = 1,
-    //    }
-    //    pub use SQL_DB_RETURN_TO_POOL as SQL_DB_DEFAULT;
-    //
-    //    #[identifier(1207)]
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_ENLIST_IN_DTC;
-    //    impl GetAttr<SQLPOINTER> for SQL_ATTR_ENLIST_IN_DTC {}
-    //    impl SetAttr<SQLPOINTER> for SQL_ATTR_ENLIST_IN_DTC {}
-    //
-    //    pub enum EnlistInDtc {
-    //        SQL_DTC_DONE = 0,
-    //    }
-    //
-    //    #[identifier(1208)]
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_ENLIST_IN_XA;
-    //
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_LOGIN_TIMEOUT;
-    //    impl Attribute for SQL_ATTR_LOGIN_TIMEOUT {
-    //        type AttributeType = OdbcAttribute;
-    //        type IdentifierType = SQLINTEGER;
-    //        fn identifier() -> Self::IdentifierType {
-    //            ConnectionAttr::SQL_LOGIN_TIMEOUT as Self::IdentifierType
-    //        }
-    //    }
-    //    impl GetAttr<SQLUINTEGER> for SQL_ATTR_LOGIN_TIMEOUT {}
-    //    impl SetAttr<SQLUINTEGER> for SQL_ATTR_LOGIN_TIMEOUT {}
-    //
-    //    // TODO: Is this or isn't it driver dependent?
-    //    //pub const SQL_LOGIN_TIMEOUT_DEFAULT: SQLUINTEGER> = 15;
-    //
-    //    // TODO: Consider removing this. Read the docs
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_ODBC_CURSORS;
-    //    impl Attribute for SQL_ATTR_ODBC_CURSORS {
-    //        type AttributeType = OdbcAttribute;
-    //        type IdentifierType = SQLINTEGER;
-    //        fn identifier() -> Self::IdentifierType {
-    //            ConnectionAttr::SQL_ODBC_CURSORS as Self::IdentifierType
-    //        }
-    //    }
-    //    impl GetAttr<SQLULEN> for SQL_ATTR_ODBC_CURSORS {}
-    //
-    //    pub enum OdbcCursors {
-    //        SQL_CUR_USE_IF_NEEDED = 0,
-    //        SQL_CUR_USE_ODBC = 1,
-    //        SQL_CUR_USE_DRIVER = 2,
-    //    }
-    //    pub use OdbcCursors::SQL_CUR_USE_DRIVER as SQL_CUR_DEFAULT;
-    //
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_PACKET_SIZE;
-    //    impl Attribute for SQL_ATTR_PACKET_SIZE {
-    //        type AttributeType = OdbcAttribute;
-    //        type IdentifierType = SQLINTEGER;
-    //        fn identifier() -> Self::IdentifierType {
-    //            ConnectionAttr::SQL_PACKET_SIZE as Self::IdentifierType
-    //        }
-    //    }
-    //    impl GetAttr<SQLUINTEGER> for SQL_ATTR_PACKET_SIZE {}
-    //
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_QUIET_MODE;
-    //    impl Attribute for SQL_ATTR_QUIET_MODE {
-    //        type AttributeType = OdbcAttribute;
-    //        type IdentifierType = SQLINTEGER;
-    //        fn identifier() -> Self::IdentifierType {
-    //            ConnectionAttr::SQL_QUIET_MODE as Self::IdentifierType
-    //        }
-    //    }
-    //
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_TRACE;
-    //    impl Attribute for SQL_ATTR_TRACE {
-    //        type AttributeType = OdbcAttribute;
-    //        type IdentifierType = SQLINTEGER;
-    //        fn identifier() -> Self::IdentifierType {
-    //            ConnectionAttr::SQL_OPT_TRACE as Self::IdentifierType
-    //        }
-    //    }
-    //    impl GetAttr<UINTEGER> for SQL_ATTR_TRACE {}
-    //
-    //    pub enum Trace {
-    //        SQL_OPT_TRACE_OFF = 0,
-    //        SQL_OPT_TRACE_ON = 1,
-    //    }
-    //    pub use Trace::SQL_OPT_TRACE_OFF as SQL_OPT_TRACE_DEFAULT;
-    //
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_TRACEFILE;
-    //    impl Attribute for SQL_ATTR_TRACEFILE {
-    //        type AttributeType = OdbcAttribute;
-    //        type IdentifierType = SQLINTEGER;
-    //        fn identifier() -> Self::IdentifierType {
-    //            ConnectionAttr::SQL_OPT_TRACEFILE as Self::IdentifierType
-    //        }
-    //    }
-    //    // TODO: Has to be null-terminated
-    //    //impl<T: AsOdbcChar> GetAttr<T> for SQL_ATTR_TRACEFILE {}
-    //    //impl<T: AsOdbcChar> SetAttr<T> for SQL_ATTR_TRACEFILE {}
-    //    //pub const SQL_OPT_TRACE_FILE_DEFAULT = "\\SQL.LOG";
-    //
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_TRANSLATE_LIB;
-    //    impl Attribute for SQL_ATTR_TRANSLATE_LIB {
-    //        type AttributeType = OdbcAttribute;
-    //        type IdentifierType = SQLINTEGER;
-    //        fn identifier() -> Self::IdentifierType {
-    //            ConnectionAttr::SQL_TRANSLATE_DLL as Self::IdentifierType
-    //        }
-    //    }
-    //    // TODO: Has to be null-terminated
-    //    //impl<T: AsOdbcChar> GetAttr<T> for SQL_ATTR_TRANSLATE_LIB {}
-    //    //impl<T: AsOdbcChar> SetAttr<T> for SQL_ATTR_TRANSLATE_LIB {}
-    //
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_TRANSLATE_OPTION;
-    //    impl Attribute for SQL_ATTR_TRANSLATE_OPTION {
-    //        type AttributeType = OdbcAttribute;
-    //        type IdentifierType = SQLINTEGER;
-    //        fn identifier() -> Self::IdentifierType {
-    //            ConnectionAttr::SQL_TRANSLATE_OPTION as Self::IdentifierType
-    //        }
-    //    }
-    //
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_TXN_ISOLATION;
-    //    impl Attribute for SQL_ATTR_TXN_ISOLATION {
-    //        type AttributeType = OdbcAttribute;
-    //        type IdentifierType = SQLINTEGER;
-    //        fn identifier() -> Self::IdentifierType {
-    //            ConnectionAttr::SQL_TXN_ISOLATION as Self::IdentifierType
-    //        }
-    //    }
-    //
-    //    // TODO: Can only be used with `SQLGetConnectAttr`
-    //    #[identifier(10001)]
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_AUTO_IPD;
-    //    impl GetAttr<SQLUINTEGER> for SQL_ATTR_AUTO_IPD {}
-    //
-    //    #[identifier(117)]
-    //    #[cfg(feature = "v3_8")]
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE;
-    //
-    //    #[cfg(feature = "v3_8")]
-    //    pub enum AsyncDbcFunctionsEnable {
-    //        SQL_ASYNC_DBC_ENABLE_OFF = 0,
-    //        SQL_ASYNC_DBC_ENABLE_ON = 1,
-    //    }
-    //    pub use AsyncDbcFunctionsEnable::SQL_ASYNC_DBC_ENABLE_OFF as SQL_ASYNC_DBC_ENABLE_DEFAULT;
-    //
-    //    #[identifier(118)]
-    //    #[cfg(feature = "v3_8")]
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_DBC_INFO_TOKEN;
-    //    // This is set-only attribute
-    //    impl SetAttr<SQLPOINTER> for SQL_ATTR_DBC_INFO_TOKEN {}
-    //
-    //    #[identifier(119)]
-    //    #[cfg(feature = "v3_8")]
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_ASYNC_DBC_EVENT;
-    //    // TODO: It's an Event handle. Should probably implement event handle
-    //    impl GetAttr<SQLPOINTER> for SQL_ATTR_ASYNC_DBC_EVENT {}
-    //
-    //    // TODO: It is not 3.5 in implementation ???
-    //    // but it says that drivers conforming to earlier versions can support this field. HMMMMMMMMMMM
-    //    #[identifier(1209)]
-    //    #[cfg(feature = "v3_5")]
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_CONNECTION_DEAD;
-    //    // Can only be used with `SQLGetConnectAttr`
-    //    impl GetAttr<SQLUINTEGER> for SQL_ATTR_CONNECTION_DEAD {}
-    //
-    //    pub enum ConnectionDead {
-    //        SQL_CD_TRUE = 1,
-    //        SQL_CD_FALSE = 0,
-    //    }
-    //
-    //    /*  ODBC Driver Manager sets this connection attribute to a unicode driver
-    //        (which supports SQLConnectW) when the application is an ANSI application
-    //        (which calls SQLConnect, SQLDriverConnect, or SQLBrowseConnect).
-    //        This is SetConnectAttr only and application does not set this attribute
-    //        This attribute was introduced because some unicode driver's some APIs may
-    //        need to behave differently on ANSI or Unicode applications. A unicode
-    //        driver, which  has same behavior for both ANSI or Unicode applications,
-    //        should return SQL_ERROR when the driver manager sets this connection
-    //        attribute. When a unicode driver returns SQL_SUCCESS on this attribute,
-    //        the driver manager treates ANSI and Unicode connections differently in
-    //        connection pooling.
-    //    */
-    //    // TODO: These 4 are not in Documentation??
-    //    #[identifier(115)]
-    //    #[cfg(feature = "v3_51")]
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_ANSI_APP;
-    //
-    //    #[cfg(feature = "v3_51")]
-    //    pub enum AnsiApp {
-    //        SQL_AA_TRUE = 1,  /* the application is an ANSI app */
-    //        SQL_AA_FALSE = 0,  /* the application is a Unicode app */
-    //    }
-    //
-    //    #[identifier(116)]
-    //    #[cfg(feature = "v3_8")]
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_RESET_CONNECTION;
-    //
-    //    #[cfg(feature = "v3_8")]
-    //    pub enum ResetConnection {
-    //        SQL_RESET_CONNECTION_YES = 1,
-    //    }
-    //
-    //    #[identifier(122)]
-    //    #[cfg(feature = "v4")]
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_CREDENTIALS;
-    //
-    //    #[identifier(123)]
-    //    #[cfg(feature = "v4")]
-    //    #[derive(ConnAttribute)]
-    //    pub struct SQL_ATTR_REFRESH_CONNECTION;
-    //
-    //    #[cfg(feature = "v4")]
-    //    pub enum RefreshConnection {
-    //        SQL_REFRESH_NOW = -1,
-    //        SQL_REFRESH_AUTO = 0,
-    //        SQL_REFRESH_MANUAL = 1,
-    //    }
-    //
-    //    // TODO: Reexport these in conn module
-    //    // TODO: Or derive them, but still export?
-    //    impl ConnAttribute for SQL_ATTR_METADATA_ID {}
-    //    impl ConnAttribute for SQL_ATTR_ASYNC_ENABLE {}
+    //}
+
+    #[identifier(112)]
+    #[derive(ConnAttribute)]
+    #[allow(non_camel_case_types)]
+    pub struct SQL_ATTR_PACKET_SIZE;
+    impl GetAttr<SQLUINTEGER> for SQL_ATTR_PACKET_SIZE {}
+    impl SetAttr<SQLUINTEGER> for SQL_ATTR_PACKET_SIZE {}
+
+    //#[identifier(111)]
+    //#[derive(ConnAttribute)]
+    //#[allow(non_camel_case_types)]
+    //pub struct SQL_ATTR_QUIET_MODE;
+    //impl GetAttr<SQLHWND> for SQL_ATTR_PACKET_SIZE {}
+    //impl SetAttr<SQLHWND> for SQL_ATTR_PACKET_SIZE {}
+
+    #[identifier(104)]
+    #[derive(ConnAttribute)]
+    #[allow(non_camel_case_types)]
+    pub struct SQL_ATTR_TRACE;
+    impl GetAttr<SQLUINTEGER> for SQL_ATTR_TRACE {}
+    impl SetAttr<Trace> for SQL_ATTR_TRACE {}
+
+    #[allow(non_camel_case_types)]
+    #[derive(EqSQLUINTEGER, AnsiType, UnicodeType, Debug, PartialEq, Eq, Clone, Copy)]
+    pub enum Trace {
+        SQL_OPT_TRACE_OFF = 0,
+        SQL_OPT_TRACE_ON = 1,
+    }
+    pub use Trace::SQL_OPT_TRACE_OFF as SQL_OPT_TRACE_DEFAULT;
+    impl<T> AsRawParts<T, SQLINTEGER> for Trace {
+        fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
+            (*self as SQLUINTEGER as SQLPOINTER, 0)
+        }
+    }
+
+    #[identifier(105)]
+    #[derive(ConnAttribute)]
+    #[allow(non_camel_case_types)]
+    pub struct SQL_ATTR_TRACEFILE;
+    // TODO: Is this default really?
+    //pub const SQL_OPT_TRACE_FILE_DEFAULT = "\\SQL.LOG";
+
+    // TODO: Has to be null-terminated
+    impl<T: AsCharRawSlice<SQLINTEGER>> GetAttr<T> for SQL_ATTR_TRACEFILE {}
+    impl<T: AsMutCharRawSlice<SQLINTEGER>> SetAttr<T> for SQL_ATTR_TRACEFILE {}
+
+    #[identifier(106)]
+    #[derive(ConnAttribute)]
+    #[allow(non_camel_case_types)]
+    pub struct SQL_ATTR_TRANSLATE_LIB;
+
+    // TODO: Has to be null-terminated
+    impl<T: AsCharRawSlice<SQLINTEGER>> GetAttr<T> for SQL_ATTR_TRANSLATE_LIB {}
+    impl<T: AsMutCharRawSlice<SQLINTEGER>> SetAttr<T> for SQL_ATTR_TRANSLATE_LIB {}
+
+    // TODO: Investigate this
+    //#[identifier(107)]
+    //#[derive(ConnAttribute)]
+    //pub struct SQL_ATTR_TRANSLATE_OPTION;
+    //impl GetAttr<SQLUINTEGER> for SQL_ATTR_TRANSLATE_OPTION {}
+    //impl SetAttr<SQLUINTEGER> for SQL_ATTR_TRANSLATE_OPTION {}
+
+    // TODO: Uncertain
+    //#[identifier(108)]
+    //#[derive(ConnAttribute)]
+    //pub struct SQL_ATTR_TXN_ISOLATION;
+
+    // TODO: Can only be used with `SQLGetConnectAttr`
+    #[identifier(10001)]
+    #[derive(ConnAttribute)]
+    pub struct SQL_ATTR_AUTO_IPD;
+    impl GetAttr<SQLUINTEGER> for SQL_ATTR_AUTO_IPD {}
+
+    #[identifier(117)]
+    #[cfg(feature = "v3_8")]
+    #[derive(ConnAttribute)]
+    pub struct SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE;
+    impl GetAttr<SQLUINTEGER> for SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE {}
+    impl SetAttr<AsyncDbcFunctionsEnable> for SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE {}
+
+    #[cfg(feature = "v3_8")]
+    #[derive(EqSQLUINTEGER, AnsiType, UnicodeType, Debug, PartialEq, Eq, Clone, Copy)]
+    pub enum AsyncDbcFunctionsEnable {
+        SQL_ASYNC_DBC_ENABLE_OFF = 0,
+        SQL_ASYNC_DBC_ENABLE_ON = 1,
+    }
+    pub use AsyncDbcFunctionsEnable::SQL_ASYNC_DBC_ENABLE_OFF as SQL_ASYNC_DBC_ENABLE_DEFAULT;
+    impl<T> AsRawParts<T, SQLINTEGER> for AsyncDbcFunctionsEnable {
+        fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
+            (*self as SQLUINTEGER as SQLPOINTER, 0)
+        }
+    }
+
+    #[identifier(118)]
+    #[cfg(feature = "v3_8")]
+    #[derive(ConnAttribute)]
+    pub struct SQL_ATTR_DBC_INFO_TOKEN;
+    // This is set-only attribute
+    impl SetAttr<SQLPOINTER> for SQL_ATTR_DBC_INFO_TOKEN {}
+
+    #[identifier(119)]
+    #[cfg(feature = "v3_8")]
+    #[derive(ConnAttribute)]
+    pub struct SQL_ATTR_ASYNC_DBC_EVENT;
+    // TODO: It's an Event handle. Should probably implement event handle
+    impl GetAttr<SQLPOINTER> for SQL_ATTR_ASYNC_DBC_EVENT {}
+
+    // TODO: It is not 3.5 in implementation ???
+    // but it says that drivers conforming to earlier versions can support this field. HMMMMMMMMMMM
+    #[identifier(1209)]
+    #[cfg(feature = "v3_5")]
+    #[derive(ConnAttribute)]
+    pub struct SQL_ATTR_CONNECTION_DEAD;
+    // Can only be used with `SQLGetConnectAttr`
+    impl GetAttr<SQLUINTEGER> for SQL_ATTR_CONNECTION_DEAD {}
+
+    #[derive(EqSQLUINTEGER, AnsiType, UnicodeType, Debug, PartialEq, Eq, Clone, Copy)]
+    pub enum ConnectionDead {
+        SQL_CD_TRUE = 1,
+        SQL_CD_FALSE = 0,
+    }
+    impl<T> AsRawParts<T, SQLINTEGER> for ConnectionDead {
+        fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
+            (*self as SQLUINTEGER as SQLPOINTER, 0)
+        }
+    }
+
+    //*  ODBC Driver Manager sets this connection attribute to a unicode driver
+    //    (which supports SQLConnectW) when the application is an ANSI application
+    //    (which calls SQLConnect, SQLDriverConnect, or SQLBrowseConnect).
+    //    This is SetConnectAttr only and application does not set this attribute
+    //    This attribute was introduced because some unicode driver's some APIs may
+    //    need to behave differently on ANSI or Unicode applications. A unicode
+    //    driver, which  has same behavior for both ANSI or Unicode applications,
+    //    should return SQL_ERROR when the driver manager sets this connection
+    //    attribute. When a unicode driver returns SQL_SUCCESS on this attribute,
+    //    the driver manager treates ANSI and Unicode connections differently in
+    //    connection pooling.
+    //*/
+    //// TODO: These 4 are not in Documentation??
+    //#[identifier(115)]
+    //#[cfg(feature = "v3_51")]
+    //#[derive(ConnAttribute)]
+    //pub struct SQL_ATTR_ANSI_APP;
+
+    //#[cfg(feature = "v3_51")]
+    //pub enum AnsiApp {
+    //    SQL_AA_TRUE = 1,  /* the application is an ANSI app */
+    //    SQL_AA_FALSE = 0,  /* the application is a Unicode app */
+    //}
+
+    //#[identifier(116)]
+    //#[cfg(feature = "v3_8")]
+    //#[derive(ConnAttribute)]
+    //pub struct SQL_ATTR_RESET_CONNECTION;
+    //impl GetAttr<SQLUINTEGER> for SQL_ATTR_RESET_CONNECTION {}
+    //impl SetAttr<ResetConnection> for SQL_ATTR_RESET_CONNECTION {}
+
+    //#[cfg(feature = "v3_8")]
+    //#[derive(EqSQLUINTEGER, AnsiType, UnicodeType, Debug, PartialEq, Eq, Clone, Copy)]
+    //pub enum ResetConnection {
+    //    SQL_RESET_CONNECTION_YES = 1,
+    //}
+
+    //#[identifier(122)]
+    //#[cfg(feature = "v4")]
+    //#[derive(ConnAttribute)]
+    //pub struct SQL_ATTR_CREDENTIALS;
+
+    //#[identifier(123)]
+    //#[cfg(feature = "v4")]
+    //#[derive(ConnAttribute)]
+    //pub struct SQL_ATTR_REFRESH_CONNECTION;
+
+    //#[cfg(feature = "v4")]
+    //pub enum RefreshConnection {
+    //    SQL_REFRESH_NOW = -1,
+    //    SQL_REFRESH_AUTO = 0,
+    //    SQL_REFRESH_MANUAL = 1,
+    //}
+
+    // TODO: Reexport these in conn module
+    // TODO: Or derive them, but still export?
+    //impl ConnAttribute for crate::stmt::SQL_ATTR_METADATA_ID {}
+    //impl ConnAttribute for crate::stmt::SQL_ATTR_ASYNC_ENABLE {}
 }
 
 pub mod stmt {
     //    pub trait StmtAttrbute: Attribute<TypeIdentifier=SQLINTEGER> {}
-
-    pub trait StmtState {}
-    pub enum S1 {}
-    impl StmtState for S1 {}
 
     //    #[deprecated]
     //    enum StmtOption {
@@ -1276,11 +1276,7 @@ pub mod stmt {
     //    }
 }
 
-pub mod desc {
-    pub trait DescState {}
-    pub enum D1 {}
-    impl DescState for D1 {}
-}
+pub mod desc {}
 
 // /// Specifies how many active connections a particular driver supports.
 //#define SQL_MAX_DRIVER_CONNECTIONS          0

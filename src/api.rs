@@ -1,9 +1,9 @@
 use crate::{
     env::EnvAttribute,
-    handle::{HandleIdentifier, Allocate, AsSQLHANDLE, KnownVersion, HDBC, HENV, SQLHDBC},
+    handle::{Allocate, AsSQLHANDLE, HandleIdentifier, HDBC, HENV, SQLHDBC},
     AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLCHARRawSlice, AsRawParts, AsSQLCHARRawSlice,
-    GetAttr, OdbcAttribute, SetAttr, SQLCHAR, SQLHANDLE, SQLHENV, SQLINTEGER, SQLPOINTER,
-    SQLRETURN, SQLSMALLINT, SQLUSMALLINT,
+    DriverCompletion, GetAttr, OdbcAttribute, SetAttr, SQLCHAR, SQLHANDLE, SQLHENV, SQLINTEGER,
+    SQLPOINTER, SQLRETURN, SQLSMALLINT, SQLUSMALLINT,
 };
 use std::mem::MaybeUninit;
 
@@ -57,11 +57,14 @@ extern "system" {
 }
 
 #[inline]
-pub fn SQLAllocHandle<'a, 'src, OH: Allocate<'a, 'src>>(
+pub fn SQLAllocHandle<'src, OH: Allocate<'src>>(
     HandleType: OH::Identifier,
     InputHandle: &'src mut OH::SrcHandle,
     OutputHandlePtr: &mut MaybeUninit<OH>,
-) -> SQLRETURN {
+) -> SQLRETURN
+where
+    OH: 'src,
+{
     unsafe {
         AllocHandle(
             OH::Identifier::identifier(),
@@ -73,7 +76,7 @@ pub fn SQLAllocHandle<'a, 'src, OH: Allocate<'a, 'src>>(
 
 #[inline]
 pub fn SQLSetEnvAttr<A: EnvAttribute, T: AnsiType>(
-    EnvironmentHandle: &mut SQLHENV<crate::handle::V_UNDEFINED>,
+    EnvironmentHandle: &mut SQLHENV,
     Attribute: A,
     ValuePtr: &T,
 ) -> SQLRETURN
@@ -93,9 +96,8 @@ where
     }
 }
 
-#[inline]
-pub fn SQLGetEnvAttr<V: KnownVersion, A: EnvAttribute, T: AnsiType>(
-    EnvironmentHandle: &mut SQLHENV<V>,
+pub fn SQLGetEnvAttr<A: EnvAttribute, T: AnsiType>(
+    EnvironmentHandle: &mut SQLHENV,
     Attribute: A,
     ValuePtr: &mut T,
     StringLengthPtr: &mut MaybeUninit<T::StrLen>,
@@ -119,16 +121,15 @@ where
 }
 
 pub fn SQLDriverConnectA<
-    V: crate::handle::KnownVersion,
     C: AsSQLCHARRawSlice<SQLSMALLINT> + ?Sized,
     MC: AsMutSQLCHARRawSlice<SQLSMALLINT>,
 >(
-    ConnectionHandle: &mut SQLHDBC<V, crate::conn::C2>,
+    ConnectionHandle: &mut SQLHDBC,
     WindowHandle: Option<SQLHANDLE>,
     InConnectionString: &C,
     OutConnectionString: &mut MC,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-    DriverCompletion: SQLUSMALLINT,
+    DriverCompletion: DriverCompletion,
 ) -> SQLRETURN {
     let InConnectionString = InConnectionString.as_SQLCHAR_raw_slice();
     let OutConnectionString = OutConnectionString.as_mut_SQLCHAR_raw_slice();
@@ -142,7 +143,7 @@ pub fn SQLDriverConnectA<
             OutConnectionString.0,
             OutConnectionString.1,
             StringLength2Ptr.as_mut_ptr(),
-            DriverCompletion,
+            DriverCompletion as SQLUSMALLINT,
         );
 
         res

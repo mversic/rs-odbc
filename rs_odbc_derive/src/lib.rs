@@ -45,6 +45,12 @@ pub fn EqSQLUINTEGER_derive(input: TokenStream) -> TokenStream {
     type_eq(input, Ident::new("SQLUINTEGER", Span::call_site()))
 }
 
+#[allow(non_snake_case)]
+#[proc_macro_derive(EqSQLULEN)]
+pub fn EqSQLULEN(input: TokenStream) -> TokenStream {
+    type_eq(input, Ident::new("SQLULEN", Span::call_site()))
+}
+
 #[proc_macro_derive(AnsiType)]
 pub fn ansi_type_derive(input: TokenStream) -> TokenStream {
     char_type(input, Ident::new("AnsiType", Span::call_site()))
@@ -72,9 +78,9 @@ fn into_attr(input: TokenStream, attr_name: Ident, identifier_type: Ident) -> To
     }
 
     let gen = quote! {
-        impl #impl_generics Attribute for #type_name #ty_generics #where_clause {
-            type AttributeType = OdbcAttribute;
-            type IdentifierType = #identifier_type;
+        impl #impl_generics crate::Attribute for #type_name #ty_generics #where_clause {
+            type AttributeType = crate::OdbcAttribute;
+            type IdentifierType = crate::#identifier_type;
 
             fn identifier() -> Self::IdentifierType {
                 #identifier
@@ -94,7 +100,7 @@ fn char_type(input: TokenStream, trait_name: Ident) -> TokenStream {
     let type_name = &ast.ident;
 
     let gen = quote! {
-        impl #impl_generics #trait_name for #type_name #ty_generics #where_clause {}
+        impl #impl_generics crate::#trait_name for #type_name #ty_generics #where_clause {}
     };
 
     gen.into()

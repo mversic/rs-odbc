@@ -1,30 +1,8 @@
-use super::conn::{ConnState, C2, C4};
-use super::desc::{DescState, D1};
-use super::stmt::{StmtState, S1};
 use crate::api::{Disconnect, FreeHandle};
 use crate::{SQLSMALLINT, SQL_SUCCESS};
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::thread::panicking;
-
-pub trait Version {}
-pub trait KnownVersion: Version {}
-
-#[allow(non_camel_case_types)]
-pub enum V_UNDEFINED {}
-impl Version for V_UNDEFINED {}
-
-pub enum V3 {}
-impl Version for V3 {}
-impl KnownVersion for V3 {}
-
-pub enum V3_8 {}
-impl Version for V3_8 {}
-impl KnownVersion for V3_8 {}
-
-pub enum V4 {}
-impl Version for V4 {}
-impl KnownVersion for V4 {}
 
 pub trait AsSQLHANDLE {
     #[allow(non_snake_case)]
@@ -40,7 +18,7 @@ pub trait Handle: AsSQLHANDLE {
 }
 
 // TODO: Where to require Drop? I could make a generic Drop implementation, hmmmm
-pub trait Allocate<'a, 'b>: Handle + Drop {
+pub trait Allocate<'src>: Handle + Drop {
     type SrcHandle: AsSQLHANDLE;
 }
 
@@ -113,39 +91,29 @@ pub type HDBC = SQLHANDLE;
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/environment-handles
 #[repr(transparent)]
-pub struct SQLHENV<V: Version> {
-    pub handle: SQLHANDLE,
-    version: PhantomData<V>,
+pub struct SQLHENV {
+    handle: SQLHANDLE,
 }
-impl SQLHENV<V_UNDEFINED> {
+impl SQLHENV {
+    // TODO: Consider removing this function
     pub fn new() -> MaybeUninit<Self> {
         MaybeUninit::uninit()
     }
-
-    // TODO: Consider using transmute
-    pub fn assume_version<V: KnownVersion>(self) -> SQLHENV<V> {
-        let source = std::mem::ManuallyDrop::new(self);
-
-        SQLHENV {
-            handle: source.handle,
-            version: PhantomData,
-        }
-    }
 }
-impl<V: Version> Handle for SQLHENV<V> {
+impl Handle for SQLHENV {
     type Identifier = SQL_HANDLE_ENV;
 }
-impl<'a, 'b> Allocate<'a, 'b> for SQLHENV<V_UNDEFINED> {
+impl<'a> Allocate<'a> for SQLHENV {
     type SrcHandle = SQL_NULL_HANDLE;
 }
-impl<V: KnownVersion> SQLEndTranHandle for SQLHENV<V> {}
-impl<V: Version> AsSQLHANDLE for SQLHENV<V> {
+impl SQLEndTranHandle for SQLHENV {}
+impl AsSQLHANDLE for SQLHENV {
     #[allow(non_snake_case)]
     fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
         self.handle
     }
 }
-impl<V: Version> Drop for SQLHENV<V> {
+impl Drop for SQLHENV {
     fn drop(&mut self) {
         let ret = unsafe { FreeHandle(SQL_HANDLE_ENV::identifier(), self.as_SQLHANDLE()) };
 
@@ -174,62 +142,45 @@ impl<V: Version> Drop for SQLHENV<V> {
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/connection-handles
 #[repr(transparent)]
-pub struct SQLHDBC<'env, V: KnownVersion, C: ConnState> {
+pub struct SQLHDBC<'env> {
     handle: SQLHANDLE,
-    version: PhantomData<V>,
-    state: PhantomData<C>,
-    parent: PhantomData<&'env SQLHENV<V>>,
+    parent: PhantomData<&'env SQLHENV>,
 }
-impl<'a, 'env, V: KnownVersion> Allocate<'a, 'env> for SQLHDBC<'env, V, C2> {
-    type SrcHandle = SQLHENV<V>;
+impl<'env> Allocate<'env> for SQLHDBC<'env> {
+    type SrcHandle = SQLHENV;
 }
-impl<V: KnownVersion, C: ConnState> Handle for SQLHDBC<'_, V, C> {
+impl Handle for SQLHDBC<'_> {
     type Identifier = SQL_HANDLE_DBC;
 }
-impl<'env, V: KnownVersion> SQLHDBC<'env, V, C2> {
+impl<'env> SQLHDBC<'env> {
     pub fn new() -> MaybeUninit<Self> {
         MaybeUninit::uninit()
     }
-
-    // TODO: Consider using transmute
-    pub fn assume_connected(self) -> SQLHDBC<'env, V, C4> {
-        let source = std::mem::ManuallyDrop::new(self);
-
-        SQLHDBC {
-            handle: source.handle,
-            version: PhantomData,
-            state: PhantomData,
-            parent: PhantomData,
-        }
-    }
 }
-impl<V: KnownVersion> SQLCancelHandle for SQLHDBC<'_, V, C4> {}
-impl<V: KnownVersion> SQLCompleteAsyncHandle for SQLHDBC<'_, V, C4> {}
-impl<V: KnownVersion> SQLEndTranHandle for SQLHDBC<'_, V, C4> {}
-impl<V: KnownVersion, C: ConnState> AsSQLHANDLE for SQLHDBC<'_, V, C> {
+impl SQLCancelHandle for SQLHDBC<'_> {}
+impl SQLCompleteAsyncHandle for SQLHDBC<'_> {}
+impl SQLEndTranHandle for SQLHDBC<'_> {}
+impl AsSQLHANDLE for SQLHDBC<'_> {
     #[allow(non_snake_case)]
     fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
         self.handle
     }
 }
-impl<V: KnownVersion, C: ConnState> Drop for SQLHDBC<'_, V, C> {
+impl Drop for SQLHDBC<'_> {
     fn drop(&mut self) {
-        if C::connected() {
-            let ret = unsafe { Disconnect(self.as_SQLHANDLE()) };
-            if ret != SQL_SUCCESS && !panicking() {
-                panic!("SQLDisconnect -> {:?}", ret)
-            }
-        }
-
         let ret = unsafe { FreeHandle(SQL_HANDLE_DBC::identifier(), self.as_SQLHANDLE()) };
+
         if ret != SQL_SUCCESS && !panicking() {
-            // TODO: Improve this scenario by checking the reason for failure
             let ret = unsafe { Disconnect(self.as_SQLHANDLE()) };
             if ret != SQL_SUCCESS && !panicking() {
+                // TODO: Improve this scenario by checking the reason for failure
                 panic!("SQLDisconnect -> {:?}", ret)
             }
 
-            panic!("SQLFreeHandle -> {:?}", ret)
+            let ret = unsafe { FreeHandle(SQL_HANDLE_DBC::identifier(), self.as_SQLHANDLE()) };
+            if ret != SQL_SUCCESS && !panicking() {
+                panic!("SQLFreeHandle -> {:?}", ret)
+            }
         }
     }
 }
@@ -257,32 +208,30 @@ impl<V: KnownVersion, C: ConnState> Drop for SQLHDBC<'_, V, C> {
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/statement-handles
 #[repr(transparent)]
-pub struct SQLHSTMT<'env, 'conn, V: KnownVersion, S: StmtState> {
+pub struct SQLHSTMT<'env, 'conn> {
     handle: SQLHANDLE,
-    version: PhantomData<V>,
-    state: PhantomData<S>,
-    parent: PhantomData<&'conn SQLHDBC<'env, V, C4>>,
+    parent: PhantomData<&'conn SQLHDBC<'env>>,
 }
-impl<V: KnownVersion> SQLHSTMT<'_, '_, V, S1> {
+impl SQLHSTMT<'_, '_> {
     pub fn new() -> MaybeUninit<Self> {
         MaybeUninit::uninit()
     }
 }
-impl<'env, 'conn, V: KnownVersion> Allocate<'env, 'conn> for SQLHSTMT<'env, 'conn, V, S1> {
-    type SrcHandle = SQLHDBC<'env, V, C4>;
+impl<'env, 'conn> Allocate<'conn> for SQLHSTMT<'env, 'conn> {
+    type SrcHandle = SQLHDBC<'env>;
 }
-impl<V: KnownVersion, S: StmtState> Handle for SQLHSTMT<'_, '_, V, S> {
+impl Handle for SQLHSTMT<'_, '_> {
     type Identifier = SQL_HANDLE_STMT;
 }
-impl<V: KnownVersion, S: StmtState> SQLCancelHandle for SQLHSTMT<'_, '_, V, S> {}
-impl<V: KnownVersion, S: StmtState> SQLCompleteAsyncHandle for SQLHSTMT<'_, '_, V, S> {}
-impl<V: KnownVersion, S: StmtState> AsSQLHANDLE for SQLHSTMT<'_, '_, V, S> {
+impl SQLCancelHandle for SQLHSTMT<'_, '_> {}
+impl SQLCompleteAsyncHandle for SQLHSTMT<'_, '_> {}
+impl AsSQLHANDLE for SQLHSTMT<'_, '_> {
     #[allow(non_snake_case)]
     fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
         self.handle
     }
 }
-impl<V: KnownVersion, S: StmtState> Drop for SQLHSTMT<'_, '_, V, S> {
+impl Drop for SQLHSTMT<'_, '_> {
     fn drop(&mut self) {
         let ret = unsafe { FreeHandle(SQL_HANDLE_STMT::identifier(), self.as_SQLHANDLE()) };
 
@@ -315,30 +264,28 @@ impl<V: KnownVersion, S: StmtState> Drop for SQLHSTMT<'_, '_, V, S> {
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/descriptor-handles
 #[repr(transparent)]
-pub struct SQLHDESC<'env, 'conn, V: KnownVersion, D: DescState> {
+pub struct SQLHDESC<'env, 'conn> {
     handle: SQLHANDLE,
-    version: PhantomData<V>,
-    state: PhantomData<D>,
-    parent: PhantomData<&'conn SQLHDBC<'env, V, C4>>,
+    parent: PhantomData<&'conn SQLHDBC<'env>>,
 }
-impl<V: KnownVersion> SQLHDESC<'_, '_, V, D1> {
+impl SQLHDESC<'_, '_> {
     pub fn new() -> MaybeUninit<Self> {
         MaybeUninit::uninit()
     }
 }
-impl<'env, 'conn, V: KnownVersion> Allocate<'env, 'conn> for SQLHDESC<'env, 'conn, V, D1> {
-    type SrcHandle = SQLHDBC<'env, V, C4>;
+impl<'env, 'conn> Allocate<'conn> for SQLHDESC<'env, 'conn> {
+    type SrcHandle = SQLHDBC<'env>;
 }
-impl<V: KnownVersion, D: DescState> Handle for SQLHDESC<'_, '_, V, D> {
+impl Handle for SQLHDESC<'_, '_> {
     type Identifier = SQL_HANDLE_DESC;
 }
-impl<V: KnownVersion, D: DescState> AsSQLHANDLE for SQLHDESC<'_, '_, V, D> {
+impl AsSQLHANDLE for SQLHDESC<'_, '_> {
     #[allow(non_snake_case)]
     fn as_SQLHANDLE(&mut self) -> SQLHANDLE {
         self.handle
     }
 }
-impl<V: KnownVersion, D: DescState> Drop for SQLHDESC<'_, '_, V, D> {
+impl Drop for SQLHDESC<'_, '_> {
     fn drop(&mut self) {
         let ret = unsafe { FreeHandle(SQL_HANDLE_DESC::identifier(), self.as_SQLHANDLE()) };
 
