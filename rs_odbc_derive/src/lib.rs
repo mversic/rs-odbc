@@ -3,38 +3,38 @@ use proc_macro2::{Ident, Span};
 use quote::quote;
 use syn;
 
-#[proc_macro_derive(EnvAttribute, attributes(identifier))]
-pub fn env_attribute_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(EnvAttr, attributes(identifier))]
+pub fn env_attr_derive(input: TokenStream) -> TokenStream {
     into_attr(
         input,
-        Ident::new("EnvAttribute", Span::call_site()),
+        Ident::new("EnvAttr", Span::call_site()),
         Ident::new("SQLINTEGER", Span::call_site()),
     )
 }
 
-#[proc_macro_derive(ConnAttribute, attributes(identifier))]
-pub fn conn_attribute_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(ConnAttr, attributes(identifier))]
+pub fn conn_attr_derive(input: TokenStream) -> TokenStream {
     into_attr(
         input,
-        Ident::new("ConnAttribute", Span::call_site()),
+        Ident::new("ConnAttr", Span::call_site()),
         Ident::new("SQLINTEGER", Span::call_site()),
     )
 }
 
-#[proc_macro_derive(StmtAttribute, attributes(identifier))]
-pub fn stmt_attribute_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(StmtAttr, attributes(identifier))]
+pub fn stmt_attr_derive(input: TokenStream) -> TokenStream {
     into_attr(
         input,
-        Ident::new("StmtAttribute", Span::call_site()),
+        Ident::new("StmtAttr", Span::call_site()),
         Ident::new("SQLINTEGER", Span::call_site()),
     )
 }
 
-#[proc_macro_derive(ColAttribute, attributes(identifier))]
-pub fn col_attribute_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(ColAttr, attributes(identifier))]
+pub fn col_attr_derive(input: TokenStream) -> TokenStream {
     into_attr(
         input,
-        Ident::new("ColAttribute", Span::call_site()),
+        Ident::new("ColAttr", Span::call_site()),
         Ident::new("SQLUSMALLINT", Span::call_site()),
     )
 }
@@ -79,9 +79,9 @@ fn into_attr(input: TokenStream, attr_name: Ident, identifier_type: Ident) -> To
 
     let gen = quote! {
         impl #impl_generics crate::Attribute for #type_name #ty_generics #where_clause {
-            type AttributeType = crate::OdbcAttribute;
-            type IdentifierType = crate::#identifier_type;
-            const IDENTIFIER: Self::IdentifierType = #identifier;
+            type AttrType = crate::OdbcAttr;
+            type IdentType = crate::#identifier_type;
+            const IDENTIFIER: Self::IdentType = #identifier;
         }
 
         impl #impl_generics #attr_name for #type_name #ty_generics #where_clause {}

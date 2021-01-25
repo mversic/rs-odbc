@@ -1,4 +1,4 @@
-use crate::{AsMutSQLCHARRawSlice, AsSQLCHARRawSlice, SQLCHAR, SQLSMALLINT};
+use crate::{AsMutRawSQLCHARSlice, AsRawSQLCHARSlice, SQLCHAR, SQLSMALLINT};
 
 #[derive(Debug)]
 pub struct SQLCHARString<T> {
@@ -48,13 +48,13 @@ impl<T: Copy> SQLCHARString<T> {
     }
 }
 
-impl AsSQLCHARRawSlice<SQLSMALLINT> for SQLCHARString<SQLSMALLINT> {
-    fn as_SQLCHAR_raw_slice(&self) -> (*const SQLCHAR, SQLSMALLINT) {
+impl AsRawSQLCHARSlice<SQLSMALLINT> for SQLCHARString<SQLSMALLINT> {
+    fn as_raw_SQLCHAR_slice(&self) -> (*const SQLCHAR, SQLSMALLINT) {
         (self.inner.as_ptr().cast(), self.inner.capacity() as SQLSMALLINT)
     }
 }
-impl AsMutSQLCHARRawSlice<SQLSMALLINT> for SQLCHARString<SQLSMALLINT> {
-    fn as_mut_SQLCHAR_raw_slice(&mut self) -> (*mut SQLCHAR, SQLSMALLINT) {
+impl AsMutRawSQLCHARSlice<SQLSMALLINT> for SQLCHARString<SQLSMALLINT> {
+    fn as_mut_raw_SQLCHAR_slice(&mut self) -> (*mut SQLCHAR, SQLSMALLINT) {
         (self.inner.as_mut_ptr().cast(), self.inner.capacity() as SQLSMALLINT)
     }
 }

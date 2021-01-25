@@ -1,8 +1,8 @@
 use crate::{
-    env::EnvAttribute,
+    env::EnvAttr,
     handle::{Allocate, AsSQLHANDLE, HandleIdentifier, HDBC, HENV, SQLHDBC},
-    AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLCHARRawSlice, AsRawParts, AsSQLCHARRawSlice,
-    DriverCompletion, GetAttr, OdbcAttribute, SetAttr, SQLCHAR, SQLHANDLE, SQLHENV, SQLINTEGER,
+    AnsiType, AsMutPtr, AsMutRawSlice, AsMutRawSQLCHARSlice, AsRawParts, AsRawSQLCHARSlice,
+    DriverCompletion, GetAttr, OdbcAttr, SetAttr, SQLCHAR, SQLHANDLE, SQLHENV, SQLINTEGER,
     SQLPOINTER, SQLRETURN, SQLSMALLINT, SQLUSMALLINT,
 };
 use crate::handle::AsMutSQLHANDLE;
@@ -82,14 +82,14 @@ where
 }
 
 #[inline]
-pub fn SQLSetEnvAttr<A: EnvAttribute, T: AnsiType>(
+pub fn SQLSetEnvAttr<A: EnvAttr, T: AnsiType>(
     EnvironmentHandle: &mut SQLHENV,
     Attribute: A,
     ValuePtr: &T,
 ) -> SQLRETURN
 where
     A: SetAttr<T>,
-    T: AsRawParts<OdbcAttribute, SQLINTEGER>,
+    T: AsRawParts<OdbcAttr, SQLINTEGER>,
 {
     let ValuePtr = ValuePtr.as_raw_parts();
 
@@ -103,7 +103,7 @@ where
     }
 }
 
-pub fn SQLGetEnvAttr<A: EnvAttribute, T: AnsiType>(
+pub fn SQLGetEnvAttr<A: EnvAttr, T: AnsiType>(
     EnvironmentHandle: &SQLHENV,
     Attribute: A,
     ValuePtr: &mut T,
@@ -111,7 +111,7 @@ pub fn SQLGetEnvAttr<A: EnvAttribute, T: AnsiType>(
 ) -> SQLRETURN
 where
     A: GetAttr<T>,
-    T: AsMutRawSlice<OdbcAttribute, SQLINTEGER>,
+    T: AsMutRawSlice<OdbcAttr, SQLINTEGER>,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     let ValuePtr = ValuePtr.as_mut_raw_slice();
@@ -128,8 +128,8 @@ where
 }
 
 pub fn SQLDriverConnectA<
-    C: AsSQLCHARRawSlice<SQLSMALLINT> + ?Sized,
-    MC: AsMutSQLCHARRawSlice<SQLSMALLINT>,
+    C: AsRawSQLCHARSlice<SQLSMALLINT> + ?Sized,
+    MC: AsMutRawSQLCHARSlice<SQLSMALLINT>,
 >(
     ConnectionHandle: &mut SQLHDBC,
     WindowHandle: Option<SQLHANDLE>,
@@ -138,8 +138,8 @@ pub fn SQLDriverConnectA<
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
     DriverCompletion: DriverCompletion,
 ) -> SQLRETURN {
-    let InConnectionString = InConnectionString.as_SQLCHAR_raw_slice();
-    let OutConnectionString = OutConnectionString.as_mut_SQLCHAR_raw_slice();
+    let InConnectionString = InConnectionString.as_raw_SQLCHAR_slice();
+    let OutConnectionString = OutConnectionString.as_mut_raw_SQLCHAR_slice();
 
     unsafe {
         let res = DriverConnectA(
