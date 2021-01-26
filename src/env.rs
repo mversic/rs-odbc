@@ -1,6 +1,8 @@
-use crate::{AsRawParts, Attribute, GetAttr, OdbcAttr, OdbcBool, SetAttr};
-use crate::{SQLINTEGER, SQLPOINTER, SQLUINTEGER};
-use rs_odbc_derive::{AnsiType, EnvAttr, EqSQLUINTEGER};
+use crate::{
+    AsRawParts, Attribute, GetAttr, OdbcAttr, SetAttr, SQLINTEGER, SQLPOINTER, SQLUINTEGER,
+};
+use rs_odbc_derive::{EnvAttr, EqSQLUINTEGER};
+use std::mem::MaybeUninit;
 
 pub trait EnvAttr: Attribute<IdentType = SQLINTEGER> {}
 
@@ -8,8 +10,8 @@ pub trait EnvAttr: Attribute<IdentType = SQLINTEGER> {}
 #[derive(EnvAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_ODBC_VERSION;
-impl GetAttr<SQLUINTEGER> for SQL_ATTR_ODBC_VERSION {}
-impl SetAttr<OdbcVersion> for SQL_ATTR_ODBC_VERSION {}
+impl<C> GetAttr<C, MaybeUninit<SQLUINTEGER>> for SQL_ATTR_ODBC_VERSION {}
+impl<C> SetAttr<C, OdbcVersion> for SQL_ATTR_ODBC_VERSION {}
 
 #[identifier(201)]
 #[derive(EnvAttr)]
@@ -19,17 +21,17 @@ pub struct SQL_ATTR_CONNECTION_POOLING;
 #[cfg(feature = "v3_8")]
 pub use ConnectionPooling::SQL_CP_OFF as SQL_CP_DEFAULT;
 #[cfg(feature = "v3_8")]
-impl GetAttr<SQLUINTEGER> for SQL_ATTR_CONNECTION_POOLING {}
+impl<C> GetAttr<C, MaybeUninit<SQLUINTEGER>> for SQL_ATTR_CONNECTION_POOLING {}
 #[cfg(feature = "v3_8")]
-impl SetAttr<ConnectionPooling> for SQL_ATTR_CONNECTION_POOLING {}
+impl<C> SetAttr<C, ConnectionPooling> for SQL_ATTR_CONNECTION_POOLING {}
 
 #[identifier(202)]
 #[derive(EnvAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CP_MATCH;
 pub use CpMatch::SQL_CP_STRICT_MATCH as SQL_CP_MATCH_DEFAULT;
-impl GetAttr<SQLUINTEGER> for SQL_ATTR_CP_MATCH {}
-impl SetAttr<CpMatch> for SQL_ATTR_CP_MATCH {}
+impl<C> GetAttr<C, MaybeUninit<SQLUINTEGER>> for SQL_ATTR_CP_MATCH {}
+impl<C> SetAttr<C, CpMatch> for SQL_ATTR_CP_MATCH {}
 
 // TODO:
 // For private driver manager
@@ -37,15 +39,16 @@ impl SetAttr<CpMatch> for SQL_ATTR_CP_MATCH {}
 // #[derive(EnvAttr)]
 // pub struct SQL_ATTR_APPLICATION_KEY;
 
-#[identifier(1001)]
-#[derive(EnvAttr)]
-#[allow(non_camel_case_types)]
-pub struct SQL_ATTR_OUTPUT_NTS;
-impl GetAttr<SQLUINTEGER> for SQL_ATTR_OUTPUT_NTS {}
-impl SetAttr<OdbcBool> for SQL_ATTR_OUTPUT_NTS {}
+// TODO: Is this used in V3.x?
+//#[identifier(1001)]
+//#[derive(EnvAttr)]
+//#[allow(non_camel_case_types)]
+//pub struct SQL_ATTR_OUTPUT_NTS;
+//impl GetAttr<MaybeUninit<SQLUINTEGER>> for SQL_ATTR_OUTPUT_NTS {}
+//impl SetAttr<OdbcBool> for SQL_ATTR_OUTPUT_NTS {}
 
 #[allow(non_camel_case_types)]
-#[derive(EqSQLUINTEGER, AnsiType, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(EqSQLUINTEGER, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum OdbcVersion {
     SQL_OV_ODBC3 = 3,
     #[cfg(feature = "v3_8")]
@@ -61,7 +64,7 @@ impl AsRawParts<OdbcAttr, SQLINTEGER> for OdbcVersion {
 
 #[cfg(feature = "v3_8")]
 #[allow(non_camel_case_types)]
-#[derive(EqSQLUINTEGER, AnsiType, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(EqSQLUINTEGER, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ConnectionPooling {
     SQL_CP_OFF = 0,
     SQL_CP_ONE_PER_DRIVER = 1,
@@ -77,7 +80,7 @@ impl AsRawParts<OdbcAttr, SQLINTEGER> for ConnectionPooling {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(EqSQLUINTEGER, AnsiType, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(EqSQLUINTEGER, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CpMatch {
     SQL_CP_STRICT_MATCH = 0,
     SQL_CP_RELAXED_MATCH = 1,

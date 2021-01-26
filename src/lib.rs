@@ -23,7 +23,7 @@ pub use conn::{
 };
 pub use env::{
     ConnectionPooling::*, CpMatch::*, OdbcVersion::*, SQL_ATTR_CONNECTION_POOLING,
-    SQL_ATTR_CP_MATCH, SQL_ATTR_ODBC_VERSION, SQL_ATTR_OUTPUT_NTS, SQL_CP_DEFAULT,
+    SQL_ATTR_CP_MATCH, SQL_ATTR_ODBC_VERSION, SQL_CP_DEFAULT,
     SQL_CP_MATCH_DEFAULT,
 };
 pub use handle::{
@@ -40,15 +40,27 @@ pub trait AsMutPtr<T> {
     fn as_mut_ptr(&mut self) -> *mut T;
 }
 // TODO: Is it possible to derive this trait?
-pub trait AsRawParts<P, LEN> {
+pub trait AsRawParts<T, LEN> {
     // TODO: Is it possible to not have P type?
     fn as_raw_parts(&self) -> (SQLPOINTER, LEN);
 }
-pub trait AsMutRawSlice<P, LEN> {
+pub trait AsMutRawSlice<T, LEN> {
     // TODO: Is it possible to not have P type?
     // TODO: Consider extracting StrLen to a separate trait
     type StrLen;
     fn as_mut_raw_slice(&mut self) -> (SQLPOINTER, LEN);
+}
+pub trait AsRawSQLCHARSlice<LEN> {
+    fn as_raw_SQLCHAR_slice(&self) -> (*const SQLCHAR, LEN);
+}
+pub trait AsRawSQLWCHARSlice<LEN> {
+    fn as_raw_SQLWCHAR_slice(&self) -> (*const SQLWCHAR, LEN);
+}
+pub trait AsMutRawSQLCHARSlice<LEN> {
+    fn as_mut_raw_SQLCHAR_slice(&mut self) -> (*mut SQLCHAR, LEN);
+}
+pub trait AsMutRawSQLWCHARSlice<LEN> {
+    fn as_mut_raw_SQLWCHAR_slice(&mut self) -> (*mut SQLWCHAR, LEN);
 }
 
 impl AsMutPtr<SQLINTEGER> for MaybeUninit<SQLINTEGER> {
@@ -64,12 +76,16 @@ impl<T> AsMutPtr<T> for MaybeUninit<()> {
     }
 }
 
-impl AnsiType for SQLUINTEGER {}
-impl UnicodeType for SQLUINTEGER {}
-impl<T> AsMutRawSlice<T, SQLINTEGER> for SQLUINTEGER {
+impl AsMutRawSlice<OdbcAttr, SQLINTEGER> for MaybeUninit<SQLUINTEGER> {
     type StrLen = ();
     fn as_mut_raw_slice(&mut self) -> (SQLPOINTER, SQLINTEGER) {
-        (self as *mut _ as SQLPOINTER, 0)
+        (self.as_mut_ptr().cast(), 0)
+    }
+}
+impl AsRawSQLCHARSlice<SQLSMALLINT> for str {
+    fn as_raw_SQLCHAR_slice(&self) -> (*const SQLCHAR, SQLSMALLINT) {
+        // TODO: This cast is problematic
+        (self.as_ptr(), self.len() as SQLSMALLINT)
     }
 }
 
@@ -81,40 +97,10 @@ pub trait Attribute {
 }
 pub enum OdbcAttr {}
 pub enum DriverAttr {}
-pub trait GetAttr<T> {}
-pub trait SetAttr<T> {}
-pub trait AnsiType {}
-pub trait UnicodeType {}
-
-pub trait AsRawSQLCHARSlice<LEN> {
-    #[allow(non_snake_case)]
-    fn as_raw_SQLCHAR_slice(&self) -> (*const SQLCHAR, LEN);
-}
-pub trait AsSQLWCHARRawSlice<LEN> {
-    #[allow(non_snake_case)]
-    fn as_raw_SQLCHAR_slice(&self) -> (*const SQLCHAR, LEN);
-}
-pub trait AsMutRawSQLCHARSlice<LEN> {
-    //type InitializedType;
-    #[allow(non_snake_case)]
-    fn as_mut_raw_SQLCHAR_slice(&mut self) -> (*mut SQLCHAR, LEN);
-    //unsafe fn assume_init(self) -> Self::InitializedType;
-}
-pub trait AsMutSQLWCHARRawSlice<LEN> {
-    //type InitializedType;
-    #[allow(non_snake_case)]
-    fn as_mut_raw_SQLCHAR_slice(&mut self) -> (*mut SQLCHAR, LEN);
-    //unsafe fn assume_init(self) -> Self::InitializedType;
-}
-pub trait AsRawCharSlice<LEN>: AsRawSQLCHARSlice<LEN> + AsSQLWCHARRawSlice<LEN> {}
-pub trait AsMutRawCharSlice<LEN>: AsMutRawSQLCHARSlice<LEN> + AsMutSQLWCHARRawSlice<LEN> {}
-
-impl AsRawSQLCHARSlice<SQLSMALLINT> for str {
-    #[allow(non_snake_case)]
-    fn as_raw_SQLCHAR_slice(&self) -> (*const SQLCHAR, SQLSMALLINT) {
-        (self.as_ptr(), self.len() as SQLSMALLINT)
-    }
-}
+pub trait GetAttr<C, T> {}
+pub trait SetAttr<C, T> {}
+pub enum AnsiType {}
+pub enum UnicodeType {}
 
 // TODO: Maybe implement something like this?
 //impl<const M: usize> AsMutRawSQLCHARSlice<SQLSMALLINT> for [MaybeUninit<SQLCHAR>; M] {
@@ -144,7 +130,7 @@ impl AsRawSQLCHARSlice<SQLSMALLINT> for str {
 // SQL_ATTR_OUTPUT_NTS(u32, true), SQL_ATTR_AUTO_IPD(u32, _)
 #[allow(non_camel_case_types)]
 // TODO: Type equality should be derived such as EqSQLUINTEGER
-#[derive(rs_odbc_derive::AnsiType, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum OdbcBool {
     SQL_FALSE = 0,
     SQL_TRUE = 1,

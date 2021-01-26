@@ -1,4 +1,4 @@
-use crate::{AsMutRawCharSlice, Attribute, GetAttr, SQLINTEGER, SQLLEN, SQLRETURN, SQLSMALLINT};
+use crate::{Attribute, GetAttr, SQLINTEGER, SQLLEN, SQLRETURN, SQLSMALLINT};
 
 pub trait DiagField: Attribute<IdentType = SQLSMALLINT> {}
 

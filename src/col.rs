@@ -1,5 +1,6 @@
 use crate::{Attribute, GetAttr, SQLSMALLINT, SQLUSMALLINT};
 use rs_odbc_derive::ColAttr;
+use std::mem::MaybeUninit;
 
 pub trait ColAttr: Attribute<IdentType = SQLUSMALLINT> {}
 
@@ -49,7 +50,7 @@ pub struct SQL_DESC_FIXED_PREC_SCALE;
 #[derive(ColAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DESC_UPDATABLE;
-impl GetAttr<SQLSMALLINT> for SQL_DESC_UPDATABLE {}
+impl<C> GetAttr<C, MaybeUninit<SQLSMALLINT>> for SQL_DESC_UPDATABLE {}
 
 ///// Describes the updatability of the column in the result set, not the column in the base table.
 //#[repr(SQLSMALLINT)]
@@ -172,7 +173,7 @@ pub struct SQL_DESC_NAME;
 #[derive(ColAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DESC_UNNAMED;
-impl GetAttr<SQLSMALLINT> for SQL_DESC_UNNAMED {}
+impl<C> GetAttr<C, MaybeUninit<SQLSMALLINT>> for SQL_DESC_UNNAMED {}
 
 //#[repr(SQLSMALLINT)]
 //pub enum DescUnnamed {

@@ -51,16 +51,6 @@ pub fn EqSQLULEN(input: TokenStream) -> TokenStream {
     type_eq(input, Ident::new("SQLULEN", Span::call_site()))
 }
 
-#[proc_macro_derive(AnsiType)]
-pub fn ansi_type_derive(input: TokenStream) -> TokenStream {
-    char_type(input, Ident::new("AnsiType", Span::call_site()))
-}
-
-#[proc_macro_derive(UnicodeType)]
-pub fn unicode_type_derive(input: TokenStream) -> TokenStream {
-    char_type(input, Ident::new("UnicodeType", Span::call_site()))
-}
-
 fn into_attr(input: TokenStream, attr_name: Ident, identifier_type: Ident) -> TokenStream {
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
 
@@ -85,19 +75,6 @@ fn into_attr(input: TokenStream, attr_name: Ident, identifier_type: Ident) -> To
         }
 
         impl #impl_generics #attr_name for #type_name #ty_generics #where_clause {}
-    };
-
-    gen.into()
-}
-
-fn char_type(input: TokenStream, trait_name: Ident) -> TokenStream {
-    let ast: syn::DeriveInput = syn::parse(input).unwrap();
-
-    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
-    let type_name = &ast.ident;
-
-    let gen = quote! {
-        impl #impl_generics crate::#trait_name for #type_name #ty_generics #where_clause {}
     };
 
     gen.into()

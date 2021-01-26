@@ -42,19 +42,6 @@ pub type SQLSETPOSIROW = SQLUSMALLINT;
 #[cfg(target_pointer_width = "64")]
 pub type SQLSETPOSIROW = u64;
 
-pub trait AsSqlCharStr {
-    fn as_sql_str(&self) -> &[UnsafeCell<SQLCHAR>];
-}
-pub trait AsMutSqlCharStr {
-    fn as_mut_sql_str(&mut self) -> &mut[UnsafeCell<SQLCHAR>];
-}
-pub trait AsSqlWcharStr {
-    fn as_sql_str(&self) -> &[UnsafeCell<SQLWCHAR>];
-}
-pub trait AsMutSqlWcharStr {
-    fn as_mut_sql_str(&mut self) -> &mut[UnsafeCell<SQLWCHAR>];
-}
-
 pub struct SqlStateA([SQLCHAR; 6]);
 pub struct SqlStateW([SQLWCHAR; 6]);
 

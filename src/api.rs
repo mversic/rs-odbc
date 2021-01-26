@@ -1,11 +1,11 @@
+use crate::handle::AsMutSQLHANDLE;
 use crate::{
-    env::EnvAttr,
+    env::EnvAttr, AnsiType,
     handle::{Allocate, AsSQLHANDLE, HandleIdentifier, HDBC, HENV, SQLHDBC},
-    AnsiType, AsMutPtr, AsMutRawSlice, AsMutRawSQLCHARSlice, AsRawParts, AsRawSQLCHARSlice,
+    AsMutPtr, AsMutRawSlice, AsRawParts, AsRawSQLCHARSlice, AsMutRawSQLCHARSlice,
     DriverCompletion, GetAttr, OdbcAttr, SetAttr, SQLCHAR, SQLHANDLE, SQLHENV, SQLINTEGER,
     SQLPOINTER, SQLRETURN, SQLSMALLINT, SQLUSMALLINT,
 };
-use crate::handle::AsMutSQLHANDLE;
 use std::mem::MaybeUninit;
 
 // TODO: Fix linking
@@ -64,7 +64,8 @@ pub fn SQLAllocHandle<'src, OH: Allocate<'src>>(
     OutputHandlePtr: &mut MaybeUninit<OH>,
 ) -> SQLRETURN
 where
-    OH: 'src,
+    OH::SrcHandle: AsSQLHANDLE,
+    OH: AsMutSQLHANDLE,
 {
     unsafe {
         AllocHandle(
@@ -82,13 +83,13 @@ where
 }
 
 #[inline]
-pub fn SQLSetEnvAttr<A: EnvAttr, T: AnsiType>(
+pub fn SQLSetEnvAttr<A: EnvAttr, T>(
     EnvironmentHandle: &mut SQLHENV,
     Attribute: A,
     ValuePtr: &T,
 ) -> SQLRETURN
 where
-    A: SetAttr<T>,
+    A: SetAttr<AnsiType, T>,
     T: AsRawParts<OdbcAttr, SQLINTEGER>,
 {
     let ValuePtr = ValuePtr.as_raw_parts();
@@ -103,14 +104,14 @@ where
     }
 }
 
-pub fn SQLGetEnvAttr<A: EnvAttr, T: AnsiType>(
+pub fn SQLGetEnvAttr<A: EnvAttr, T>(
     EnvironmentHandle: &SQLHENV,
     Attribute: A,
     ValuePtr: &mut T,
     StringLengthPtr: &mut MaybeUninit<T::StrLen>,
 ) -> SQLRETURN
 where
-    A: GetAttr<T>,
+    A: GetAttr<AnsiType, T>,
     T: AsMutRawSlice<OdbcAttr, SQLINTEGER>,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
@@ -158,5 +159,5 @@ pub fn SQLDriverConnectA<
 }
 
 pub fn SQLDisconnect(ConnectionHandle: &mut SQLHDBC) -> SQLRETURN {
-    unsafe{ Disconnect(ConnectionHandle.as_mut_SQLHANDLE()) }
+    unsafe { Disconnect(ConnectionHandle.as_mut_SQLHANDLE()) }
 }

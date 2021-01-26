@@ -17,7 +17,7 @@ pub trait HandleIdentifier {
     const IDENTIFIER: SQLSMALLINT;
 }
 
-pub trait Handle: AsSQLHANDLE {
+pub trait Handle {
     type Identifier: HandleIdentifier;
 }
 
