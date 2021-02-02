@@ -1,182 +1,216 @@
-use std::cell::UnsafeCell;
+use crate::{SQLSMALLINT, SQLCHAR, SQLUINTEGER, SQLUSMALLINT, SQLSCHAR};
+use rs_odbc_derive::{Identifier as Ident, CType};
 use crate::sql_types::*;
+use crate::Identifier;
 
-// TODO: Add support for mingw-x64 on x86 platform
-//use std::convert::TryFrom;
-//use ucs2;
+pub trait CType: Identifier<IdentType = SQLSMALLINT> {}
 
-/// UCS-2 encoded character
-pub type SQLWCHAR = u16;
-//impl TryFrom<&str> for &mut [SQLWCHAR] {
-//    type Error = u16;
-//
-//    fn try_from(source: &str) -> Result<Self, Self::Error> {
-//        unimplemented!()
-//    }
-//}
+const SQL_UNSIGNED_OFFSET: SQLSMALLINT = -22;
+const SQL_SIGNED_OFFSET: SQLSMALLINT = -20;
+const SQL_C_SHORT: SQLSMALLINT = SQL_SMALLINT::IDENTIFIER;
+const SQL_C_LONG: SQLSMALLINT = SQL_INTEGER::IDENTIFIER;
+const SQL_C_TINYINT: SQLSMALLINT = SQL_TINYINT::IDENTIFIER;
 
-pub type SQLSMALLINT = i16;
-pub type SQLUSMALLINT = u16;
+// TODO: This value is discouraged from being used
+#[derive(Ident, CType)]
+#[identifier(SQLSMALLINT, 99)]
+#[allow(non_camel_case_types)]
+struct SQL_C_DEFAULT;
 
-pub type SQLINTEGER = i32;
-pub type SQLUINTEGER = u32;
-
-pub type SQLREAL = f32;
-pub type SQLDOUBLE = f64;
-pub type SQLFLOAT = f64;
-
-/// ASCII encoded character
-pub type SQLCHAR = u8;
-pub type SQLSCHAR = i8;
-
-pub type SQLBIGINT = i64;
-pub type SQLUBIGINT = u64;
-
-pub type SQLLEN = isize;
-pub type SQLULEN = usize;
-
-pub type RETCODE = i16;
-
-#[cfg(target_pointer_width = "32")]
-pub type SQLSETPOSIROW = SQLUSMALLINT;
-#[cfg(target_pointer_width = "64")]
-pub type SQLSETPOSIROW = u64;
-
-pub struct SqlStateA([SQLCHAR; 6]);
-pub struct SqlStateW([SQLWCHAR; 6]);
-
-//impl AsAsciiStr for std::ffi::CStr {
-//    fn as_ascii_str(&self) -> Result<&[UnsafeCell<SQLCHAR>], Error> {
-//        self.to_bytes()
-//    }
-//}
-//impl AsMutAsciiStr for std::ffi::CStr {
-//    fn as_mut_ascii_str(&mut self) -> Result<&mut [UnsafeCell<SQLCHAR>], Error> {
-//        self.to_bytes()
-//    }
-//}
-
-/// ODBC C data types indicate the data type of C buffers used to store data in the
-/// application.
-///
-/// # Documentation
-/// https://docs.microsoft.com/en-us/sql/odbc/reference/appendixes/c-data-types
-#[repr(transparent)]
-pub struct CTypeIdentifier(SQLSMALLINT);
-
-impl CTypeIdentifier {
-    pub const fn raw_value(&self) -> SQLSMALLINT {
-        self.0
-    }
-
-    /// Used to construct a driver-specific C type identifier
-    #[cfg(feature = "v3_8")]
-    pub fn driver_specific(source: SQLSMALLINT) -> Self {
-        CTypeIdentifier(source)
-    }
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_CHAR;
+impl  Identifier for SQL_C_CHAR {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_CHAR::IDENTIFIER;
 }
 
-// This value is discouraged from being used
-#[allow(dead_code)]
-const SQL_C_DEFAULT: CTypeIdentifier = CTypeIdentifier(99);
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_WCHAR;
+impl Identifier for SQL_C_WCHAR {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_WCHAR::IDENTIFIER;
+}
 
-const SQL_SIGNED_OFFSET: CTypeIdentifier = CTypeIdentifier(-20);
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_SSHORT;
+impl Identifier for SQL_C_SSHORT {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_C_SHORT + SQL_SIGNED_OFFSET;
+}
 
-const SQL_UNSIGNED_OFFSET: CTypeIdentifier = CTypeIdentifier(-22);
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_USHORT;
+impl Identifier for SQL_C_USHORT {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_C_SHORT + SQL_UNSIGNED_OFFSET;
+}
 
-pub const SQL_C_CHAR: CTypeIdentifier = CTypeIdentifier(SQL_CHAR.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_SLONG;
+impl Identifier for SQL_C_SLONG {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_C_LONG + SQL_SIGNED_OFFSET;
+}
 
-pub const SQL_C_WCHAR: CTypeIdentifier = CTypeIdentifier(SQL_WCHAR.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_ULONG;
+impl Identifier for SQL_C_ULONG {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_C_LONG + SQL_UNSIGNED_OFFSET;
+}
 
-/// Replaced by SQL_C_SSHORT and SQL_C_USHORT
-#[deprecated]
-const SQL_C_SHORT: CTypeIdentifier = CTypeIdentifier(SQL_SMALLINT.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_FLOAT;
+impl Identifier for SQL_C_FLOAT {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_REAL::IDENTIFIER;
 
-#[allow(deprecated)]
-pub const SQL_C_SSHORT: CTypeIdentifier =
-    CTypeIdentifier(SQL_C_SHORT.raw_value() + SQL_SIGNED_OFFSET.raw_value());
+}
 
-#[allow(deprecated)]
-pub const SQL_C_USHORT: CTypeIdentifier =
-    CTypeIdentifier(SQL_C_SHORT.raw_value() + SQL_UNSIGNED_OFFSET.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_DOUBLE;
+impl Identifier for SQL_C_DOUBLE {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_DOUBLE::IDENTIFIER;
+}
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_BIT;
+impl Identifier for SQL_C_BIT {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_BIT::IDENTIFIER;
+}
 
-/// Replaced by SQL_C_SLONG and SQL_C_ULONG
-#[deprecated]
-const SQL_C_LONG: CTypeIdentifier = CTypeIdentifier(SQL_INTEGER.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_STINYINT;
+impl Identifier for SQL_C_STINYINT {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_C_TINYINT + SQL_SIGNED_OFFSET;
+}
 
-#[allow(deprecated)]
-pub const SQL_C_SLONG: CTypeIdentifier =
-    CTypeIdentifier(SQL_C_LONG.raw_value() + SQL_SIGNED_OFFSET.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_UTINYINT;
+impl Identifier for SQL_C_UTINYINT {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_C_TINYINT + SQL_UNSIGNED_OFFSET;
+}
 
-#[allow(deprecated)]
-pub const SQL_C_ULONG: CTypeIdentifier =
-    CTypeIdentifier(SQL_C_LONG.raw_value() + SQL_UNSIGNED_OFFSET.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_SBIGINT;
+impl Identifier for SQL_C_SBIGINT {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_BIGINT::IDENTIFIER + SQL_SIGNED_OFFSET;
+}
 
-pub const SQL_C_FLOAT: CTypeIdentifier = CTypeIdentifier(SQL_REAL.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_UBIGINT;
+impl Identifier for SQL_C_UBIGINT {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_BIGINT::IDENTIFIER + SQL_UNSIGNED_OFFSET;
+}
 
-pub const SQL_C_DOUBLE: CTypeIdentifier = CTypeIdentifier(SQL_DOUBLE.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_BINARY;
+impl Identifier for SQL_C_BINARY {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_BINARY::IDENTIFIER;
+}
 
-pub const SQL_C_BIT: CTypeIdentifier = CTypeIdentifier(SQL_BIT.raw_value());
-
-#[deprecated]
-#[allow(dead_code)]
-const SQL_C_TINYINT: CTypeIdentifier = CTypeIdentifier(SQL_TINYINT.raw_value());
-
-pub const SQL_C_STINYINT: CTypeIdentifier =
-    CTypeIdentifier(SQL_TINYINT.raw_value() + SQL_SIGNED_OFFSET.raw_value());
-
-pub const SQL_C_UTINYINT: CTypeIdentifier =
-    CTypeIdentifier(SQL_TINYINT.raw_value() + SQL_UNSIGNED_OFFSET.raw_value());
-
-pub const SQL_C_SBIGINT: CTypeIdentifier =
-    CTypeIdentifier(SQL_BIGINT.raw_value() + SQL_SIGNED_OFFSET.raw_value());
-
-pub const SQL_C_UBIGINT: CTypeIdentifier =
-    CTypeIdentifier(SQL_BIGINT.raw_value() + SQL_UNSIGNED_OFFSET.raw_value());
-
-pub const SQL_C_BINARY: CTypeIdentifier = CTypeIdentifier(SQL_BINARY.raw_value());
-
+// TODO: Weird?
 pub use SQL_C_BINARY as SQL_C_VARBOOKMARK;
 
-pub const SQL_C_NUMERIC: CTypeIdentifier = CTypeIdentifier(SQL_NUMERIC.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_NUMERIC;
+impl Identifier for SQL_C_NUMERIC {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_NUMERIC::IDENTIFIER;
+}
 
+#[derive(CType)]
 #[cfg(feature = "v3_5")]
-pub const SQL_C_GUID: CTypeIdentifier = CTypeIdentifier(SQL_GUID.raw_value());
+#[allow(non_camel_case_types)]
+pub struct SQL_C_GUID;
+impl Identifier for SQL_C_GUID {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_GUID::IDENTIFIER;
+}
 
-pub const SQL_C_TYPE_DATE: CTypeIdentifier = CTypeIdentifier(SQL_TYPE_DATE.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_TYPE_DATE;
+impl Identifier for SQL_C_TYPE_DATE {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_DATE::IDENTIFIER;
+}
 
-pub const SQL_C_TYPE_TIME: CTypeIdentifier = CTypeIdentifier(SQL_TYPE_TIME.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_TYPE_TIME;
+impl Identifier for SQL_C_TYPE_TIME {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIME::IDENTIFIER;
+}
 
-pub const SQL_C_TYPE_TIMESTAMP: CTypeIdentifier = CTypeIdentifier(SQL_TYPE_TIMESTAMP.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_TYPE_TIMESTAMP;
+impl Identifier for SQL_C_TYPE_TIMESTAMP {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIMESTAMP::IDENTIFIER;
+}
 
 #[cfg(feature = "v4")]
-pub const SQL_C_TYPE_TIME_WITH_TIMEZONE: CTypeIdentifier =
-    CTypeIdentifier(SQL_TYPE_TIME_WITH_TIMEZONE.raw_value());
+#[allow(non_camel_case_types)]
+pub struct SQL_C_TYPE_TIME_WITH_TIMEZONE;
+#[cfg(feature = "v4")]
+impl Identifier for SQL_C_TYPE_TIME_WITH_TIMEZONE {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIME_WITH_TIMEZONE::IDENTIFIER;
+}
 
 #[cfg(feature = "v4")]
-pub const SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE: CTypeIdentifier =
-    CTypeIdentifier(SQL_TYPE_TIMESTAMP_WITH_TIMEZONE.raw_value());
+#[allow(non_camel_case_types)]
+pub struct SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE;
+#[cfg(feature = "v4")]
+impl Identifier for SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIMESTAMP_WITH_TIMEZONE;
+}
 
-pub const SQL_C_INTERVAL_YEAR: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_YEAR.raw_value());
-pub const SQL_C_INTERVAL_MONTH: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_MONTH.raw_value());
-pub const SQL_C_INTERVAL_DAY: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_DAY.raw_value());
-pub const SQL_C_INTERVAL_HOUR: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_HOUR.raw_value());
-pub const SQL_C_INTERVAL_MINUTE: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_MINUTE.raw_value());
-pub const SQL_C_INTERVAL_SECOND: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_SECOND.raw_value());
-pub const SQL_C_INTERVAL_YEAR_TO_MONTH: CTypeIdentifier =
-    CTypeIdentifier(SQL_INTERVAL_YEAR_TO_MONTH.raw_value());
-pub const SQL_C_INTERVAL_DAY_TO_HOUR: CTypeIdentifier =
-    CTypeIdentifier(SQL_INTERVAL_DAY_TO_HOUR.raw_value());
-pub const SQL_C_INTERVAL_DAY_TO_MINUTE: CTypeIdentifier =
-    CTypeIdentifier(SQL_INTERVAL_DAY_TO_MINUTE.raw_value());
-pub const SQL_C_INTERVAL_DAY_TO_SECOND: CTypeIdentifier =
-    CTypeIdentifier(SQL_INTERVAL_DAY_TO_SECOND.raw_value());
-pub const SQL_C_INTERVAL_HOUR_TO_MINUTE: CTypeIdentifier =
-    CTypeIdentifier(SQL_INTERVAL_HOUR_TO_MINUTE.raw_value());
-pub const SQL_C_INTERVAL_HOUR_TO_SECOND: CTypeIdentifier =
-    CTypeIdentifier(SQL_INTERVAL_HOUR_TO_SECOND.raw_value());
-pub const SQL_C_INTERVAL_MINUTE_TO_SECOND: CTypeIdentifier =
-    CTypeIdentifier(SQL_INTERVAL_MINUTE_TO_SECOND.raw_value());
+//pub const SQL_C_INTERVAL_YEAR: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_YEAR.raw_value());
+//pub const SQL_C_INTERVAL_MONTH: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_MONTH.raw_value());
+//pub const SQL_C_INTERVAL_DAY: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_DAY.raw_value());
+//pub const SQL_C_INTERVAL_HOUR: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_HOUR.raw_value());
+//pub const SQL_C_INTERVAL_MINUTE: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_MINUTE.raw_value());
+//pub const SQL_C_INTERVAL_SECOND: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_SECOND.raw_value());
+//pub const SQL_C_INTERVAL_YEAR_TO_MONTH: CTypeIdentifier =
+//    CTypeIdentifier(SQL_INTERVAL_YEAR_TO_MONTH.raw_value());
+//pub const SQL_C_INTERVAL_DAY_TO_HOUR: CTypeIdentifier =
+//    CTypeIdentifier(SQL_INTERVAL_DAY_TO_HOUR.raw_value());
+//pub const SQL_C_INTERVAL_DAY_TO_MINUTE: CTypeIdentifier =
+//    CTypeIdentifier(SQL_INTERVAL_DAY_TO_MINUTE.raw_value());
+//pub const SQL_C_INTERVAL_DAY_TO_SECOND: CTypeIdentifier =
+//    CTypeIdentifier(SQL_INTERVAL_DAY_TO_SECOND.raw_value());
+//pub const SQL_C_INTERVAL_HOUR_TO_MINUTE: CTypeIdentifier =
+//    CTypeIdentifier(SQL_INTERVAL_HOUR_TO_MINUTE.raw_value());
+//pub const SQL_C_INTERVAL_HOUR_TO_SECOND: CTypeIdentifier =
+//    CTypeIdentifier(SQL_INTERVAL_HOUR_TO_SECOND.raw_value());
+//pub const SQL_C_INTERVAL_MINUTE_TO_SECOND: CTypeIdentifier =
+//    CTypeIdentifier(SQL_INTERVAL_MINUTE_TO_SECOND.raw_value());
 
 // =================================================================================== //
 
@@ -190,6 +224,7 @@ pub struct SQL_NUMERIC_STRUCT {
     pub val: [SQLCHAR; SQL_MAX_NUMERIC_LEN],
 }
 
+// TODO: Why is this required?
 pub const SQL_MAX_NUMERIC_LEN: usize = 16;
 
 #[repr(C)]
@@ -302,7 +337,7 @@ struct SQL_YEAR_MONTH_STRUCT {
 }
 
 // TODO: Must be copy because it's used in uinon
-// Maybe it's would bt ok in nightly
+// Maybe it would bt ok in nightly
 #[repr(C)]
 #[derive(Clone, Copy)]
 #[allow(non_camel_case_types)]

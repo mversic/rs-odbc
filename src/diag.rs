@@ -1,6 +1,6 @@
-use crate::{Attribute, GetAttr, SQLINTEGER, SQLLEN, SQLRETURN, SQLSMALLINT};
+use crate::{Identifier, GetAttr, SQLINTEGER, SQLLEN, SQLRETURN, SQLSMALLINT};
 
-pub trait DiagField: Attribute<IdentType = SQLSMALLINT> {}
+pub trait DiagField: Identifier<IdentType = SQLSMALLINT> {}
 
 //// Header fields -----------------------------------------------------------------
 //#[identifier(-1249)]

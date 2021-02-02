@@ -1,8 +1,10 @@
-use crate::{AsRawParts, Attribute, GetAttr, SetAttr, SQLINTEGER, SQLPOINTER, OdbcAttr, SQLULEN};
-use rs_odbc_derive::{EqSQLULEN, StmtAttr};
+use crate::{AsSQLPOINTER, GetAttr, Len, OdbcAttr, SetAttr, SQLINTEGER, SQLPOINTER, SQLULEN};
+use rs_odbc_derive::{EqSQLULEN, Identifier, StmtAttr};
 use std::mem::MaybeUninit;
 
-pub trait StmtAttr: Attribute<IdentType = SQLINTEGER> {}
+pub trait StmtAttr: crate::Identifier<IdentType = SQLINTEGER> {
+    type AttrType;
+}
 
 // TODO: These seem to be from v2.0
 //#[deprecated]
@@ -11,91 +13,91 @@ pub trait StmtAttr: Attribute<IdentType = SQLINTEGER> {}
 //    SQL_GET_BOOKMARK = 13,
 //}
 
-#[identifier(0)]
-#[derive(StmtAttr)]
+#[identifier(SQLINTEGER, 0)]
+#[derive(Identifier, StmtAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_QUERY_TIMEOUT;
 pub const SQL_QUERY_TIMEOUT_DEFAULT: SQLULEN = 0;
 impl<C> GetAttr<C, MaybeUninit<SQLULEN>> for SQL_ATTR_QUERY_TIMEOUT {}
 impl<C> SetAttr<C, SQLULEN> for SQL_ATTR_QUERY_TIMEOUT {}
 
-#[identifier(1)]
-#[derive(StmtAttr)]
+#[identifier(SQLINTEGER, 1)]
+#[derive(Identifier, StmtAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_MAX_ROWS;
 impl<C> GetAttr<C, MaybeUninit<SQLULEN>> for SQL_ATTR_MAX_ROWS {}
 impl<C> SetAttr<C, SQLULEN> for SQL_ATTR_MAX_ROWS {}
 
-#[identifier(2)]
-#[derive(StmtAttr)]
+#[identifier(SQLINTEGER, 2)]
+#[derive(Identifier, StmtAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_NOSCAN;
 pub use Noscan::SQL_NOSCAN_OFF as SQL_NOSCAN_DEFAULT;
 impl<C> GetAttr<C, MaybeUninit<SQLULEN>> for SQL_ATTR_NOSCAN {}
 impl<C> SetAttr<C, Noscan> for SQL_ATTR_NOSCAN {}
 
-#[identifier(3)]
-#[derive(StmtAttr)]
+#[identifier(SQLINTEGER, 3)]
+#[derive(Identifier, StmtAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_MAX_LENGTH;
 pub const SQL_MAX_LENGTH_DEFAULT: SQLULEN = 0;
 impl<C> GetAttr<C, MaybeUninit<SQLULEN>> for SQL_ATTR_MAX_LENGTH {}
 impl<C> SetAttr<C, SQLULEN> for SQL_ATTR_MAX_LENGTH {}
 
-#[identifier(6)]
-#[derive(StmtAttr)]
+#[identifier(SQLINTEGER, 6)]
+#[derive(Identifier, StmtAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CURSOR_TYPE;
 pub use CursorType::SQL_CURSOR_FORWARD_ONLY as SQL_CURSOR_TYPE_DEFAULT;
 impl<C> GetAttr<C, MaybeUninit<SQLULEN>> for SQL_ATTR_CURSOR_TYPE {}
 impl<C> SetAttr<C, CursorType> for SQL_ATTR_CURSOR_TYPE {}
 
-#[identifier(7)]
-#[derive(StmtAttr)]
+#[identifier(SQLINTEGER, 7)]
+#[derive(Identifier, StmtAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CONCURRENCY;
 pub use Concurrency::SQL_CONCUR_READ_ONLY as SQL_CONCUR_DEFAULT;
 impl<C> GetAttr<C, MaybeUninit<SQLULEN>> for SQL_ATTR_CONCURRENCY {}
 impl<C> SetAttr<C, Concurrency> for SQL_ATTR_CONCURRENCY {}
 
-#[identifier(8)]
-#[derive(StmtAttr)]
+#[identifier(SQLINTEGER, 8)]
+#[derive(Identifier, StmtAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_KEYSET_SIZE;
 pub const SQL_KEYSET_SIZE_DEFAULT: SQLULEN = 0;
 impl<C> GetAttr<C, MaybeUninit<SQLULEN>> for SQL_ATTR_KEYSET_SIZE {}
 impl<C> SetAttr<C, SQLULEN> for SQL_ATTR_KEYSET_SIZE {}
 
-#[identifier(10)]
-#[derive(StmtAttr)]
+#[identifier(SQLINTEGER, 10)]
+#[derive(Identifier, StmtAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_SIMULATE_CURSOR;
 impl<C> GetAttr<C, MaybeUninit<SQLULEN>> for SQL_ATTR_SIMULATE_CURSOR {}
 impl<C> SetAttr<C, SimulateCursor> for SQL_ATTR_SIMULATE_CURSOR {}
 
-#[identifier(11)]
-#[derive(StmtAttr)]
+#[identifier(SQLINTEGER, 11)]
+#[derive(Identifier, StmtAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_RETRIEVE_DATA;
 pub use RetrieveData::SQL_RD_ON as SQL_RD_DEFAULT;
 impl<C> GetAttr<C, MaybeUninit<SQLULEN>> for SQL_ATTR_RETRIEVE_DATA {}
 impl<C> SetAttr<C, RetrieveData> for SQL_ATTR_RETRIEVE_DATA {}
 
-#[identifier(12)]
-#[derive(StmtAttr)]
+#[identifier(SQLINTEGER, 12)]
+#[derive(Identifier, StmtAttr)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_USE_BOOKMARKS;
 pub use UseBookmarks::SQL_UB_OFF as SQL_UB_DEFAULT;
 impl<C> GetAttr<C, MaybeUninit<SQLULEN>> for SQL_ATTR_USE_BOOKMARKS {}
 impl<C> SetAttr<C, RetrieveData> for SQL_ATTR_USE_BOOKMARKS {}
 
-//#[identifier(15)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 15)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_ENABLE_AUTO_IPD;
 //
-//#[identifier(16)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 16)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_FETCH_BOOKMARK_PTR;
 //
@@ -103,142 +105,145 @@ impl<C> SetAttr<C, RetrieveData> for SQL_ATTR_USE_BOOKMARKS {}
 //
 //// TODO: This one could be special??
 //// Corresponds to ARD SQL_DESC_BIND_TYPE
-//#[identifier(5)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 5)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_ROW_BIND_TYPE;
 //
 //// Corresponds to APD SQL_DESC_BIND_OFFSET_PTR
-//#[identifier(17)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 17)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_PARAM_BIND_OFFSET_PTR;
 //
 //// Corresponds to APD SQL_DESC_BIND_TYPE
-//#[identifier(18)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 18)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_PARAM_BIND_TYPE;
 //
 //// Corresponds to APD SQL_DESC_ARRAY_STATUS_PTR
-//#[identifier(18)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 18)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_PARAM_OPERATION_PTR;
 //
 //// Corresponds to IPD SQL_DESC_ARRAY_STATUS_PTR
-//#[identifier(20)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 20)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_PARAM_STATUS_PTR;
 //
 //// Corresponds to IPD SQL_DESC_ROWS_PROCESSED_PTR
-//#[identifier(21)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 21)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_PARAMS_PROCESSED_PTR;
 //
 //// Corresponds to APD SQL_DESC_ARRAY_SIZE
-//#[identifier(22)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 22)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_PARAMSET_SIZE;
 //
 //// Corresponds to ARD SQL_DESC_BIND_OFFSET_PTR
-//#[identifier(23)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 23)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_ROW_BIND_OFFSET_PTR;
 //
 //// Corresponds to ARD SQL_DESC_ARRAY_STATUS_PTR
-//#[identifier(24)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 24)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_ROW_OPERATION_PTR;
 //
 //// Corresponds to IRD SQL_DESC_ARRAY_STATUS_PTR
-//#[identifier(25)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 25)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_ROW_STATUS_PTR;
 //
 //// Corresponds to IRD SQL_DESC_ROWS_PROCESSED_PTR
-//#[identifier(26)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 26)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_ROWS_FETCHED_PTR;
 //
 //// Corresponds to ARD SQL_DESC_ARRAY_SIZE
-//#[identifier(27)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 27)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_ROW_ARRAY_SIZE;
 //
-//#[identifier(29)]
+//#[identifier(SQLINTEGER, 29)]
 //#[cfg(feature = "v3_8")]
-//#[derive(StmtAttr)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_ASYNC_STMT_EVENT;
 //
-//#[identifier(30)]
+//#[identifier(SQLINTEGER, 30)]
 //#[cfg(feature = "v4")]
-//#[derive(StmtAttr)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_SAMPLE_SIZE;
 //
-//#[identifier(31)]
+//#[identifier(SQLINTEGER, 31)]
 //#[cfg(feature = "v4")]
-//#[derive(StmtAttr)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_DYNAMIC_COLUMNS;
 //
-//#[identifier(32)]
+//#[identifier(SQLINTEGER, 32)]
 //#[cfg(feature = "v4")]
-//#[derive(StmtAttr)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_TYPE_EXCEPTION_BEHAVIOR;
 //
-//#[identifier(33)]
+//#[identifier(SQLINTEGER, 33)]
 //#[cfg(feature = "v4")]
-//#[derive(StmtAttr)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_LENGTH_EXCEPTION_BEHAVIOR;
 //
-//#[identifier(10010)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 10010)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_APP_ROW_DESC;
 //
-//#[identifier(10010)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 10010)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_APP_PARAM_DESC;
 //
-//// TODO: Write-only - Cannot be used with SetStmtAttr
-//#[identifier(14)]
-//#[derive(StmtAttr)]
+//// TODO: Write-only - Cannot be used with SetIdentifier, StmtAttr
+//#[identifier(SQLINTEGER, 14)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
+//// This is read-only attribute
 //pub struct SQL_ATTR_ROW_NUMBER;
 //
-//// TODO: Write-only - Cannot be used with SetStmtAttr
-//#[identifier(10012)]
-//#[derive(StmtAttr)]
+//// TODO: Write-only - Cannot be used with SetIdentifier, StmtAttr
+//#[identifier(SQLINTEGER, 10012)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
+//// This is read-only attribute
 //pub struct SQL_ATTR_IMP_ROW_DESC;
 //
-//// TODO: Write-only - Cannot be used with SetStmtAttr
-//#[identifier(10013)]
-//#[derive(StmtAttr)]
+//// TODO: Write-only - Cannot be used with SetIdentifier, StmtAttr
+//#[identifier(SQLINTEGER, 10013)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
+//// This is read-only attribute
 //pub struct SQL_ATTR_IMP_PARAM_DESC;
 //
-//#[identifier(-1)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, -1)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_CURSOR_SCROLLABLE;
 //
-//#[identifier(-2)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, -2)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_CURSOR_SENSITIVITY;
 //
@@ -248,14 +253,14 @@ impl<C> SetAttr<C, RetrieveData> for SQL_ATTR_USE_BOOKMARKS {}
 //// #[cfg(feature = "v3_8")]
 //// SQL_ATTR_ASYNC_STMT_PCONTEXT
 //
-//#[identifier(10014)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 10014)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 pub struct SQL_ATTR_METADATA_ID;
 //impl<C> GetAttr<C, MaybeUninit<SQLUINTEGER>> for SQL_ATTR_METADATA_ID {}
 //
-//#[identifier(4)]
-//#[derive(StmtAttr)]
+//#[identifier(SQLINTEGER, 4)]
+//#[derive(Identifier, StmtAttr)]
 //#[allow(non_camel_case_types)]
 pub struct SQL_ATTR_ASYNC_ENABLE;
 //impl<C> GetAttr<C, MaybeUninit<SQLULEN>> for SQL_ATTR_ASYNC_ENABLE {}
@@ -266,9 +271,14 @@ pub enum Noscan {
     SQL_NOSCAN_OFF = 0,
     SQL_NOSCAN_ON = 1,
 }
-impl AsRawParts<OdbcAttr, SQLINTEGER> for Noscan {
-    fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
-        (*self as SQLULEN as SQLPOINTER, 0)
+impl AsSQLPOINTER for Noscan {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+        *self as SQLULEN as SQLPOINTER
+    }
+}
+impl<LEN: Default> Len<OdbcAttr, LEN> for Noscan {
+    fn len(&self) -> LEN {
+        Default::default()
     }
 }
 
@@ -280,9 +290,14 @@ pub enum CursorType {
     SQL_CURSOR_DYNAMIC = 2,
     SQL_CURSOR_STATIC = 3,
 }
-impl AsRawParts<OdbcAttr, SQLINTEGER> for CursorType {
-    fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
-        (*self as SQLULEN as SQLPOINTER, 0)
+impl AsSQLPOINTER for CursorType {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+        *self as SQLULEN as SQLPOINTER
+    }
+}
+impl<LEN: Default> Len<OdbcAttr, LEN> for CursorType {
+    fn len(&self) -> LEN {
+        Default::default()
     }
 }
 
@@ -294,9 +309,14 @@ pub enum Concurrency {
     SQL_CONCUR_ROWVER = 3,
     SQL_CONCUR_VALUES = 4,
 }
-impl AsRawParts<OdbcAttr, SQLINTEGER> for Concurrency {
-    fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
-        (*self as SQLULEN as SQLPOINTER, 0)
+impl AsSQLPOINTER for Concurrency {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+        *self as SQLULEN as SQLPOINTER
+    }
+}
+impl<LEN: Default> Len<OdbcAttr, LEN> for Concurrency {
+    fn len(&self) -> LEN {
+        Default::default()
     }
 }
 
@@ -307,9 +327,14 @@ pub enum SimulateCursor {
     SQL_SC_TRY_UNIQUE = 1,
     SQL_SC_UNIQUE = 2,
 }
-impl AsRawParts<OdbcAttr, SQLINTEGER> for SimulateCursor {
-    fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
-        (*self as SQLULEN as SQLPOINTER, 0)
+impl AsSQLPOINTER for SimulateCursor {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+        *self as SQLULEN as SQLPOINTER
+    }
+}
+impl<LEN: Default> Len<OdbcAttr, LEN> for SimulateCursor {
+    fn len(&self) -> LEN {
+        Default::default()
     }
 }
 
@@ -319,9 +344,14 @@ pub enum RetrieveData {
     SQL_RD_OFF = 0,
     SQL_RD_ON = 1,
 }
-impl AsRawParts<OdbcAttr, SQLINTEGER> for RetrieveData {
-    fn as_raw_parts(&self) -> (SQLPOINTER, SQLINTEGER) {
-        (*self as SQLULEN as SQLPOINTER, 0)
+impl AsSQLPOINTER for RetrieveData {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+        *self as SQLULEN as SQLPOINTER
+    }
+}
+impl<LEN: Default> Len<OdbcAttr, LEN> for RetrieveData {
+    fn len(&self) -> LEN {
+        Default::default()
     }
 }
 
@@ -332,3 +362,13 @@ pub enum UseBookmarks {
     SQL_UB_ON = 1,
 }
 
+impl AsSQLPOINTER for UseBookmarks {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+        *self as SQLULEN as SQLPOINTER
+    }
+}
+impl<LEN: Default> Len<OdbcAttr, LEN> for UseBookmarks {
+    fn len(&self) -> LEN {
+        Default::default()
+    }
+}

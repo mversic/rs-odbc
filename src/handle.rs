@@ -1,5 +1,5 @@
-use crate::api::{Disconnect, FreeHandle};
-use crate::{SQLSMALLINT, SQL_SUCCESS};
+use crate::extern_api::SQLFreeHandle;
+use crate::{SQLSMALLINT, SQL_SUCCESS, SQLPOINTER};
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::thread::panicking;
@@ -69,10 +69,11 @@ pub struct RawHandle {
 #[allow(non_camel_case_types)]
 pub type SQLHANDLE = *mut RawHandle;
 
+// TODO: Keep these?
 pub type HENV = SQLHANDLE;
 pub type HDBC = SQLHANDLE;
-//type HSTMT = SQLHANDLE;
-//type HDESC = SQLHANDLE;
+pub type HSTMT = SQLHANDLE;
+pub type HDESC = SQLHANDLE;
 
 /// An environment is a global context which holds information such as:
 /// * The environment's state
@@ -117,7 +118,7 @@ impl AsMutSQLHANDLE for SQLHENV {
 }
 impl Drop for SQLHENV {
     fn drop(&mut self) {
-        let ret = unsafe { FreeHandle(SQL_HANDLE_ENV::IDENTIFIER, self.as_SQLHANDLE()) };
+        let ret = unsafe { SQLFreeHandle(SQL_HANDLE_ENV::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if ret != SQL_SUCCESS && !panicking() {
             panic!("SQLFreeHandle returned: {:?}", ret)
@@ -176,7 +177,7 @@ impl AsMutSQLHANDLE for SQLHDBC<'_> {
 }
 impl Drop for SQLHDBC<'_> {
     fn drop(&mut self) {
-        let ret = unsafe { FreeHandle(SQL_HANDLE_DBC::IDENTIFIER, self.as_SQLHANDLE()) };
+        let ret = unsafe { SQLFreeHandle(SQL_HANDLE_DBC::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if ret != SQL_SUCCESS && !panicking() {
             panic!("SQLFreeHandle -> {:?}", ret)
@@ -238,7 +239,7 @@ impl AsMutSQLHANDLE for SQLHSTMT<'_, '_> {
 }
 impl Drop for SQLHSTMT<'_, '_> {
     fn drop(&mut self) {
-        let ret = unsafe { FreeHandle(SQL_HANDLE_STMT::IDENTIFIER, self.as_SQLHANDLE()) };
+        let ret = unsafe { SQLFreeHandle(SQL_HANDLE_STMT::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if ret != SQL_SUCCESS && !panicking() {
             panic!("SQLFreeHandle returned: {:?}", ret)
@@ -298,7 +299,7 @@ impl AsMutSQLHANDLE for SQLHDESC<'_, '_> {
 }
 impl Drop for SQLHDESC<'_, '_> {
     fn drop(&mut self) {
-        let ret = unsafe { FreeHandle(SQL_HANDLE_DESC::IDENTIFIER, self.as_SQLHANDLE()) };
+        let ret = unsafe { SQLFreeHandle(SQL_HANDLE_DESC::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if ret != SQL_SUCCESS && !panicking() {
             panic!("SQLFreeHandle returned: {:?}", ret)
@@ -317,4 +318,4 @@ impl AsSQLHANDLE for SQL_NULL_HANDLE {
 
 // TODO: Check https://github.com/microsoft/ODBC-Specification/blob/b7ef71fba508ed010cd979428efae3091b732d75/Windows/inc/sqltypes.h
 // This is unixOBDC value
-//type SQLHWND = SQLPOINTER;
+pub type SQLHWND = SQLPOINTER;
