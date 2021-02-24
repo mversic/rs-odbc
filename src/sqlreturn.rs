@@ -1,4 +1,5 @@
 use crate::SQLSMALLINT;
+use rs_odbc_derive::odbc_type;
 
 /// Each function in ODBC returns a code, known as its return code, which indicates the
 /// overall success or failure of the function. Program logic is generally based on return
@@ -7,15 +8,8 @@ use crate::SQLSMALLINT;
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/return-codes-odbc
 /// https://github.com/microsoft/ODBC-Specification/blob/ODBC%204.0.md
-#[derive(PartialEq, Eq, Debug)]
-#[repr(transparent)]
-pub struct SQLRETURN(SQLSMALLINT);
-
-impl SQLRETURN {
-    pub const fn raw_value(&self) -> SQLSMALLINT {
-        self.0
-    }
-}
+#[odbc_type(SQLSMALLINT)]
+pub struct SQLRETURN;
 
 /// Function completed successfully. The application calls SQLGetDiagField to retrieve
 /// additional information from the header record.
@@ -69,3 +63,11 @@ pub const SQL_METADATA_CHANGED: SQLRETURN = SQLRETURN(103);
 /// The driver does not know how much additional data is to be written.
 #[cfg(feature = "v4")]
 pub const SQL_MORE_DATA: SQLRETURN = SQLRETURN(104);
+
+#[allow(non_snake_case)]
+pub fn SQL_SUCCEEDED<T: Into<SQLRETURN>>(ret: T) -> bool {
+    match ret.into() {
+        SQL_SUCCESS | SQL_SUCCESS_WITH_INFO => true,
+        _ => false,
+    }
+}

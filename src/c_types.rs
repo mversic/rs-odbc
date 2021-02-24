@@ -1,133 +1,167 @@
-use crate::{SQLSMALLINT, SQLCHAR, SQLUINTEGER, SQLUSMALLINT, SQLSCHAR};
-use rs_odbc_derive::{Identifier as Ident, CType};
 use crate::sql_types::*;
-use crate::Identifier;
+use crate::{AsMutRawSlice, AsRawSlice, Identifier};
+use crate::{
+    SQLBIGINT, SQLCHAR, SQLDOUBLE, SQLINTEGER, SQLLEN, SQLREAL, SQLSCHAR, SQLSMALLINT, SQLUBIGINT,
+    SQLUINTEGER, SQLUSMALLINT, SQLWCHAR,
+};
+use rs_odbc_derive::CType;
+use std::mem::MaybeUninit;
 
 pub trait CType: Identifier<IdentType = SQLSMALLINT> {}
+pub trait InCType<T>: CType {}
+pub trait OutCType<T>: CType {}
 
 const SQL_UNSIGNED_OFFSET: SQLSMALLINT = -22;
 const SQL_SIGNED_OFFSET: SQLSMALLINT = -20;
-const SQL_C_SHORT: SQLSMALLINT = SQL_SMALLINT::IDENTIFIER;
-const SQL_C_LONG: SQLSMALLINT = SQL_INTEGER::IDENTIFIER;
-const SQL_C_TINYINT: SQLSMALLINT = SQL_TINYINT::IDENTIFIER;
+const SQL_C_SHORT: SQLSMALLINT = SQL_SMALLINT.identifier();
+const SQL_C_LONG: SQLSMALLINT = SQL_INTEGER.identifier();
+const SQL_C_TINYINT: SQLSMALLINT = SQL_TINYINT.identifier();
 
 // TODO: This value is discouraged from being used
-#[derive(Ident, CType)]
-#[identifier(SQLSMALLINT, 99)]
-#[allow(non_camel_case_types)]
-struct SQL_C_DEFAULT;
+//#[derive(Identifier)]
+//#[identifier(SQLSMALLINT, 99)]
+//#[allow(non_camel_case_types)]
+//struct SQL_C_DEFAULT;
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_CHAR;
-impl  Identifier for SQL_C_CHAR {
+impl Identifier for SQL_C_CHAR {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_CHAR::IDENTIFIER;
+    const IDENTIFIER: Self::IdentType = SQL_CHAR.identifier();
 }
+impl<T: AsMutRawSlice<SQLCHAR, SQLLEN>> OutCType<T> for SQL_C_CHAR {}
+impl<T: AsRawSlice<SQLCHAR, SQLLEN>> InCType<T> for SQL_C_CHAR {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_WCHAR;
 impl Identifier for SQL_C_WCHAR {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_WCHAR::IDENTIFIER;
+    const IDENTIFIER: Self::IdentType = SQL_WCHAR.identifier();
 }
+impl<T: AsMutRawSlice<SQLWCHAR, SQLLEN>> OutCType<T> for SQL_C_WCHAR {}
+impl<T: AsRawSlice<SQLWCHAR, SQLLEN>> InCType<T> for SQL_C_WCHAR {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_SSHORT;
 impl Identifier for SQL_C_SSHORT {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_C_SHORT + SQL_SIGNED_OFFSET;
+    const IDENTIFIER: Self::IdentType = SQL_C_SHORT + SQL_SIGNED_OFFSET;
 }
+impl OutCType<MaybeUninit<SQLSMALLINT>> for SQL_C_SSHORT {}
+impl InCType<SQLSMALLINT> for SQL_C_SSHORT {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_USHORT;
 impl Identifier for SQL_C_USHORT {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_C_SHORT + SQL_UNSIGNED_OFFSET;
+    const IDENTIFIER: Self::IdentType = SQL_C_SHORT + SQL_UNSIGNED_OFFSET;
 }
+impl OutCType<MaybeUninit<SQLUSMALLINT>> for SQL_C_USHORT {}
+impl InCType<SQLUSMALLINT> for SQL_C_USHORT {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_SLONG;
 impl Identifier for SQL_C_SLONG {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_C_LONG + SQL_SIGNED_OFFSET;
+    const IDENTIFIER: Self::IdentType = SQL_C_LONG + SQL_SIGNED_OFFSET;
 }
+impl OutCType<MaybeUninit<SQLINTEGER>> for SQL_C_SLONG {}
+impl InCType<SQLINTEGER> for SQL_C_SLONG {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_ULONG;
 impl Identifier for SQL_C_ULONG {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_C_LONG + SQL_UNSIGNED_OFFSET;
+    const IDENTIFIER: Self::IdentType = SQL_C_LONG + SQL_UNSIGNED_OFFSET;
 }
+impl OutCType<MaybeUninit<SQLUINTEGER>> for SQL_C_ULONG {}
+impl InCType<SQLUINTEGER> for SQL_C_ULONG {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_FLOAT;
 impl Identifier for SQL_C_FLOAT {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_REAL::IDENTIFIER;
-
+    const IDENTIFIER: Self::IdentType = SQL_REAL.identifier();
 }
+impl OutCType<MaybeUninit<SQLREAL>> for SQL_C_FLOAT {}
+impl InCType<SQLREAL> for SQL_C_FLOAT {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_DOUBLE;
 impl Identifier for SQL_C_DOUBLE {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_DOUBLE::IDENTIFIER;
+    const IDENTIFIER: Self::IdentType = SQL_DOUBLE.identifier();
 }
+impl OutCType<MaybeUninit<SQLDOUBLE>> for SQL_C_DOUBLE {}
+impl InCType<SQLDOUBLE> for SQL_C_DOUBLE {}
+
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_BIT;
 impl Identifier for SQL_C_BIT {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_BIT::IDENTIFIER;
+    const IDENTIFIER: Self::IdentType = SQL_BIT.identifier();
 }
+impl OutCType<MaybeUninit<SQLCHAR>> for SQL_C_BIT {}
+impl InCType<SQLCHAR> for SQL_C_BIT {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_STINYINT;
 impl Identifier for SQL_C_STINYINT {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_C_TINYINT + SQL_SIGNED_OFFSET;
+    const IDENTIFIER: Self::IdentType = SQL_C_TINYINT + SQL_SIGNED_OFFSET;
 }
+impl OutCType<MaybeUninit<SQLSCHAR>> for SQL_C_STINYINT {}
+impl InCType<SQLSCHAR> for SQL_C_STINYINT {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_UTINYINT;
 impl Identifier for SQL_C_UTINYINT {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_C_TINYINT + SQL_UNSIGNED_OFFSET;
+    const IDENTIFIER: Self::IdentType = SQL_C_TINYINT + SQL_UNSIGNED_OFFSET;
 }
+impl OutCType<MaybeUninit<SQLCHAR>> for SQL_C_UTINYINT {}
+impl InCType<SQLCHAR> for SQL_C_UTINYINT {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_SBIGINT;
 impl Identifier for SQL_C_SBIGINT {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_BIGINT::IDENTIFIER + SQL_SIGNED_OFFSET;
+    const IDENTIFIER: Self::IdentType = SQL_BIGINT.identifier() + SQL_SIGNED_OFFSET;
 }
+impl OutCType<MaybeUninit<SQLBIGINT>> for SQL_C_SBIGINT {}
+impl InCType<SQLBIGINT> for SQL_C_SBIGINT {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_UBIGINT;
 impl Identifier for SQL_C_UBIGINT {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_BIGINT::IDENTIFIER + SQL_UNSIGNED_OFFSET;
+    const IDENTIFIER: Self::IdentType = SQL_BIGINT.identifier() + SQL_UNSIGNED_OFFSET;
 }
+impl OutCType<MaybeUninit<SQLUBIGINT>> for SQL_C_UBIGINT {}
+impl InCType<SQLUBIGINT> for SQL_C_UBIGINT {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_BINARY;
 impl Identifier for SQL_C_BINARY {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_BINARY::IDENTIFIER;
+    const IDENTIFIER: Self::IdentType = SQL_BINARY.identifier();
 }
+impl<T: AsMutRawSlice<SQLCHAR, SQLLEN>> OutCType<T> for SQL_C_BINARY {}
+impl<T: AsRawSlice<SQLCHAR, SQLLEN>> InCType<T> for SQL_C_BINARY {}
 
 // TODO: Weird?
 pub use SQL_C_BINARY as SQL_C_VARBOOKMARK;
@@ -137,8 +171,10 @@ pub use SQL_C_BINARY as SQL_C_VARBOOKMARK;
 pub struct SQL_C_NUMERIC;
 impl Identifier for SQL_C_NUMERIC {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_NUMERIC::IDENTIFIER;
+    const IDENTIFIER: Self::IdentType = SQL_NUMERIC.identifier();
 }
+impl OutCType<MaybeUninit<SQL_NUMERIC_STRUCT>> for SQL_C_NUMERIC {}
+impl InCType<SQL_NUMERIC_STRUCT> for SQL_C_NUMERIC {}
 
 #[derive(CType)]
 #[cfg(feature = "v3_5")]
@@ -146,76 +182,209 @@ impl Identifier for SQL_C_NUMERIC {
 pub struct SQL_C_GUID;
 impl Identifier for SQL_C_GUID {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_GUID::IDENTIFIER;
+    const IDENTIFIER: Self::IdentType = SQL_GUID.identifier();
 }
+impl OutCType<MaybeUninit<SQLGUID>> for SQL_C_GUID {}
+impl InCType<SQLGUID> for SQL_C_GUID {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_DATE;
 impl Identifier for SQL_C_TYPE_DATE {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_DATE::IDENTIFIER;
+    const IDENTIFIER: Self::IdentType = SQL_TYPE_DATE.identifier();
 }
+impl OutCType<MaybeUninit<SQL_DATE_STRUCT>> for SQL_C_TYPE_DATE {}
+impl InCType<SQL_DATE_STRUCT> for SQL_C_TYPE_DATE {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIME;
 impl Identifier for SQL_C_TYPE_TIME {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIME::IDENTIFIER;
+    const IDENTIFIER: Self::IdentType = SQL_TYPE_TIME.identifier();
 }
+impl OutCType<MaybeUninit<SQL_TIME_STRUCT>> for SQL_C_TYPE_TIME {}
+impl InCType<SQL_TIME_STRUCT> for SQL_C_TYPE_TIME {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIMESTAMP;
 impl Identifier for SQL_C_TYPE_TIMESTAMP {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIMESTAMP::IDENTIFIER;
+    const IDENTIFIER: Self::IdentType = SQL_TYPE_TIMESTAMP.identifier();
 }
+impl OutCType<MaybeUninit<SQL_TIMESTAMP_STRUCT>> for SQL_C_TYPE_TIMESTAMP {}
+impl InCType<SQL_TIMESTAMP_STRUCT> for SQL_C_TYPE_TIMESTAMP {}
 
+#[derive(CType)]
 #[cfg(feature = "v4")]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIME_WITH_TIMEZONE;
 #[cfg(feature = "v4")]
 impl Identifier for SQL_C_TYPE_TIME_WITH_TIMEZONE {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIME_WITH_TIMEZONE::IDENTIFIER;
+    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIME_WITH_TIMEZONE.identifier();
 }
+#[cfg(feature = "v4")]
+impl OutCType<MaybeUninit<SQL_TIME_WITH_TIMEZONE_STRUCT>> for SQL_C_TYPE_TIME_WITH_TIMEZONE {}
+#[cfg(feature = "v4")]
+impl InCType<SQL_TIME_WITH_TIMEZONE_STRUCT> for SQL_C_TYPE_TIME_WITH_TIMEZONE {}
 
+#[derive(CType)]
 #[cfg(feature = "v4")]
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE;
 #[cfg(feature = "v4")]
 impl Identifier for SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE {
     type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIMESTAMP_WITH_TIMEZONE;
+    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIMESTAMP_WITH_TIMEZONE.identifier();
 }
+#[cfg(feature = "v4")]
+impl OutCType<MaybeUninit<SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT>>
+    for SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE
+{
+}
+#[cfg(feature = "v4")]
+impl InCType<SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT> for SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE {}
 
-//pub const SQL_C_INTERVAL_YEAR: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_YEAR.raw_value());
-//pub const SQL_C_INTERVAL_MONTH: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_MONTH.raw_value());
-//pub const SQL_C_INTERVAL_DAY: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_DAY.raw_value());
-//pub const SQL_C_INTERVAL_HOUR: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_HOUR.raw_value());
-//pub const SQL_C_INTERVAL_MINUTE: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_MINUTE.raw_value());
-//pub const SQL_C_INTERVAL_SECOND: CTypeIdentifier = CTypeIdentifier(SQL_INTERVAL_SECOND.raw_value());
-//pub const SQL_C_INTERVAL_YEAR_TO_MONTH: CTypeIdentifier =
-//    CTypeIdentifier(SQL_INTERVAL_YEAR_TO_MONTH.raw_value());
-//pub const SQL_C_INTERVAL_DAY_TO_HOUR: CTypeIdentifier =
-//    CTypeIdentifier(SQL_INTERVAL_DAY_TO_HOUR.raw_value());
-//pub const SQL_C_INTERVAL_DAY_TO_MINUTE: CTypeIdentifier =
-//    CTypeIdentifier(SQL_INTERVAL_DAY_TO_MINUTE.raw_value());
-//pub const SQL_C_INTERVAL_DAY_TO_SECOND: CTypeIdentifier =
-//    CTypeIdentifier(SQL_INTERVAL_DAY_TO_SECOND.raw_value());
-//pub const SQL_C_INTERVAL_HOUR_TO_MINUTE: CTypeIdentifier =
-//    CTypeIdentifier(SQL_INTERVAL_HOUR_TO_MINUTE.raw_value());
-//pub const SQL_C_INTERVAL_HOUR_TO_SECOND: CTypeIdentifier =
-//    CTypeIdentifier(SQL_INTERVAL_HOUR_TO_SECOND.raw_value());
-//pub const SQL_C_INTERVAL_MINUTE_TO_SECOND: CTypeIdentifier =
-//    CTypeIdentifier(SQL_INTERVAL_MINUTE_TO_SECOND.raw_value());
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_INTERVAL_YEAR;
+impl Identifier for SQL_C_INTERVAL_YEAR {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = SQL_INTERVAL_YEAR.identifier();
+}
+impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_YEAR {}
+impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_YEAR {}
+
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_INTERVAL_MONTH;
+impl Identifier for SQL_C_INTERVAL_MONTH {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = SQL_INTERVAL_MONTH.identifier();
+}
+impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_MONTH {}
+impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_MONTH {}
+
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_INTERVAL_DAY;
+impl Identifier for SQL_C_INTERVAL_DAY {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = SQL_INTERVAL_DAY.identifier();
+}
+impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_DAY {}
+impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_DAY {}
+
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_INTERVAL_HOUR;
+impl Identifier for SQL_C_INTERVAL_HOUR {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = SQL_INTERVAL_HOUR.identifier();
+}
+impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_HOUR {}
+impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_HOUR {}
+
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_INTERVAL_MINUTE;
+impl Identifier for SQL_C_INTERVAL_MINUTE {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = SQL_INTERVAL_MINUTE.identifier();
+}
+impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_MINUTE {}
+impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_MINUTE {}
+
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_INTERVAL_SECOND;
+impl Identifier for SQL_C_INTERVAL_SECOND {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = SQL_INTERVAL_SECOND.identifier();
+}
+impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_SECOND {}
+impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_SECOND {}
+
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_INTERVAL_YEAR_TO_MONTH;
+impl Identifier for SQL_C_INTERVAL_YEAR_TO_MONTH {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = SQL_INTERVAL_YEAR_TO_MONTH.identifier();
+}
+impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_YEAR_TO_MONTH {}
+impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_YEAR_TO_MONTH {}
+
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_INTERVAL_DAY_TO_HOUR;
+impl Identifier for SQL_C_INTERVAL_DAY_TO_HOUR {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = SQL_INTERVAL_DAY_TO_HOUR.identifier();
+}
+impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_DAY_TO_HOUR {}
+impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_DAY_TO_HOUR {}
+
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_INTERVAL_DAY_TO_MINUTE;
+impl Identifier for SQL_C_INTERVAL_DAY_TO_MINUTE {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = SQL_INTERVAL_DAY_TO_MINUTE.identifier();
+}
+impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_DAY_TO_MINUTE {}
+impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_DAY_TO_MINUTE {}
+
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_INTERVAL_DAY_TO_SECOND;
+impl Identifier for SQL_C_INTERVAL_DAY_TO_SECOND {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = SQL_INTERVAL_DAY_TO_SECOND.identifier();
+}
+impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_DAY_TO_SECOND {}
+impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_DAY_TO_SECOND {}
+
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_INTERVAL_HOUR_TO_MINUTE;
+impl Identifier for SQL_C_INTERVAL_HOUR_TO_MINUTE {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = SQL_INTERVAL_HOUR_TO_MINUTE.identifier();
+}
+impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_HOUR_TO_MINUTE {}
+impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_HOUR_TO_MINUTE {}
+
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_INTERVAL_HOUR_TO_SECOND;
+impl Identifier for SQL_C_INTERVAL_HOUR_TO_SECOND {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = SQL_INTERVAL_HOUR_TO_SECOND.identifier();
+}
+impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_HOUR_TO_SECOND {}
+impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_HOUR_TO_SECOND {}
+
+#[derive(CType)]
+#[allow(non_camel_case_types)]
+pub struct SQL_C_INTERVAL_MINUTE_TO_SECOND;
+impl Identifier for SQL_C_INTERVAL_MINUTE_TO_SECOND {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = SQL_INTERVAL_MINUTE_TO_SECOND.identifier();
+}
+impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_MINUTE_TO_SECOND {}
+impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_MINUTE_TO_SECOND {}
 
 // =================================================================================== //
 
+pub const SQL_MAX_NUMERIC_LEN: usize = 16;
+
 #[repr(C)]
 #[allow(non_camel_case_types)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct SQL_NUMERIC_STRUCT {
     pub precision: SQLCHAR,
     pub scale: SQLSCHAR,
@@ -224,12 +393,10 @@ pub struct SQL_NUMERIC_STRUCT {
     pub val: [SQLCHAR; SQL_MAX_NUMERIC_LEN],
 }
 
-// TODO: Why is this required?
-pub const SQL_MAX_NUMERIC_LEN: usize = 16;
-
 #[repr(C)]
 #[cfg(feature = "v3_5")]
 #[allow(non_camel_case_types, non_snake_case)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct SQLGUID {
     pub Data1: u32,
     pub Data2: u16,
@@ -239,71 +406,92 @@ pub struct SQLGUID {
 
 #[repr(C)]
 #[allow(non_camel_case_types)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct SQL_DATE_STRUCT {
-    year: SQLSMALLINT,
-    month: SQLUSMALLINT,
-    day: SQLUSMALLINT,
+    pub year: SQLSMALLINT,
+    pub month: SQLUSMALLINT,
+    pub day: SQLUSMALLINT,
 }
 
 #[repr(C)]
 #[allow(non_camel_case_types)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct SQL_TIME_STRUCT {
-    hour: SQLUSMALLINT,
-    minute: SQLUSMALLINT,
-    second: SQLUSMALLINT,
+    pub hour: SQLUSMALLINT,
+    pub minute: SQLUSMALLINT,
+    pub second: SQLUSMALLINT,
 }
 
 #[repr(C)]
 #[allow(non_camel_case_types)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct SQL_TIMESTAMP_STRUCT {
-    year: SQLSMALLINT,
-    month: SQLUSMALLINT,
-    day: SQLUSMALLINT,
-    hour: SQLUSMALLINT,
-    minute: SQLUSMALLINT,
-    second: SQLUSMALLINT,
+    pub year: SQLSMALLINT,
+    pub month: SQLUSMALLINT,
+    pub day: SQLUSMALLINT,
+    pub hour: SQLUSMALLINT,
+    pub minute: SQLUSMALLINT,
+    pub second: SQLUSMALLINT,
     /// Number of billionths of a second and ranges from 0 through 999,999,999
-    fraction: SQLUINTEGER,
+    pub fraction: SQLUINTEGER,
 }
 
 #[repr(C)]
 #[cfg(feature = "v4")]
 #[allow(non_camel_case_types)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct SQL_TIME_WITH_TIMEZONE_STRUCT {
-    hour: SQLUSMALLINT,
-    minute: SQLUSMALLINT,
-    second: SQLUSMALLINT,
-    timezone_hours: SQLSMALLINT,
-    timezone_minutes: SQLUSMALLINT,
+    pub hour: SQLUSMALLINT,
+    pub minute: SQLUSMALLINT,
+    pub second: SQLUSMALLINT,
+    pub timezone_hours: SQLSMALLINT,
+    pub timezone_minutes: SQLUSMALLINT,
 }
 
 #[repr(C)]
 #[cfg(feature = "v4")]
 #[allow(non_camel_case_types)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT {
-    year: SQLSMALLINT,
-    month: SQLUSMALLINT,
-    day: SQLUSMALLINT,
-    hour: SQLUSMALLINT,
-    minute: SQLUSMALLINT,
-    second: SQLUSMALLINT,
+    pub year: SQLSMALLINT,
+    pub month: SQLUSMALLINT,
+    pub day: SQLUSMALLINT,
+    pub hour: SQLUSMALLINT,
+    pub minute: SQLUSMALLINT,
+    pub second: SQLUSMALLINT,
     /// Number of billionths of a second and ranges from 0 through 999,999,999
-    fraction: SQLUINTEGER,
-    timezone_hours: SQLSMALLINT,
-    timezone_minutes: SQLUSMALLINT,
+    pub fraction: SQLUINTEGER,
+    pub timezone_hours: SQLSMALLINT,
+    pub timezone_minutes: SQLUSMALLINT,
 }
 
 #[repr(C)]
 #[allow(non_camel_case_types)]
+#[derive(Clone, Copy)]
 pub struct SQL_INTERVAL_STRUCT {
-    interval_type: SQLINTERVAL,
-    interval_sign: SQLSMALLINT,
+    pub interval_type: SQLINTERVAL,
+    pub interval_sign: SQLSMALLINT,
+    // TODO: Make public
     interval: IntervalUnion,
+}
+impl Eq for SQL_INTERVAL_STRUCT {}
+impl PartialEq<SQL_INTERVAL_STRUCT> for SQL_INTERVAL_STRUCT {
+    fn eq(&self, other: &SQL_INTERVAL_STRUCT) -> bool {
+        unimplemented!()
+    }
+}
+impl std::fmt::Debug for SQL_INTERVAL_STRUCT {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        unimplemented!()
+    }
 }
 
 // TODO: Probably shouldn't use an enum with C FFI
+// But it's literally defined as enum in ODBC
 #[repr(C)]
-enum SQLINTERVAL {
+#[allow(non_camel_case_types)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum SQLINTERVAL {
     SQL_IS_YEAR = 1,
     SQL_IS_MONTH = 2,
     SQL_IS_DAY = 3,
@@ -321,30 +509,32 @@ enum SQLINTERVAL {
 
 #[repr(C)]
 // TODO: Should this be public?
-union IntervalUnion {
-    year_month: SQL_YEAR_MONTH_STRUCT,
-    day_second: SQL_DAY_SECOND_STRUCT,
-}
-
-// TODO: Must be copy because it's used in uinon
-// Maybe it's would bt ok in nightly
-#[repr(C)]
+// TODO: Remove Copy
 #[derive(Clone, Copy)]
-#[allow(non_camel_case_types)]
-struct SQL_YEAR_MONTH_STRUCT {
-    year: SQLUINTEGER,
-    month: SQLUINTEGER,
+union IntervalUnion {
+    pub year_month: SQL_YEAR_MONTH_STRUCT,
+    pub day_second: SQL_DAY_SECOND_STRUCT,
 }
 
 // TODO: Must be copy because it's used in uinon
 // Maybe it would bt ok in nightly
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[allow(non_camel_case_types)]
+struct SQL_YEAR_MONTH_STRUCT {
+    pub year: SQLUINTEGER,
+    pub month: SQLUINTEGER,
+}
+
+// TODO: Must be copy because it's used in uinon
+// Maybe it would bt ok in nightly
+#[repr(C)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[allow(non_camel_case_types)]
 struct SQL_DAY_SECOND_STRUCT {
-    day: SQLUINTEGER,
-    month: SQLUINTEGER,
-    minute: SQLUINTEGER,
-    second: SQLUINTEGER,
-    fraction: SQLUINTEGER,
+    pub day: SQLUINTEGER,
+    pub month: SQLUINTEGER,
+    pub minute: SQLUINTEGER,
+    pub second: SQLUINTEGER,
+    pub fraction: SQLUINTEGER,
 }

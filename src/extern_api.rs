@@ -1,13 +1,17 @@
 use crate::handle::{HDBC, HDESC, HENV, HSTMT, SQLHWND};
 use crate::{
-    RETCODE, SQLCHAR, SQLHANDLE, SQLINTEGER, SQLLEN, SQLRETURN, SQLSETPOSIROW, SQLSMALLINT,
-    SQLULEN, SQLUSMALLINT, SQLWCHAR,
+    RETCODE, SQLCHAR, SQLHANDLE, SQLINTEGER, SQLLEN, SQLPOINTER, SQLRETURN,
+    SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
 
 // TODO: Replace these two types with SQLPOINTER once library is stabilized
 // they are used to avoid provenance related errors during initial development
 type ConstSQLPOINTER = *const std::ffi::c_void;
 type MutSQLPOINTER = *mut std::ffi::c_void;
+impl crate::Identifier for ConstSQLPOINTER {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = crate::SQL_IS_POINTER;
+}
 
 // TODO static linking is not currently supported here for windows
 #[cfg_attr(windows, link(name = "odbc32"))]
@@ -37,9 +41,9 @@ extern "system" {
         ParameterType: SQLSMALLINT,
         ColumnSize: SQLULEN,
         DecimalDigits: SQLSMALLINT,
-        ParameterValuePtr: MutSQLPOINTER,
+        ParameterValuePtr: SQLPOINTER,
         BufferLength: SQLLEN,
-        StrLen_or_IndPtr: *mut SQLLEN,
+        StrLen_or_IndPtr: *const SQLLEN,
     ) -> SQLRETURN;
 
     pub(crate) fn SQLBrowseConnectA(

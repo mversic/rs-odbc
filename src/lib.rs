@@ -7,6 +7,7 @@ pub mod diag;
 pub mod env;
 pub(crate) mod extern_api;
 pub mod handle;
+pub mod info;
 pub mod sql_types;
 pub mod sqlchar_str;
 pub mod sqlreturn;
@@ -14,10 +15,7 @@ pub mod stmt;
 
 use std::mem::MaybeUninit;
 
-use rs_odbc_derive::EqSQLSMALLINT;
-
 pub use conn::{
-    AccessMode::*, AsyncDbcFunctionsEnable::*, AutoCommit::*, ConnectionDead::*, Trace::*,
     SQL_ASYNC_DBC_ENABLE_DEFAULT, SQL_ATTR_ACCESS_MODE, SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE,
     SQL_ATTR_AUTOCOMMIT, SQL_ATTR_AUTO_IPD, SQL_ATTR_CONNECTION_DEAD, SQL_ATTR_CONNECTION_TIMEOUT,
     SQL_ATTR_CURRENT_CATALOG, SQL_ATTR_LOGIN_TIMEOUT, SQL_ATTR_PACKET_SIZE, SQL_ATTR_TRACE,
@@ -25,17 +23,20 @@ pub use conn::{
     SQL_OPT_TRACE_DEFAULT,
 };
 pub use env::{
-    ConnectionPooling::*, CpMatch::*, OdbcVersion::*, SQL_ATTR_CONNECTION_POOLING,
-    SQL_ATTR_CP_MATCH, SQL_ATTR_ODBC_VERSION, SQL_CP_DEFAULT, SQL_CP_MATCH_DEFAULT,
+    SQL_ATTR_CONNECTION_POOLING, SQL_ATTR_CP_MATCH, SQL_ATTR_ODBC_VERSION, SQL_CP_DEFAULT,
+    SQL_CP_DRIVER_AWARE, SQL_CP_MATCH_DEFAULT, SQL_CP_OFF, SQL_CP_ONE_PER_DRIVER,
+    SQL_CP_ONE_PER_HENV, SQL_CP_RELAXED_MATCH, SQL_CP_STRICT_MATCH, SQL_OV_ODBC3, SQL_OV_ODBC3_80,
 };
 pub use handle::{
     SQLHANDLE, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT, SQLHWND, SQL_HANDLE_DBC, SQL_HANDLE_DESC,
     SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE,
 }; // TODO: SQLHWND
+pub use rs_odbc_derive::odbc_type;
+pub use sql_types::*;
 pub use sqlchar_str::SQLCHARString;
 pub use sqlreturn::{
     SQLRETURN, SQL_ERROR, SQL_INVALID_HANDLE, SQL_NEED_DATA, SQL_NO_DATA, SQL_PARAM_DATA_AVAILABLE,
-    SQL_STILL_EXECUTING, SQL_SUCCESS, SQL_SUCCESS_WITH_INFO,
+    SQL_STILL_EXECUTING, SQL_SUCCEEDED, SQL_SUCCESS, SQL_SUCCESS_WITH_INFO,
 };
 pub use DriverCompletion::*;
 pub use {api::*, c_types::*, sql_types::*};
@@ -50,7 +51,7 @@ pub type SQLUINTEGER = u32;
 
 pub type SQLREAL = f32;
 pub type SQLDOUBLE = f64;
-pub type SQLFLOAT = f64;
+pub use SQLDOUBLE as SQLFLOAT;
 
 /// ASCII encoded character
 pub type SQLCHAR = u8;
@@ -75,82 +76,208 @@ pub type SQLSETPOSIROW = u64;
 pub struct SqlStateA([SQLCHAR; 6]);
 pub struct SqlStateW([SQLWCHAR; 6]);
 
+type UWORD = u16;
 type SQLPOINTER = *mut std::ffi::c_void;
 
-pub const SQL_IS_POINTER: i8 = -4;
-pub const SQL_IS_UINTEGER: i8 = -5;
-pub const SQL_IS_INTEGER: i8 = -6;
-pub const SQL_IS_USMALLINT: i8 = -7;
-pub const SQL_IS_SMALLINT: i8 = -8;
+const SQL_IS_POINTER: SQLSMALLINT = -4;
+const SQL_IS_UINTEGER: SQLSMALLINT = -5;
+const SQL_IS_INTEGER: SQLSMALLINT = -6;
+const SQL_IS_USMALLINT: SQLSMALLINT = -7;
+const SQL_IS_SMALLINT: SQLSMALLINT = -8;
 
-pub trait AsMutPtr<T> {
+pub unsafe trait AsMutPtr<T> {
     fn as_mut_ptr(&mut self) -> *mut T;
 }
 
-// TODO: Is it possible to derive this trait?
-pub trait AsSQLPOINTER {
+pub unsafe trait AsSQLPOINTER {
+    #[allow(non_snake_case)]
     fn as_SQLPOINTER(&self) -> SQLPOINTER;
 }
-pub trait AsMutSQLPOINTER {
-    // TODO: Consider extracting StrLen to a separate trait
-    type StrLen;
+/// If type implementing this trait is a reference allocated inside Driver Manager, then
+/// it must be constrained by the given lifetime parameter 'a. Such references are never
+/// owned (and therefore never dropped) by the Rust code
+pub unsafe trait AsMutSQLPOINTER<'a> {
+    #[allow(non_snake_case)]
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER;
 }
-pub trait Len<AT, LEN> {
+pub unsafe trait Len<AT, LEN: Copy> {
+    type StrLen;
+    // TODO: consider returning MaybeUninit here. This should be entirely valid
+    // It could be difficult to implement because of conflict with odbc_type macro
     fn len(&self) -> LEN;
 }
-pub trait AsRawSlice<T, LEN> {
+pub unsafe trait AsRawSlice<T, LEN: Copy> {
     fn as_raw_slice(&self) -> (*const T, LEN);
 }
-pub trait AsMutRawSlice<T, LEN> {
+pub unsafe trait AsMutRawSlice<T, LEN: Copy> {
     fn as_mut_raw_slice(&mut self) -> (*mut T, LEN);
 }
 
-impl<T> AsMutPtr<T> for MaybeUninit<()> {
+unsafe impl<T> AsMutPtr<T> for MaybeUninit<()> {
     fn as_mut_ptr(&mut self) -> *mut T {
-        // TODO: If using dangling pointers is ok, this trait can be removed entirely
-        // and use MaybeUninit::as_mut_ptr instead as is
+        // TODO: If using dangling pointers is ok, this trait can be removed entirely and use MaybeUninit::as_mut_ptr instead as is
+        // However, it is SAFER to use null pointers because it is likely that implementation will null-check before dereferencing
         std::ptr::null_mut()
     }
 }
 
-impl AsMutSQLPOINTER for MaybeUninit<SQLUINTEGER> {
-    // TODO: Either has to be in separate trait or this trait has to be paramterized
-    type StrLen = ();
-
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        self.as_mut_ptr().cast()
-    }
-}
-impl<T, LEN: From<i8>> Len<T, LEN> for MaybeUninit<SQLUINTEGER> {
-    fn len(&self) -> LEN {
-        LEN::from(SQL_IS_UINTEGER)
-    }
-}
-impl AsRawSlice<SQLCHAR, SQLSMALLINT> for str {
+unsafe impl AsRawSlice<SQLCHAR, SQLSMALLINT> for str {
     fn as_raw_slice(&self) -> (*const SQLCHAR, SQLSMALLINT) {
         // TODO: This cast is problematic
         (self.as_ptr(), self.len() as SQLSMALLINT)
     }
 }
-impl AsSQLPOINTER for str {
+unsafe impl AsSQLPOINTER for str {
     fn as_SQLPOINTER(&self) -> SQLPOINTER {
         self.as_ptr() as *mut _
     }
 }
-//impl Len<SQLINTEGER> for str {
-//    fn len(&self) -> SQLINTEGER {
-//        2 * self.len()
-//    }
-//}
-//const fn SQL_LEN_BINARY_ATTR<LEN>(length: LEN) {
-//    const SQL_LEN_BINARY_ATTR_OFFSET: LEN = -100;
-//    -length + SQL_LEN_BINARY_ATTR_OFFSET
-//}
-impl Len<DriverAttr, SQLINTEGER> for [u8] {
-    fn len(&self) -> SQLINTEGER {
-        // TODO: This is not correct
-        self.len() as SQLINTEGER
+impl Identifier for SQLSMALLINT {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_IS_SMALLINT;
+}
+impl Identifier for SQLUSMALLINT {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_IS_USMALLINT;
+}
+impl Identifier for SQLINTEGER {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_IS_INTEGER;
+}
+impl Identifier for SQLUINTEGER {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_IS_UINTEGER;
+}
+impl Identifier for SQLLEN {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQLINTEGER::IDENTIFIER;
+}
+impl Identifier for SQLULEN {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQLUINTEGER::IDENTIFIER;
+}
+impl Identifier for SQLPOINTER {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: SQLSMALLINT = SQL_IS_POINTER;
+}
+unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for SQLSMALLINT
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(SQLSMALLINT::IDENTIFIER)
+    }
+}
+unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for SQLUSMALLINT
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(SQLUSMALLINT::IDENTIFIER)
+    }
+}
+unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for SQLINTEGER
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(SQLINTEGER::IDENTIFIER)
+    }
+}
+unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for SQLUINTEGER
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(SQLUINTEGER::IDENTIFIER)
+    }
+}
+unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for SQLLEN
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(SQLLEN::IDENTIFIER)
+    }
+}
+unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for SQLULEN
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(SQLULEN::IDENTIFIER)
+    }
+}
+unsafe impl<LEN: Copy> Len<DriverAttr, LEN> for SQLSMALLINT
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(SQLSMALLINT::IDENTIFIER)
+    }
+}
+unsafe impl<LEN: Copy> Len<DriverAttr, LEN> for SQLUSMALLINT
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(SQLUSMALLINT::IDENTIFIER)
+    }
+}
+unsafe impl<LEN: Copy> Len<DriverAttr, LEN> for SQLINTEGER
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(SQLINTEGER::IDENTIFIER)
+    }
+}
+unsafe impl<LEN: Copy> Len<DriverAttr, LEN> for SQLUINTEGER
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(SQLUINTEGER::IDENTIFIER)
+    }
+}
+unsafe impl<LEN: Copy> Len<DriverAttr, LEN> for SQLLEN
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(SQLLEN::IDENTIFIER)
+    }
+}
+unsafe impl<LEN: Copy> Len<DriverAttr, LEN> for SQLULEN
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(SQLULEN::IDENTIFIER)
     }
 }
 
@@ -158,55 +285,37 @@ pub enum OdbcAttr {}
 pub enum DriverAttr {}
 
 pub trait Identifier {
-    type IdentType;
+    type IdentType: Copy;
 
     const IDENTIFIER: Self::IdentType;
 }
-pub trait GetAttr<C, T> {}
-pub trait SetAttr<C, T> {}
+pub unsafe trait ReadAttr<C, T> {}
+pub unsafe trait WriteAttr<C, T> {}
 pub enum AnsiType {}
 pub enum UnicodeType {}
 
-// TODO: Maybe implement something like this?
-//impl<const M: usize> AsMutRawSlice<SQLSMALLINT> for [MaybeUninit<SQLCHAR>; M] {
-//    type InitializedType = [SQLCHAR; M];
-//
-//    fn as_mut_raw_SQLCHAR_slice(&mut self) -> (*mut SQLCHAR, SQLSMALLINT) {
-//        unimplemented!()
-//    }
-//    unsafe fn assume_init(self) -> Self::InitializedType {
-//        let mut nul_mark_found = false;
-//
-//        self.iter_mut().for_each(|x| {
-//            if nul_mark_found {
-//                if *x.as_mut_ptr() == 0 {
-//                    nul_mark_found = true;
-//                }
-//            } else {
-//                std::ptr::write(x.as_mut_ptr(), 0);
-//            }
-//        });
-//
-//        std::mem::transmute::<_, Self::InitializedType>(self)
-//    }
-//}
-
 // TODO: Comapare attribute types: <attribute>(type, default)
 // SQL_ATTR_OUTPUT_NTS(u32, true), SQL_ATTR_AUTO_IPD(u32, _)
+#[odbc_type(SQLUINTEGER)]
 #[allow(non_camel_case_types)]
-// TODO: Type equality should be derived such as EqSQLUINTEGER
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum OdbcBool {
-    SQL_FALSE = 0,
-    SQL_TRUE = 1,
-}
+pub struct OdbcBool;
+pub const SQL_FALSE: OdbcBool = OdbcBool(0);
+pub const SQL_TRUE: OdbcBool = OdbcBool(1);
 
 // TODO
 //pub use SQL_COLUMN_SEARCHABLE::SQL_SEARCHABLE as SQL_PRED_SEARCHABLE;
 // Special return values for SQLGetData
 // SQL_NO_TOTAL = -4,
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[odbc_type(SQLSMALLINT)]
+// TODO: See how to name this struct
+pub struct NullAllowed;
+pub const SQL_NO_NULLS: NullAllowed = NullAllowed(0);
+pub const SQL_NULLABLE: NullAllowed = NullAllowed(1);
+// TODO: This value should not be used with SQLSpecialColumns
+pub const SQL_NULLABLE_UNKNOWN: NullAllowed = NullAllowed(2);
+
+#[odbc_type(SQLUSMALLINT)]
 #[allow(non_camel_case_types)]
 pub enum DriverCompletion {
     SQL_DRIVER_NOPROMPT = 0,
@@ -215,25 +324,111 @@ pub enum DriverCompletion {
     SQL_DRIVER_COMPLETE_REQUIRED = 3,
 }
 
-#[derive(EqSQLSMALLINT, Debug, PartialEq, Eq, Clone, Copy)]
+#[odbc_type(SQLSMALLINT)]
 #[allow(non_camel_case_types)]
-pub enum Nullable {
-    SQL_NO_NULLS = 0,
-    SQL_NULLABLE = 1,
-    // TODO: This value should not be used with SQLSpecialColumns
-    SQL_NULLABLE_UNKNOWN = 2,
+pub enum IdentifierType {
+    SQL_BEST_ROWID = 1,
+    SQL_ROWVER = 2,
 }
 
-#[allow(non_snake_case)]
-pub fn SQL_SUCCEEDED<T: Into<SQLRETURN>>(ret: T) -> bool {
-    match ret.into() {
-        SQL_SUCCESS | SQL_SUCCESS_WITH_INFO => true,
-        _ => false,
-    }
+#[odbc_type(SQLUSMALLINT)]
+#[allow(non_camel_case_types)]
+pub enum BulkOperation {
+    SQL_ADD = 4,
+    SQL_UPDATE_BY_BOOKMARK = 5,
+    SQL_DELETE_BY_BOOKMARK = 6,
+    SQL_FETCH_BY_BOOKMARK = 7,
 }
-//pub mod info {
-//    pub trait InfoType: Identifier<TypeIdentifier=SQLUSMALLINT> {}
+
+#[odbc_type(SQLUSMALLINT)]
+#[allow(non_camel_case_types)]
+pub enum Operation {
+    SQL_POSITION = 0,
+    SQL_REFRESH = 1,
+    SQL_UPDATE = 2,
+    SQL_DELETE = 3,
+}
+
+#[odbc_type(SQLUSMALLINT)]
+#[allow(non_camel_case_types)]
+pub enum LockType {
+    SQL_LOCK_NO_CHANGE = 0,
+    SQL_LOCK_EXCLUSIVE = 1,
+    SQL_LOCK_UNLOCK = 2,
+}
+
+#[odbc_type(SQLSMALLINT)]
+#[allow(non_camel_case_types)]
+pub enum CompletionType {
+    SQL_COMMIT = 0,
+    SQL_ROLLBACK = 1,
+}
+
+#[odbc_type(SQLUSMALLINT)]
+#[allow(non_camel_case_types)]
+pub enum FreeStmtOption {
+    SQL_CLOSE = 0,
+    SQL_UNBIND = 2,
+    SQL_RESET_PARAMS = 3,
+}
+
+#[odbc_type(SQLUSMALLINT)]
+#[allow(non_camel_case_types)]
+pub enum Reserved {
+    SQL_QUICK = 0,
+    SQL_ENSURE = 1,
+}
+
+#[odbc_type(SQLUSMALLINT)]
+#[allow(non_camel_case_types)]
+pub enum Unique {
+    SQL_INDEX_UNIQUE = 0,
+    SQL_INDEX_ALL = 1,
+}
+
+#[odbc_type(SQLSMALLINT)]
+#[allow(non_camel_case_types)]
+pub enum Scope {
+    SQL_SCOPE_CURROW = 0,
+    SQL_SCOPE_TRANSACTION = 1,
+    SQL_SCOPE_SESSION = 2,
+}
+
+#[odbc_type(SQLSMALLINT)]
+#[allow(non_camel_case_types)]
+// TODO: Think about splitting for IO
+pub enum ParameterType {
+    SQL_PARAM_INPUT = 1,
+    SQL_PARAM_INPUT_OUTPUT = 2,
+    SQL_PARAM_OUTPUT = 4,
+
+    SQL_PARAM_INPUT_OUTPUT_STREAM = 8,
+    SQL_PARAM_OUTPUT_STREAM = 16,
+
+    SQL_PARAM_TYPE_UNKNOWN = 0,
+    SQL_RESULT_COL = 3,
+    SQL_RETURN_VALUE = 5,
+}
+
+//pub const fn SQL_LEN_BINARY_ATTR<LEN>(length: LEN) {
+//    const SQL_LEN_BINARY_ATTR_OFFSET: LEN = -100;
+//    -length + SQL_LEN_BINARY_ATTR_OFFSET
 //}
+
+pub trait GetData<T>: Identifier<IdentType = SQLSMALLINT> {}
+impl<T, TT: OutCType<T>> GetData<T> for TT {}
+
+//#[derive(Identifier)]
+//#[identifier(SQLSMALLINT, -99)]
+//#[allow(non_camel_case_types)]
+//pub struct SQL_ARD_TYPE;
+//impl<T> GetData<T> for SQL_ARD_TYPE {}
+//
+//#[derive(Identifier)]
+//#[identifier(SQLSMALLINT, -100)]
+//#[allow(non_camel_case_types)]
+//pub struct SQL_APD_TYPE;
+//impl<T> GetData<T> for SQL_APD_TYPE {}
 
 // /// Specifies how many active connections a particular driver supports.
 //#define SQL_MAX_DRIVER_CONNECTIONS          0
@@ -241,3 +436,91 @@ pub fn SQL_SUCCEEDED<T: Into<SQLRETURN>>(ret: T) -> bool {
 ///// Some drivers limit the number of active statements they support; the SQL_MAX_CONCURRENT_ACTIVITIES option in SQLGetInfo specifies how many active statements a driver supports on a single connection.
 //#define SQL_MAX_CONCURRENT_ACTIVITIES       1
 //#define SQL_MAXIMUM_CONCURRENT_ACTIVITIES   SQL_MAX_CONCURRENT_ACTIVITIES
+
+// TODO: and what about SQLCHAR vs SQLWCHAR?
+pub const SQL_ALL_CATALOGS: &str = "%";
+pub const SQL_ALL_SCHEMAS: &str = "%";
+pub const SQL_ALL_TABLE_TYPES: &str = "%";
+
+#[odbc_type(SQLUSMALLINT)]
+#[allow(non_camel_case_types)]
+pub enum FunctionId {
+    SQL_API_ODBC3_ALL_FUNCTIONS = 999,
+    SQL_API_SQLALLOCCONNECT = 1,
+    SQL_API_SQLALLOCENV = 2,
+    SQL_API_SQLALLOCHANDLE = 1001,
+    SQL_API_SQLALLOCSTMT = 3,
+    SQL_API_SQLBINDCOL = 4,
+    SQL_API_SQLBINDPARAM = 1002,
+    SQL_API_SQLCANCEL = 5,
+    SQL_API_SQLCLOSECURSOR = 1003,
+    SQL_API_SQLCOLATTRIBUTE = 6,
+    SQL_API_SQLCOLUMNS = 40,
+    SQL_API_SQLCONNECT = 7,
+    SQL_API_SQLCOPYDESC = 1004,
+    SQL_API_SQLDATASOURCES = 57,
+    SQL_API_SQLDESCRIBECOL = 8,
+    SQL_API_SQLDISCONNECT = 9,
+    SQL_API_SQLENDTRAN = 1005,
+    SQL_API_SQLERROR = 10,
+    SQL_API_SQLEXECDIRECT = 11,
+    SQL_API_SQLEXECUTE = 12,
+    SQL_API_SQLFETCH = 13,
+    SQL_API_SQLFETCHSCROLL = 1021,
+    SQL_API_SQLFREECONNECT = 14,
+    SQL_API_SQLFREEENV = 15,
+    SQL_API_SQLFREEHANDLE = 1006,
+    SQL_API_SQLFREESTMT = 16,
+    SQL_API_SQLGETCONNECTATTR = 1007,
+    SQL_API_SQLGETCONNECTOPTION = 42,
+    SQL_API_SQLGETCURSORNAME = 17,
+    SQL_API_SQLGETDATA = 43,
+    SQL_API_SQLGETDESCFIELD = 1008,
+    SQL_API_SQLGETDESCREC = 1009,
+    SQL_API_SQLGETDIAGFIELD = 1010,
+    SQL_API_SQLGETDIAGREC = 1011,
+    SQL_API_SQLGETENVATTR = 1012,
+    SQL_API_SQLGETFUNCTIONS = 44,
+    SQL_API_SQLGETINFO = 45,
+    SQL_API_SQLGETSTMTATTR = 1014,
+    SQL_API_SQLGETSTMTOPTION = 46,
+    SQL_API_SQLGETTYPEINFO = 47,
+    SQL_API_SQLNUMRESULTCOLS = 18,
+    SQL_API_SQLPARAMDATA = 48,
+    SQL_API_SQLPREPARE = 19,
+    SQL_API_SQLPUTDATA = 49,
+    SQL_API_SQLROWCOUNT = 20,
+    SQL_API_SQLSETCONNECTATTR = 1016,
+    SQL_API_SQLSETCONNECTOPTION = 50,
+    SQL_API_SQLSETCURSORNAME = 21,
+    SQL_API_SQLSETDESCFIELD = 1017,
+    SQL_API_SQLSETDESCREC = 1018,
+    SQL_API_SQLSETENVATTR = 1019,
+    SQL_API_SQLSETPARAM = 22,
+    SQL_API_SQLSETSTMTATTR = 1020,
+    SQL_API_SQLSETSTMTOPTION = 51,
+    SQL_API_SQLSPECIALCOLUMNS = 52,
+    SQL_API_SQLSTATISTICS = 53,
+    SQL_API_SQLTABLES = 54,
+    SQL_API_SQLTRANSACT = 23,
+    SQL_API_SQLCANCELHANDLE = 1550,
+    SQL_API_SQLCOMPLETEASYNC = 1551,
+}
+
+//pub const fn SQL_FUNC_EXISTS(pfExists: SQLUSMALLINT, uwAPI: SQLUSMALLINT) -> OdbcBool {
+//    if *((pfExists as *const UWORD).offset((uwAPI >> 4) as isize)) & (1 << (uwAPI & 0x000F)) {
+//        return SQL_TRUE;
+//    }
+//
+//    SQL_FALSE
+//}
+
+// TODO: Please try to use odbc_type derive. The problem is that str doesn't implement Identifier
+pub struct TableType(&'static str);
+impl TableType {
+    pub const fn driver_specific(val: &'static str) -> Self {
+        Self(val)
+    }
+}
+pub const TABLE: TableType = TableType("TABLE");
+pub const VIEW: TableType = TableType("VIEW");

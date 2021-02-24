@@ -48,7 +48,7 @@ impl<T: Copy> SQLCHARString<T> {
     }
 }
 
-impl AsRawSlice<SQLCHAR, SQLSMALLINT> for SQLCHARString<SQLSMALLINT> {
+unsafe impl AsRawSlice<SQLCHAR, SQLSMALLINT> for SQLCHARString<SQLSMALLINT> {
     fn as_raw_slice(&self) -> (*const SQLCHAR, SQLSMALLINT) {
         (
             self.inner.as_ptr().cast(),
@@ -56,11 +56,16 @@ impl AsRawSlice<SQLCHAR, SQLSMALLINT> for SQLCHARString<SQLSMALLINT> {
         )
     }
 }
-impl AsMutRawSlice<SQLCHAR, SQLSMALLINT> for SQLCHARString<SQLSMALLINT> {
+unsafe impl AsMutRawSlice<SQLCHAR, SQLSMALLINT> for SQLCHARString<SQLSMALLINT> {
     fn as_mut_raw_slice(&mut self) -> (*mut SQLCHAR, SQLSMALLINT) {
         (
             self.inner.as_mut_ptr().cast(),
             self.inner.capacity() as SQLSMALLINT,
         )
+    }
+}
+unsafe impl<'a, LEN> AsMutSQLPOINTER<'a> for SQLCHARString<LEN> {
+    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
+        unimplemented!()
     }
 }

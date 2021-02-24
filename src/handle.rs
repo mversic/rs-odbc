@@ -1,16 +1,15 @@
 use crate::extern_api::SQLFreeHandle;
-use crate::{SQLSMALLINT, SQL_SUCCESS, SQLPOINTER};
+use crate::{AsMutSQLPOINTER, AsSQLPOINTER, SQLPOINTER, SQLSMALLINT, SQLUSMALLINT, SQL_SUCCESS};
+use std::cell::{RefCell, UnsafeCell};
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
+use std::rc::{Rc, Weak};
 use std::thread::panicking;
 
 pub trait AsSQLHANDLE {
     #[allow(non_snake_case)]
     fn as_SQLHANDLE(&self) -> SQLHANDLE;
-}
-pub trait AsMutSQLHANDLE {
-    #[allow(non_snake_case)]
-    fn as_mut_SQLHANDLE(&mut self) -> SQLHANDLE;
 }
 
 pub trait HandleIdentifier {
@@ -24,6 +23,13 @@ pub trait Handle {
 // TODO: Where to require Drop? I could make a generic Drop implementation, hmmmm
 pub trait Allocate<'src>: Handle + Drop {
     type SrcHandle: AsSQLHANDLE;
+    fn from_raw(handle: SQLHANDLE) -> Self;
+    fn uninit() -> MaybeUninit<Self>
+    where
+        Self: Sized,
+    {
+        MaybeUninit::uninit()
+    }
 }
 
 pub trait SQLCancelHandle: Handle {}
@@ -67,7 +73,7 @@ pub struct RawHandle {
 // TODO: Think about making it newtype with private field
 // This type must not be public ever because of the issues around Drop
 #[allow(non_camel_case_types)]
-pub type SQLHANDLE = *mut RawHandle;
+pub type SQLHANDLE = *mut UnsafeCell<RawHandle>;
 
 // TODO: Keep these?
 pub type HENV = SQLHANDLE;
@@ -87,32 +93,21 @@ pub type HDESC = SQLHANDLE;
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/environment-handles
-#[repr(transparent)]
 pub struct SQLHENV {
     handle: SQLHANDLE,
-}
-impl SQLHENV {
-    // TODO: Consider removing this function
-    pub fn new() -> MaybeUninit<Self> {
-        MaybeUninit::uninit()
-    }
 }
 impl Handle for SQLHENV {
     type Identifier = SQL_HANDLE_ENV;
 }
 impl<'a> Allocate<'a> for SQLHENV {
     type SrcHandle = SQL_NULL_HANDLE;
+    fn from_raw(handle: SQLHANDLE) -> Self {
+        SQLHENV { handle }
+    }
 }
 impl SQLEndTranHandle for SQLHENV {}
 impl AsSQLHANDLE for SQLHENV {
-    #[allow(non_snake_case)]
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        self.handle
-    }
-}
-impl AsMutSQLHANDLE for SQLHENV {
-    #[allow(non_snake_case)]
-    fn as_mut_SQLHANDLE(&mut self) -> SQLHANDLE {
         self.handle
     }
 }
@@ -144,34 +139,27 @@ impl Drop for SQLHENV {
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/connection-handles
-#[repr(transparent)]
 pub struct SQLHDBC<'env> {
     handle: SQLHANDLE,
     parent: PhantomData<&'env SQLHENV>,
 }
-impl<'env> Allocate<'env> for SQLHDBC<'env> {
-    type SrcHandle = SQLHENV;
-}
 impl Handle for SQLHDBC<'_> {
     type Identifier = SQL_HANDLE_DBC;
 }
-impl<'env> SQLHDBC<'env> {
-    pub fn new() -> MaybeUninit<Self> {
-        MaybeUninit::uninit()
+impl<'env> Allocate<'env> for SQLHDBC<'env> {
+    type SrcHandle = SQLHENV;
+    fn from_raw(handle: SQLHANDLE) -> Self {
+        SQLHDBC {
+            handle,
+            parent: PhantomData,
+        }
     }
 }
 impl SQLCancelHandle for SQLHDBC<'_> {}
 impl SQLCompleteAsyncHandle for SQLHDBC<'_> {}
 impl SQLEndTranHandle for SQLHDBC<'_> {}
 impl AsSQLHANDLE for SQLHDBC<'_> {
-    #[allow(non_snake_case)]
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        self.handle
-    }
-}
-impl AsMutSQLHANDLE for SQLHDBC<'_> {
-    #[allow(non_snake_case)]
-    fn as_mut_SQLHANDLE(&mut self) -> SQLHANDLE {
         self.handle
     }
 }
@@ -207,43 +195,52 @@ impl Drop for SQLHDBC<'_> {
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/statement-handles
-#[repr(transparent)]
-pub struct SQLHSTMT<'env, 'conn> {
+pub struct SQLHSTMT<'env, 'conn, 'a> {
     handle: SQLHANDLE,
     parent: PhantomData<&'conn SQLHDBC<'env>>,
+
+    // TODO: Mislim da tu cak ide i 'b
+    pub(crate) explicit_ard: Weak<SQLHDESC<'conn, 'a, SQLHDBC<'env>>>,
+    pub(crate) explicit_apd: Weak<SQLHDESC<'conn, 'a, SQLHDBC<'env>>>,
+
+    // TODO: Maybe not needed
+    pub(crate) bound_cols: HashMap<SQLUSMALLINT, Rc<RefCell<dyn AsMutSQLPOINTER<'a>>>>,
+    pub(crate) bound_params: HashMap<SQLUSMALLINT, Rc<dyn AsSQLPOINTER>>,
 }
-impl SQLHSTMT<'_, '_> {
-    pub fn new() -> MaybeUninit<Self> {
-        MaybeUninit::uninit()
-    }
-}
-impl<'env, 'conn> Allocate<'conn> for SQLHSTMT<'env, 'conn> {
-    type SrcHandle = SQLHDBC<'env>;
-}
-impl Handle for SQLHSTMT<'_, '_> {
+impl Handle for SQLHSTMT<'_, '_, '_> {
     type Identifier = SQL_HANDLE_STMT;
 }
-impl SQLCancelHandle for SQLHSTMT<'_, '_> {}
-impl SQLCompleteAsyncHandle for SQLHSTMT<'_, '_> {}
-impl AsSQLHANDLE for SQLHSTMT<'_, '_> {
-    #[allow(non_snake_case)]
+impl<'env, 'conn> Allocate<'conn> for SQLHSTMT<'env, 'conn, '_> {
+    type SrcHandle = SQLHDBC<'env>;
+
+    fn from_raw(handle: SQLHANDLE) -> Self {
+        SQLHSTMT {
+            handle,
+            parent: PhantomData,
+
+            explicit_ard: Weak::new(),
+            explicit_apd: Weak::new(),
+
+            bound_cols: HashMap::new(),
+            bound_params: HashMap::new(),
+        }
+    }
+}
+impl SQLCancelHandle for SQLHSTMT<'_, '_, '_> {}
+impl SQLCompleteAsyncHandle for SQLHSTMT<'_, '_, '_> {}
+impl AsSQLHANDLE for SQLHSTMT<'_, '_, '_> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.handle
     }
 }
-impl AsMutSQLHANDLE for SQLHSTMT<'_, '_> {
-    #[allow(non_snake_case)]
-    fn as_mut_SQLHANDLE(&mut self) -> SQLHANDLE {
-        self.handle
-    }
-}
-impl Drop for SQLHSTMT<'_, '_> {
+impl Drop for SQLHSTMT<'_, '_, '_> {
     fn drop(&mut self) {
         let ret = unsafe { SQLFreeHandle(SQL_HANDLE_STMT::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if ret != SQL_SUCCESS && !panicking() {
             panic!("SQLFreeHandle returned: {:?}", ret)
         }
+        // TODO: Do I have to drop bound_cols here?
     }
 }
 
@@ -269,35 +266,56 @@ impl Drop for SQLHSTMT<'_, '_> {
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/descriptor-handles
-#[repr(transparent)]
-pub struct SQLHDESC<'env, 'conn> {
+pub struct SQLHDESC<'conn, 'a, T> {
     handle: SQLHANDLE,
-    parent: PhantomData<&'conn SQLHDBC<'env>>,
+    parent: PhantomData<&'conn T>,
+    // TODO: Couldn't Vec be used?
+    pub(crate) data_ptrs: HashMap<SQLSMALLINT, Rc<RefCell<dyn AsMutSQLPOINTER<'a>>>>,
 }
-impl SQLHDESC<'_, '_> {
-    pub fn new() -> MaybeUninit<Self> {
-        MaybeUninit::uninit()
-    }
-}
-impl<'env, 'conn> Allocate<'conn> for SQLHDESC<'env, 'conn> {
-    type SrcHandle = SQLHDBC<'env>;
-}
-impl Handle for SQLHDESC<'_, '_> {
+impl<T> Handle for SQLHDESC<'_, '_, T> {
     type Identifier = SQL_HANDLE_DESC;
 }
-impl AsSQLHANDLE for SQLHDESC<'_, '_> {
-    #[allow(non_snake_case)]
+impl<'env, 'conn> Allocate<'conn> for SQLHDESC<'conn, '_, SQLHDBC<'env>> {
+    type SrcHandle = SQLHDBC<'env>;
+    fn from_raw(handle: SQLHANDLE) -> Self {
+        SQLHDESC {
+            handle,
+            parent: PhantomData,
+            data_ptrs: HashMap::new(),
+        }
+    }
+}
+impl<T> AsSQLHANDLE for SQLHDESC<'_, '_, T> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.handle
     }
 }
-impl AsMutSQLHANDLE for SQLHDESC<'_, '_> {
-    #[allow(non_snake_case)]
-    fn as_mut_SQLHANDLE(&mut self) -> SQLHANDLE {
-        self.handle
+// TODO: use derive odbc_type somehow?
+unsafe impl<T> AsSQLPOINTER for SQLHDESC<'_, '_, T> {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+        self.as_SQLHANDLE().cast()
     }
 }
-impl Drop for SQLHDESC<'_, '_> {
+unsafe impl<'a, T> AsMutSQLPOINTER<'a> for MaybeUninit<&'a SQLHDESC<'_, '_, T>> {
+    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
+        self.as_mut_ptr().cast()
+    }
+}
+unsafe impl<T, LEN: Copy> crate::Len<crate::OdbcAttr, LEN> for SQLHDESC<'_, '_, T> where LEN: From<crate::SQLSMALLINT> {
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(crate::SQL_IS_POINTER)
+    }
+}
+unsafe impl<T, LEN: Copy> crate::Len<crate::OdbcAttr, LEN> for MaybeUninit<&SQLHDESC<'_, '_, T>> where LEN: From<crate::SQLSMALLINT> {
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(crate::SQL_IS_POINTER)
+    }
+}
+impl<T> Drop for SQLHDESC<'_, '_, T> {
     fn drop(&mut self) {
         let ret = unsafe { SQLFreeHandle(SQL_HANDLE_DESC::IDENTIFIER, self.as_SQLHANDLE()) };
 
@@ -306,11 +324,9 @@ impl Drop for SQLHDESC<'_, '_> {
         }
     }
 }
-
 #[allow(non_camel_case_types)]
 pub struct SQL_NULL_HANDLE;
 impl AsSQLHANDLE for SQL_NULL_HANDLE {
-    #[allow(non_snake_case)]
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         std::ptr::null_mut()
     }
