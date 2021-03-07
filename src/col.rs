@@ -52,7 +52,7 @@ pub struct SQL_DESC_FIXED_PREC_SCALE;
 #[identifier(SQLUSMALLINT, 10)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DESC_UPDATABLE;
-unsafe impl<C> ReadAttr<C, MaybeUninit<SQLSMALLINT>> for SQL_DESC_UPDATABLE {}
+unsafe impl<C> ReadAttr<MaybeUninit<SQLSMALLINT>, C> for SQL_DESC_UPDATABLE {}
 
 ///// Describes the updatability of the column in the result set, not the column in the base table.
 //#[repr(SQLSMALLINT)]
@@ -175,7 +175,7 @@ pub struct SQL_DESC_NAME;
 #[identifier(SQLUSMALLINT, 1012)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DESC_UNNAMED;
-unsafe impl<C> ReadAttr<C, MaybeUninit<SQLSMALLINT>> for SQL_DESC_UNNAMED {}
+unsafe impl<C> ReadAttr<MaybeUninit<SQLSMALLINT>, C> for SQL_DESC_UNNAMED {}
 
 //#[repr(SQLSMALLINT)]
 //pub enum DescUnnamed {

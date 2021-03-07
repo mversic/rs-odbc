@@ -1,7 +1,7 @@
 use crate::{ReadAttr, SQLLEN, SQLSMALLINT, OdbcAttr};
 use rs_odbc_derive::{DiagField, Identifier};
 
-pub trait DiagField<H: crate::handle::HandleIdentifier>: crate::Identifier<IdentType = SQLSMALLINT> {
+pub trait DiagField<H: crate::Identifier>: crate::Identifier<IdentType = SQLSMALLINT> {
     type AttrType;
 }
 
@@ -13,7 +13,7 @@ pub struct SQL_DIAG_CURSOR_ROW_COUNT;
 impl DiagField<crate::handle::SQL_HANDLE_STMT> for SQL_DIAG_CURSOR_ROW_COUNT {
     type AttrType = OdbcAttr;
 }
-unsafe impl<C> ReadAttr<C, SQLLEN> for SQL_DIAG_CURSOR_ROW_COUNT {}
+unsafe impl<C> ReadAttr<SQLLEN, C> for SQL_DIAG_CURSOR_ROW_COUNT {}
 
 //#[identifier(7)]
 //#[derive(DiagField)]

@@ -55,15 +55,15 @@ pub struct SQL_DBMS_VER;
 #[identifier(SQLUSMALLINT, 19)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ACCESSIBLE_TABLES;
-unsafe impl<T: AsMutRawSlice<SQLCHAR, SQLSMALLINT>> ReadAttr<AnsiType, T> for SQL_ACCESSIBLE_TABLES {}
-unsafe impl<T: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>> ReadAttr<UnicodeType, T> for SQL_ACCESSIBLE_TABLES {}
+unsafe impl<T: AsMutRawSlice<SQLCHAR, SQLSMALLINT>> ReadAttr<T, AnsiType> for SQL_ACCESSIBLE_TABLES {}
+unsafe impl<T: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>> ReadAttr<T, UnicodeType> for SQL_ACCESSIBLE_TABLES {}
 
 #[derive(Identifier, InfoType)]
 #[identifier(SQLUSMALLINT, 20)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ACCESSIBLE_PROCEDURES;
-unsafe impl<T: AsMutRawSlice<SQLCHAR, SQLSMALLINT>> ReadAttr<AnsiType, T> for SQL_ACCESSIBLE_PROCEDURES {}
-unsafe impl<T: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>> ReadAttr<UnicodeType, T>
+unsafe impl<T: AsMutRawSlice<SQLCHAR, SQLSMALLINT>> ReadAttr<T, AnsiType> for SQL_ACCESSIBLE_PROCEDURES {}
+unsafe impl<T: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>> ReadAttr<T, UnicodeType>
     for SQL_ACCESSIBLE_PROCEDURES
 {
 }

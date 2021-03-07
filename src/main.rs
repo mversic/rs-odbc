@@ -4,6 +4,7 @@ use rs_odbc::{
     SQLTablesA, SQLHDBC, SQLHENV, SQLHSTMT, SQLSMALLINT, SQL_ATTR_ODBC_VERSION,
     SQL_DRIVER_COMPLETE, SQL_HANDLE_DBC, SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE,
     SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_SUCCEEDED, TABLE, VIEW, SQLHDESC, SQL_HANDLE_DESC, SQLSetStmtAttrA, SQLGetStmtAttrA,
+    SQLFreeHandle
 };
 use std::convert::TryInto;
 use std::mem::MaybeUninit;
@@ -67,7 +68,7 @@ fn main() {
     println!("{:?}", unsafe { outstr.assume_init() });
 
     let res = SQLAllocHandle(SQL_HANDLE_DESC, &conn, &mut desc);
-    let mut desc = unsafe { desc.assume_init() };
+    let mut desc = std::rc::Rc::new(unsafe { desc.assume_init() });
     println!("{:?}", res);
     let res = SQLAllocHandle(SQL_HANDLE_STMT, &conn, &mut stmt);
     let mut stmt = unsafe { stmt.assume_init() };
@@ -100,20 +101,19 @@ fn main() {
     let res = SQLSetStmtAttrA(&mut stmt, rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC, &desc);
     println!("{:?}", res);
 
-    let mut read_desc = MaybeUninit::<&SQLHDESC<SQLHSTMT>>::uninit();
-    let res = SQLGetStmtAttrA(&stmt, rs_odbc::stmt::SQL_ATTR_IMP_ROW_DESC, &mut read_desc, &mut MaybeUninit::uninit());
+    let mut read_desc = MaybeUninit::uninit();
+    let res = SQLGetStmtAttrA(&stmt, rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC, &mut read_desc, &mut MaybeUninit::uninit());
     let read_desc = unsafe {read_desc.assume_init() };
-    //println!("{:?}", read_desc);
+    SQLFetch(&stmt);
     println!("KARA: {:?}", res);
 
-    // TODO: This reference is invalid at this point because stmt was dropped
-    std::mem::drop(stmt);
     std::mem::drop(read_desc);
-    std::mem::drop(desc);
+    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+    SQLFreeHandle(SQL_HANDLE_DESC, std::rc::Rc::try_unwrap(desc).ok().unwrap());
     let res = SQLDisconnect(&mut conn);
     println!("{:?}", res);
 
-    std::mem::drop(conn);
-    std::mem::drop(conn2);
-    std::mem::drop(env);
+    SQLFreeHandle(SQL_HANDLE_DBC, conn);
+    SQLFreeHandle(SQL_HANDLE_DBC, conn2);
+    SQLFreeHandle(SQL_HANDLE_ENV, env);
 }

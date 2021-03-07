@@ -1,6 +1,9 @@
-//    pub trait DescField {
-//        fn identifier() -> SQLSMALLINT;
-//    }
+use crate::SQLSMALLINT;
+
+pub trait DescField: crate::Identifier<IdentType = SQLSMALLINT> {
+    type AttrType;
+}
+
 //    pub enum DescFieldIdentifier {
 //        // Header fields
 //        SQL_DESC_ALLOC_TYPE = 1099,

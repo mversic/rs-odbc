@@ -1,27 +1,32 @@
-use crate::extern_api::SQLFreeHandle;
-use crate::{AsMutSQLPOINTER, AsSQLPOINTER, SQLPOINTER, SQLSMALLINT, SQLUSMALLINT, SQL_SUCCESS};
-use std::cell::{RefCell, UnsafeCell};
+use crate::extern_api;
+use crate::stmt::{
+    StmtAttr, SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC,
+    SQL_ATTR_IMP_ROW_DESC,
+};
+use crate::{
+    AsMutSQLPOINTER, AsSQLPOINTER, Identifier, Len, OdbcAttr, SQLPOINTER, SQLSMALLINT,
+    SQLUSMALLINT, SQL_SUCCESS,
+};
+use std::any::type_name;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::mem::MaybeUninit;
-use std::rc::{Rc, Weak};
+use std::mem::{ManuallyDrop, MaybeUninit};
+use std::rc::Rc;
 use std::thread::panicking;
 
-pub trait AsSQLHANDLE {
+pub unsafe trait AsSQLHANDLE {
     #[allow(non_snake_case)]
     fn as_SQLHANDLE(&self) -> SQLHANDLE;
 }
 
-pub trait HandleIdentifier {
-    const IDENTIFIER: SQLSMALLINT;
-}
-
 pub trait Handle {
-    type Identifier: HandleIdentifier;
+    type Identifier: crate::Identifier<IdentType = SQLSMALLINT>;
 }
 
+// TODO: Should be unsafe?
 // TODO: Where to require Drop? I could make a generic Drop implementation, hmmmm
-pub trait Allocate<'src>: Handle + Drop {
+pub unsafe trait Allocate<'src>: Handle + Drop {
     type SrcHandle: AsSQLHANDLE;
     fn from_raw(handle: SQLHANDLE) -> Self;
     fn uninit() -> MaybeUninit<Self>
@@ -36,29 +41,67 @@ pub trait SQLCancelHandle: Handle {}
 pub trait SQLCompleteAsyncHandle: Handle {}
 pub trait SQLEndTranHandle: Handle {}
 
+pub trait DescType {
+    fn new() -> Self;
+    fn unbind_record(&self, RecNumber: SQLSMALLINT);
+    fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: Rc<RefCell<dyn AsMutSQLPOINTER>>) {}
+}
+pub struct ImplDesc {}
+pub struct AppDesc {
+    // TODO: Couldn't Vec be used? Try using vec
+    // TODO: Check which type to use as a key?
+    // TODO: Use UnsafeCell instead?
+    pub(crate) SQL_DESC_DATA_PTR: Cell<HashMap<SQLSMALLINT, Rc<RefCell<dyn AsMutSQLPOINTER>>>>,
+}
+impl AppDesc {
+    fn unbind_records(&self) {
+        self.SQL_DESC_DATA_PTR.set(HashMap::new())
+    }
+}
+impl DescType for ImplDesc {
+    fn new() -> Self {
+        Self {}
+    }
+    fn unbind_record(&self, RecNumber: SQLSMALLINT) {}
+    fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: Rc<RefCell<dyn AsMutSQLPOINTER>>) {}
+}
+impl DescType for AppDesc {
+    fn new() -> Self {
+        Self {
+            SQL_DESC_DATA_PTR: Cell::new(HashMap::new()),
+        }
+    }
+    fn unbind_record(&self, RecNumber: SQLSMALLINT) {
+        let mut ptrs = self.SQL_DESC_DATA_PTR.take();
+        ptrs.remove(&RecNumber);
+        self.SQL_DESC_DATA_PTR.set(ptrs);
+    }
+    fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: Rc<RefCell<dyn AsMutSQLPOINTER>>) {
+        let mut ptrs = self.SQL_DESC_DATA_PTR.take();
+        ptrs.insert(RecNumber, Rc::clone(&DataPtr));
+        self.SQL_DESC_DATA_PTR.set(ptrs);
+    }
+}
+
+#[derive(rs_odbc_derive::Identifier)]
+#[identifier(SQLSMALLINT, 1)]
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_ENV;
-impl HandleIdentifier for SQL_HANDLE_ENV {
-    const IDENTIFIER: SQLSMALLINT = 1;
-}
 
+#[derive(rs_odbc_derive::Identifier)]
+#[identifier(SQLSMALLINT, 2)]
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_DBC;
-impl HandleIdentifier for SQL_HANDLE_DBC {
-    const IDENTIFIER: SQLSMALLINT = 2;
-}
 
+#[derive(rs_odbc_derive::Identifier)]
+#[identifier(SQLSMALLINT, 3)]
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_STMT;
-impl HandleIdentifier for SQL_HANDLE_STMT {
-    const IDENTIFIER: SQLSMALLINT = 3;
-}
 
+#[derive(rs_odbc_derive::Identifier)]
+#[identifier(SQLSMALLINT, 4)]
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_DESC;
-impl HandleIdentifier for SQL_HANDLE_DESC {
-    const IDENTIFIER: SQLSMALLINT = 4;
-}
 
 // TODO: But must it not be a void* in the end? It is void* in unixODBC
 // TODO: Check https://github.com/microsoft/ODBC-Specification/blob/b7ef71fba508ed010cd979428efae3091b732d75/Windows/inc/sqltypes.h
@@ -73,7 +116,7 @@ pub struct RawHandle {
 // TODO: Think about making it newtype with private field
 // This type must not be public ever because of the issues around Drop
 #[allow(non_camel_case_types)]
-pub type SQLHANDLE = *mut UnsafeCell<RawHandle>;
+pub type SQLHANDLE = *mut RawHandle;
 
 // TODO: Keep these?
 pub type HENV = SQLHANDLE;
@@ -94,29 +137,34 @@ pub type HDESC = SQLHANDLE;
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/environment-handles
 pub struct SQLHENV {
-    handle: SQLHANDLE,
+    pub(crate) handle: SQLHANDLE,
 }
 impl Handle for SQLHENV {
     type Identifier = SQL_HANDLE_ENV;
 }
-impl<'a> Allocate<'a> for SQLHENV {
+unsafe impl Allocate<'_> for SQLHENV {
     type SrcHandle = SQL_NULL_HANDLE;
     fn from_raw(handle: SQLHANDLE) -> Self {
         SQLHENV { handle }
     }
 }
 impl SQLEndTranHandle for SQLHENV {}
-impl AsSQLHANDLE for SQLHENV {
+unsafe impl AsSQLHANDLE for SQLHENV {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.handle
     }
 }
 impl Drop for SQLHENV {
     fn drop(&mut self) {
-        let ret = unsafe { SQLFreeHandle(SQL_HANDLE_ENV::IDENTIFIER, self.as_SQLHANDLE()) };
+        let sql_return =
+            unsafe { extern_api::SQLFreeHandle(SQL_HANDLE_ENV::IDENTIFIER, self.as_SQLHANDLE()) };
 
-        if ret != SQL_SUCCESS && !panicking() {
-            panic!("SQLFreeHandle returned: {:?}", ret)
+        if sql_return != SQL_SUCCESS && !panicking() {
+            panic!(
+                "{}: SQLFreeHandle returned {:?}",
+                type_name::<Self>(),
+                sql_return
+            )
         }
     }
 }
@@ -140,13 +188,13 @@ impl Drop for SQLHENV {
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/connection-handles
 pub struct SQLHDBC<'env> {
-    handle: SQLHANDLE,
-    parent: PhantomData<&'env SQLHENV>,
+    parent: PhantomData<&'env ()>,
+    pub(crate) handle: SQLHANDLE,
 }
 impl Handle for SQLHDBC<'_> {
     type Identifier = SQL_HANDLE_DBC;
 }
-impl<'env> Allocate<'env> for SQLHDBC<'env> {
+unsafe impl<'env> Allocate<'env> for SQLHDBC<'env> {
     type SrcHandle = SQLHENV;
     fn from_raw(handle: SQLHANDLE) -> Self {
         SQLHDBC {
@@ -158,17 +206,22 @@ impl<'env> Allocate<'env> for SQLHDBC<'env> {
 impl SQLCancelHandle for SQLHDBC<'_> {}
 impl SQLCompleteAsyncHandle for SQLHDBC<'_> {}
 impl SQLEndTranHandle for SQLHDBC<'_> {}
-impl AsSQLHANDLE for SQLHDBC<'_> {
+unsafe impl AsSQLHANDLE for SQLHDBC<'_> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.handle
     }
 }
 impl Drop for SQLHDBC<'_> {
     fn drop(&mut self) {
-        let ret = unsafe { SQLFreeHandle(SQL_HANDLE_DBC::IDENTIFIER, self.as_SQLHANDLE()) };
+        let sql_return =
+            unsafe { extern_api::SQLFreeHandle(SQL_HANDLE_DBC::IDENTIFIER, self.as_SQLHANDLE()) };
 
-        if ret != SQL_SUCCESS && !panicking() {
-            panic!("SQLFreeHandle -> {:?}", ret)
+        if sql_return != SQL_SUCCESS && !panicking() {
+            panic!(
+                "{}: SQLFreeHandle returned {:?}",
+                type_name::<Self>(),
+                sql_return
+            )
         }
     }
 }
@@ -195,52 +248,165 @@ impl Drop for SQLHDBC<'_> {
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/statement-handles
-pub struct SQLHSTMT<'env, 'conn, 'a> {
-    handle: SQLHANDLE,
-    parent: PhantomData<&'conn SQLHDBC<'env>>,
+pub struct SQLHSTMT<'conn> {
+    parent: PhantomData<&'conn ()>,
+    pub(crate) handle: SQLHANDLE,
 
-    // TODO: Mislim da tu cak ide i 'b
-    pub(crate) explicit_ard: Weak<SQLHDESC<'conn, 'a, SQLHDBC<'env>>>,
-    pub(crate) explicit_apd: Weak<SQLHDESC<'conn, 'a, SQLHDBC<'env>>>,
+    pub(crate) ard: ManuallyDrop<SQLHDESC<'conn, AppDesc>>,
+    pub(crate) apd: ManuallyDrop<SQLHDESC<'conn, AppDesc>>,
+    pub(crate) ird: ManuallyDrop<SQLHDESC<'conn, ImplDesc>>,
+    pub(crate) ipd: ManuallyDrop<SQLHDESC<'conn, ImplDesc>>,
 
-    // TODO: Maybe not needed
-    pub(crate) bound_cols: HashMap<SQLUSMALLINT, Rc<RefCell<dyn AsMutSQLPOINTER<'a>>>>,
-    pub(crate) bound_params: HashMap<SQLUSMALLINT, Rc<dyn AsSQLPOINTER>>,
+    // TODO: If compliance with ODBC standard is desired, use Weak<_> instead of Option<Rc<_>>
+    // Current implementation is expected to be less surprising to a naive user of the library
+    pub(crate) explicit_ard: Cell<Option<Rc<SQLHDESC<'conn, AppDesc>>>>,
+    pub(crate) explicit_apd: Cell<Option<Rc<SQLHDESC<'conn, AppDesc>>>>,
 }
-impl Handle for SQLHSTMT<'_, '_, '_> {
+impl SQLHSTMT<'_> {
+    unsafe fn get_descriptor_handle<T: StmtAttr>(handle: SQLHANDLE) -> SQLHANDLE {
+        let mut descriptor_handle = MaybeUninit::uninit();
+
+        let sql_return = extern_api::SQLGetStmtAttrA(
+            handle,
+            T::IDENTIFIER,
+            descriptor_handle.as_mut_ptr() as SQLPOINTER,
+            0,
+            &mut 0,
+        );
+        if sql_return != SQL_SUCCESS {
+            panic!(
+                "{}: SQLGetStmtAttr returned {:?}",
+                type_name::<T>(),
+                sql_return
+            );
+        }
+
+        descriptor_handle.assume_init()
+    }
+
+    #[allow(non_snake_case)]
+    pub(crate) fn bind_param(
+        &self,
+        ColumnNumber: SQLSMALLINT,
+        TargetValuePtr: Rc<RefCell<dyn AsMutSQLPOINTER>>,
+    ) {
+        let explicit_apd = self.explicit_apd.take();
+        if let Some(explicit_apd) = &explicit_apd {
+            explicit_apd.data.bind_record(ColumnNumber, TargetValuePtr);
+        } else {
+            self.apd.data.bind_record(ColumnNumber, TargetValuePtr);
+        }
+
+        self.explicit_apd.set(explicit_apd);
+    }
+    #[allow(non_snake_case)]
+    pub(crate) fn bind_col(
+        &self,
+        ColumnNumber: SQLSMALLINT,
+        ParameterValuePtr: Rc<RefCell<dyn AsMutSQLPOINTER>>,
+    ) {
+        let explicit_ard = self.explicit_ard.take();
+        if let Some(explicit_ard) = &explicit_ard {
+            explicit_ard
+                .data
+                .bind_record(ColumnNumber, ParameterValuePtr);
+        } else {
+            self.ard.data.bind_record(ColumnNumber, ParameterValuePtr);
+        }
+
+        self.explicit_ard.set(explicit_ard);
+    }
+    #[allow(non_snake_case)]
+    pub(crate) fn unbind_param(&self, ColumnNumber: SQLSMALLINT) {
+        let explicit_apd = self.explicit_apd.take();
+        if let Some(explicit_apd) = &explicit_apd {
+            explicit_apd.data.unbind_record(ColumnNumber);
+        } else {
+            self.apd.data.unbind_record(ColumnNumber);
+        }
+
+        self.explicit_apd.set(explicit_apd);
+    }
+    #[allow(non_snake_case)]
+    pub(crate) fn unbind_col(&self, ColumnNumber: SQLSMALLINT) {
+        let explicit_ard = self.explicit_ard.take();
+        if let Some(explicit_ard) = &explicit_ard {
+            explicit_ard.data.unbind_record(ColumnNumber);
+        } else {
+            self.ard.data.unbind_record(ColumnNumber);
+        }
+
+        self.explicit_ard.set(explicit_ard);
+    }
+    pub(crate) fn unbind_cols(&self) {
+        let explicit_ard = self.explicit_ard.take();
+        if let Some(explicit_ard) = &explicit_ard {
+            explicit_ard.data.unbind_records();
+        } else {
+            self.ard.data.unbind_records();
+        }
+
+        self.explicit_ard.set(explicit_ard);
+    }
+    pub(crate) fn unbind_params(&self) {
+        let explicit_apd = self.explicit_apd.take();
+        if let Some(explicit_apd) = &explicit_apd {
+            explicit_apd.data.unbind_records();
+        } else {
+            self.apd.data.unbind_records();
+        }
+
+        self.explicit_apd.set(explicit_apd);
+    }
+}
+impl Handle for SQLHSTMT<'_> {
     type Identifier = SQL_HANDLE_STMT;
 }
-impl<'env, 'conn> Allocate<'conn> for SQLHSTMT<'env, 'conn, '_> {
-    type SrcHandle = SQLHDBC<'env>;
+unsafe impl<'conn> Allocate<'conn> for SQLHSTMT<'conn> {
+    // Valid because SQLHDBC is covariant
+    type SrcHandle = SQLHDBC<'conn>;
 
     fn from_raw(handle: SQLHANDLE) -> Self {
-        SQLHSTMT {
-            handle,
-            parent: PhantomData,
+        unsafe {
+            let ard = SQLHSTMT::get_descriptor_handle::<SQL_ATTR_APP_ROW_DESC>(handle);
+            let apd = SQLHSTMT::get_descriptor_handle::<SQL_ATTR_APP_PARAM_DESC>(handle);
+            let ird = SQLHSTMT::get_descriptor_handle::<SQL_ATTR_IMP_ROW_DESC>(handle);
+            let ipd = SQLHSTMT::get_descriptor_handle::<SQL_ATTR_IMP_PARAM_DESC>(handle);
 
-            explicit_ard: Weak::new(),
-            explicit_apd: Weak::new(),
+            SQLHSTMT {
+                parent: PhantomData,
+                handle,
 
-            bound_cols: HashMap::new(),
-            bound_params: HashMap::new(),
+                ard: ManuallyDrop::new(SQLHDESC::<AppDesc>::from_raw(ard)),
+                apd: ManuallyDrop::new(SQLHDESC::<AppDesc>::from_raw(apd)),
+                ird: ManuallyDrop::new(SQLHDESC::<ImplDesc>::from_raw(ird)),
+                ipd: ManuallyDrop::new(SQLHDESC::<ImplDesc>::from_raw(ipd)),
+
+                explicit_ard: Cell::new(None),
+                explicit_apd: Cell::new(None),
+            }
         }
     }
 }
-impl SQLCancelHandle for SQLHSTMT<'_, '_, '_> {}
-impl SQLCompleteAsyncHandle for SQLHSTMT<'_, '_, '_> {}
-impl AsSQLHANDLE for SQLHSTMT<'_, '_, '_> {
+impl SQLCancelHandle for SQLHSTMT<'_> {}
+impl SQLCompleteAsyncHandle for SQLHSTMT<'_> {}
+unsafe impl AsSQLHANDLE for SQLHSTMT<'_> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.handle
     }
 }
-impl Drop for SQLHSTMT<'_, '_, '_> {
+impl Drop for SQLHSTMT<'_> {
     fn drop(&mut self) {
-        let ret = unsafe { SQLFreeHandle(SQL_HANDLE_STMT::IDENTIFIER, self.as_SQLHANDLE()) };
+        let sql_return =
+            unsafe { extern_api::SQLFreeHandle(SQL_HANDLE_STMT::IDENTIFIER, self.as_SQLHANDLE()) };
 
-        if ret != SQL_SUCCESS && !panicking() {
-            panic!("SQLFreeHandle returned: {:?}", ret)
+        if sql_return != SQL_SUCCESS && !panicking() {
+            panic!(
+                "{}: SQLFreeHandle returned: {:?}",
+                type_name::<Self>(),
+                sql_return
+            )
         }
-        // TODO: Do I have to drop bound_cols here?
     }
 }
 
@@ -266,67 +432,95 @@ impl Drop for SQLHSTMT<'_, '_, '_> {
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/descriptor-handles
-pub struct SQLHDESC<'conn, 'a, T> {
-    handle: SQLHANDLE,
-    parent: PhantomData<&'conn T>,
-    // TODO: Couldn't Vec be used?
-    pub(crate) data_ptrs: HashMap<SQLSMALLINT, Rc<RefCell<dyn AsMutSQLPOINTER<'a>>>>,
+pub struct SQLHDESC<'conn, T: DescType> {
+    parent: PhantomData<&'conn ()>,
+    pub(crate) handle: SQLHANDLE,
+    // TODO
+    //pub(crate) bookmark: Rc<RefCell<dyn AsMutSQLPOINTER>>,
+    pub(crate) data: T,
 }
-impl<T> Handle for SQLHDESC<'_, '_, T> {
-    type Identifier = SQL_HANDLE_DESC;
-}
-impl<'env, 'conn> Allocate<'conn> for SQLHDESC<'conn, '_, SQLHDBC<'env>> {
-    type SrcHandle = SQLHDBC<'env>;
+impl<T: DescType> SQLHDESC<'_, T> {
+    pub fn unbind_record(&self, RecNumber: SQLSMALLINT) {
+        self.data.unbind_record(RecNumber);
+    }
+    pub fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: Rc<RefCell<dyn AsMutSQLPOINTER>>) {
+        self.data.bind_record(RecNumber, DataPtr);
+    }
+
     fn from_raw(handle: SQLHANDLE) -> Self {
         SQLHDESC {
             handle,
             parent: PhantomData,
-            data_ptrs: HashMap::new(),
+            data: T::new(),
         }
     }
 }
-impl<T> AsSQLHANDLE for SQLHDESC<'_, '_, T> {
+impl<T: DescType> Handle for SQLHDESC<'_, T> {
+    type Identifier = SQL_HANDLE_DESC;
+}
+unsafe impl<'conn> Allocate<'conn> for SQLHDESC<'conn, AppDesc> {
+    // Valid because SQLHDBC is covariant
+    type SrcHandle = SQLHDBC<'conn>;
+
+    fn from_raw(handle: SQLHANDLE) -> Self {
+        SQLHDESC::<AppDesc>::from_raw(handle)
+    }
+}
+unsafe impl<T: DescType> AsSQLHANDLE for SQLHDESC<'_, T> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.handle
     }
 }
 // TODO: use derive odbc_type somehow?
-unsafe impl<T> AsSQLPOINTER for SQLHDESC<'_, '_, T> {
+unsafe impl<T: DescType> AsSQLPOINTER for Rc<SQLHDESC<'_, T>> {
     fn as_SQLPOINTER(&self) -> SQLPOINTER {
         self.as_SQLHANDLE().cast()
     }
 }
-unsafe impl<'a, T> AsMutSQLPOINTER<'a> for MaybeUninit<&'a SQLHDESC<'_, '_, T>> {
+// TODO: This can be removed
+unsafe impl<LEN: Copy, T: DescType> Len<OdbcAttr, LEN> for Rc<SQLHDESC<'_, T>>
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = ();
+
+    fn len(&self) -> LEN {
+        LEN::from(crate::SQL_IS_POINTER)
+    }
+}
+// TODO: This can be removed
+unsafe impl AsMutSQLPOINTER for MaybeUninit<&SQLHDESC<'_, ImplDesc>> {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        self.as_mut_ptr().cast()
+        unimplemented!()
     }
 }
-unsafe impl<T, LEN: Copy> crate::Len<crate::OdbcAttr, LEN> for SQLHDESC<'_, '_, T> where LEN: From<crate::SQLSMALLINT> {
+unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for MaybeUninit<&SQLHDESC<'_, ImplDesc>>
+where
+    LEN: From<SQLSMALLINT>,
+{
     type StrLen = ();
 
     fn len(&self) -> LEN {
         LEN::from(crate::SQL_IS_POINTER)
     }
 }
-unsafe impl<T, LEN: Copy> crate::Len<crate::OdbcAttr, LEN> for MaybeUninit<&SQLHDESC<'_, '_, T>> where LEN: From<crate::SQLSMALLINT> {
-    type StrLen = ();
-
-    fn len(&self) -> LEN {
-        LEN::from(crate::SQL_IS_POINTER)
-    }
-}
-impl<T> Drop for SQLHDESC<'_, '_, T> {
+impl<T: DescType> Drop for SQLHDESC<'_, T> {
     fn drop(&mut self) {
-        let ret = unsafe { SQLFreeHandle(SQL_HANDLE_DESC::IDENTIFIER, self.as_SQLHANDLE()) };
+        let sql_return =
+            unsafe { extern_api::SQLFreeHandle(SQL_HANDLE_DESC::IDENTIFIER, self.as_SQLHANDLE()) };
 
-        if ret != SQL_SUCCESS && !panicking() {
-            panic!("SQLFreeHandle returned: {:?}", ret)
+        if sql_return != SQL_SUCCESS && !panicking() {
+            panic!(
+                "{}: SQLFreeHandle returned: {:?}",
+                type_name::<Self>(),
+                sql_return
+            )
         }
     }
 }
 #[allow(non_camel_case_types)]
 pub struct SQL_NULL_HANDLE;
-impl AsSQLHANDLE for SQL_NULL_HANDLE {
+unsafe impl AsSQLHANDLE for SQL_NULL_HANDLE {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         std::ptr::null_mut()
     }

@@ -96,7 +96,7 @@ pub unsafe trait AsSQLPOINTER {
 /// If type implementing this trait is a reference allocated inside Driver Manager, then
 /// it must be constrained by the given lifetime parameter 'a. Such references are never
 /// owned (and therefore never dropped) by the Rust code
-pub unsafe trait AsMutSQLPOINTER<'a> {
+pub unsafe trait AsMutSQLPOINTER {
     #[allow(non_snake_case)]
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER;
 }
@@ -289,8 +289,8 @@ pub trait Identifier {
 
     const IDENTIFIER: Self::IdentType;
 }
-pub unsafe trait ReadAttr<C, T> {}
-pub unsafe trait WriteAttr<C, T> {}
+pub unsafe trait ReadAttr<T, C> {}
+pub unsafe trait WriteAttr<T, C> {}
 pub enum AnsiType {}
 pub enum UnicodeType {}
 
@@ -524,3 +524,18 @@ impl TableType {
 }
 pub const TABLE: TableType = TableType("TABLE");
 pub const VIEW: TableType = TableType("VIEW");
+
+unsafe impl Len<OdbcAttr, i32> for MaybeUninit<usize> {
+    type StrLen = ();
+    // TODO: consider returning MaybeUninit here. This should be entirely valid
+    // It could be difficult to implement because of conflict with odbc_type macro
+    fn len(&self) -> i32 {
+        0 as i32
+    }
+}
+
+unsafe impl AsMutSQLPOINTER for MaybeUninit<usize> {
+    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
+        unimplemented!()
+    }
+}

@@ -8,8 +8,8 @@ pub trait EnvAttr: crate::Identifier<IdentType = SQLINTEGER> {}
 #[identifier(SQLINTEGER, 200)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_ODBC_VERSION;
-unsafe impl<C> ReadAttr<C, MaybeUninit<OdbcVersion>> for SQL_ATTR_ODBC_VERSION {}
-unsafe impl<C> WriteAttr<C, OdbcVersion> for SQL_ATTR_ODBC_VERSION {}
+unsafe impl<C> ReadAttr<MaybeUninit<OdbcVersion>, C> for SQL_ATTR_ODBC_VERSION {}
+unsafe impl<C> WriteAttr<OdbcVersion, C> for SQL_ATTR_ODBC_VERSION {}
 
 #[cfg(feature = "v3_8")]
 #[derive(Identifier, EnvAttr)]
@@ -17,16 +17,16 @@ unsafe impl<C> WriteAttr<C, OdbcVersion> for SQL_ATTR_ODBC_VERSION {}
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CONNECTION_POOLING;
 #[cfg(feature = "v3_8")]
-unsafe impl<C> ReadAttr<C, MaybeUninit<ConnectionPooling>> for SQL_ATTR_CONNECTION_POOLING {}
+unsafe impl<C> ReadAttr<MaybeUninit<ConnectionPooling>, C> for SQL_ATTR_CONNECTION_POOLING {}
 #[cfg(feature = "v3_8")]
-unsafe impl<C> WriteAttr<C, ConnectionPooling> for SQL_ATTR_CONNECTION_POOLING {}
+unsafe impl<C> WriteAttr<ConnectionPooling, C> for SQL_ATTR_CONNECTION_POOLING {}
 
 #[derive(Identifier, EnvAttr)]
 #[identifier(SQLINTEGER, 202)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CP_MATCH;
-unsafe impl<C> ReadAttr<C, MaybeUninit<CpMatch>> for SQL_ATTR_CP_MATCH {}
-unsafe impl<C> WriteAttr<C, CpMatch> for SQL_ATTR_CP_MATCH {}
+unsafe impl<C> ReadAttr<MaybeUninit<CpMatch>, C> for SQL_ATTR_CP_MATCH {}
+unsafe impl<C> WriteAttr<CpMatch, C> for SQL_ATTR_CP_MATCH {}
 
 // TODO:
 //For private driver manager

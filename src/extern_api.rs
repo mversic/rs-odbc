@@ -26,7 +26,7 @@ extern "system" {
 
     pub(crate) fn SQLBindCol(
         StatementHandle: HSTMT,
-        ColumnNumber: SQLUSMALLINT,
+        ColumnNumber: SQLSMALLINT,
         TargetType: SQLSMALLINT,
         TargetValuePtr: MutSQLPOINTER,
         BufferLength: SQLLEN,
@@ -35,7 +35,7 @@ extern "system" {
 
     pub(crate) fn SQLBindParameter(
         StatementHandle: HSTMT,
-        ParameterNumber: SQLUSMALLINT,
+        ParameterNumber: SQLSMALLINT,
         InputOutputType: SQLSMALLINT,
         ValueType: SQLSMALLINT,
         ParameterType: SQLSMALLINT,

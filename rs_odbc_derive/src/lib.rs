@@ -155,12 +155,12 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
                         self.0 as crate::SQLPOINTER
                     }
                 }
-                unsafe impl crate::AsMutSQLPOINTER<'_> for #type_name {
+                unsafe impl crate::AsMutSQLPOINTER for #type_name {
                     fn as_mut_SQLPOINTER(&mut self) -> crate::SQLPOINTER {
                         self as *mut _ as crate::SQLPOINTER
                     }
                 }
-                unsafe impl crate::AsMutSQLPOINTER<'_> for std::mem::MaybeUninit<#type_name> {
+                unsafe impl crate::AsMutSQLPOINTER for std::mem::MaybeUninit<#type_name> {
                     fn as_mut_SQLPOINTER(&mut self) -> crate::SQLPOINTER {
                         self.as_mut_ptr().cast()
                     }

@@ -64,7 +64,7 @@ unsafe impl AsMutRawSlice<SQLCHAR, SQLSMALLINT> for SQLCHARString<SQLSMALLINT> {
         )
     }
 }
-unsafe impl<'a, LEN> AsMutSQLPOINTER<'a> for SQLCHARString<LEN> {
+unsafe impl<LEN> AsMutSQLPOINTER for SQLCHARString<LEN> {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
         unimplemented!()
     }
