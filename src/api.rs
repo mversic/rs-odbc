@@ -2,7 +2,6 @@ use crate::extern_api;
 use crate::handle::*;
 use std::cell::RefCell;
 use std::mem::MaybeUninit;
-use std::rc::Rc;
 
 use crate::{
     col::ColAttr, conn::ConnAttr, diag::DiagField, env::EnvAttr, info::InfoType,
@@ -59,16 +58,16 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLBindCol<TT: OutCType<T>, T: AsMutSQLPOINTER>(
-    StatementHandle: &mut SQLHSTMT,
+pub fn SQLBindCol<'data, TT: OutCType<T>, T: AsMutSQLPOINTER>(
+    StatementHandle: &SQLHSTMT<'_, 'data>,
     // Using SQLSMALLINT due to conflicting requirements
     ColumnNumber: SQLSMALLINT,
     TargetType: TT,
-    TargetValuePtr: Option<Rc<RefCell<T>>>,
+    TargetValuePtr: Option<&'data RefCell<T>>,
     StrLen_or_IndPtr: &mut MaybeUninit<T::StrLen>,
 ) -> SQLRETURN
 where
-    // TODO: 'static lifetime can be removed if bound is included in trait objects like dyn AsMutSQLPOINTER + 'a
+    // TODO: 'static lifetime can be removed if bound is included in trait objects like dyn AsMutSQLPOINTER + 'data
     // TODO: OdbcAttr makes no sense here
     T: Len<OdbcAttr, SQLLEN> + 'static,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLLEN>,
@@ -110,8 +109,8 @@ where
 #[inline]
 #[allow(non_snake_case, unused_variables)]
 // TODO: T should be AsSQLPOINTER, not AsMutSQLPOINTER type
-pub fn SQLBindParameter<TT: InCType<T>, T: AsMutSQLPOINTER>(
-    StatementHandle: &mut SQLHSTMT,
+pub fn SQLBindParameter<'data, TT: InCType<T>, T: AsMutSQLPOINTER>(
+    StatementHandle: &mut SQLHSTMT<'_, 'data>,
     // Using SQLSMALLINT due to conflicting requirements
     ParameterNumber: SQLSMALLINT,
     InputOutputType: ParameterType,
@@ -120,12 +119,12 @@ pub fn SQLBindParameter<TT: InCType<T>, T: AsMutSQLPOINTER>(
     ParameterType: SqlType,
     ColumnSize: SQLULEN,
     DecimalDigits: SQLSMALLINT,
-    ParameterValuePtr: Option<Rc<RefCell<T>>>,
+    ParameterValuePtr: Option<&'data RefCell<T>>,
     // TODO: What type should be used here, T::StrLen?
     StrLen_or_IndPtr: &SQLLEN,
 ) -> SQLRETURN
 where
-    // TODO: 'static lifetime can be removed if bound is included in trait objects like dyn <AsMutSQLPOINTER + 'a>
+    // TODO: 'static lifetime can be removed if bound is included in trait objects like dyn <AsMutSQLPOINTER + 'data>
     // TODO: OdbcAttr makes no sense here
     T: Len<OdbcAttr, SQLLEN> + 'static,
 {
@@ -618,10 +617,14 @@ where
 #[inline]
 #[allow(non_snake_case)]
 // TODO: Not sure if application and implementation descriptors can be interchangeably copied
-pub fn SQLCopyDesc<DT1: DescType, DT2: DescType>(
+pub fn SQLCopyDesc<DT1, DT2>(
     SourceDescHandle: &mut SQLHDESC<DT1>,
     TargetDescHandle: &mut SQLHDESC<DT2>,
-) -> SQLRETURN {
+) -> SQLRETURN
+where
+    DT1: for<'data> DescType<'data>,
+    DT2: for<'data> DescType<'data>,
+{
     unsafe {
         extern_api::SQLCopyDesc(
             SourceDescHandle.as_SQLHANDLE(),
@@ -1050,14 +1053,42 @@ pub fn SQLExecute(StatementHandle: &SQLHSTMT) -> SQLRETURN {
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLFetch(StatementHandle: &SQLHSTMT) -> SQLRETURN {
-    //let bound_buffers = std::mem::take(&mut StatementHandle.bound_cols);
-    //let vec: Vec<_> = bound_buffers.into_iter().filter_map(|(k, v)| Weak::upgrade(&v).map(|v| (k, v))).collect();
+    //let data_ptrs: Vec<_> = StatementHandle
+    //    .ard
+    //    .data
+    //    .data_ptrs
+    //    .take()
+    //    .into_iter()
+    //    .filter_map(|(k, v)| {
+    //        match v {
+    //            crate::handle::SQL_DESC_DATA_PTR::Owned(v) => {
+    //                if let Some(v) = Weak::upgrade(&v) {
+    //                    Some((k, v))
+    //                } else {
+    //                    //TODO: Prefer using SQLSetDescField(StatementHandle.ard, SQL_DESC_DATA_PTR, None)
+    //                    // because that way target type isn't required
+    //                    //SQLBindCol(StatementHandle, k, crate::SQL_C_ULONG, None, &mut MaybeUninit::uninit());
+    //                    None
+    //                }
+    //            }
+    //            crate::handle::SQL_DESC_DATA_PTR::Ref(v) => {
+    //                Some((k, *v))
+    //            }
+    //        }
+    //    })
+    //    .collect();
 
+    //let data_refs = data_ptrs.iter().map(|(k, v)| (k, v.borrow_mut()));
     let sql_return = unsafe { extern_api::SQLFetch(StatementHandle.as_SQLHANDLE()) };
 
-    // TODO: Improve? Don't use drop
-    //std::mem::drop(vec);
-    //StatementHandle.bound_cols = bound_buffers;
+    //drop(data_refs);
+    // TODO
+    //StatementHandle.ard.data.data_ptrs.set(
+    //    data_ptrs
+    //        .into_iter()
+    //        .map(|(k, v)| (k, Rc::downgrade(&v)))
+    //        .collect(),
+    //);
 
     sql_return
 }
@@ -1382,7 +1413,7 @@ where
 //#[inline]
 //#[allow(non_snake_case)]
 //pub fn SQLGetDescFieldA<A: DescField, T: AsMutSQLPOINTER>(
-//    DescriptorHandle: &'a mut SQLHDESC,
+//    DescriptorHandle: &'data mut SQLHDESC,
 //    RecNumber: SQLSMALLINT,
 //    FieldIdentifier: A,
 //    ValuePtr: &mut T,
@@ -1416,7 +1447,7 @@ where
 //#[inline]
 //#[allow(non_snake_case)]
 //pub fn SQLGetDescFieldW<A: DescField, T: AsMutSQLPOINTER>(
-//    DescriptorHandle: &'a mut SQLHDESC,
+//    DescriptorHandle: &'data mut SQLHDESC,
 //    RecNumber: SQLSMALLINT,
 //    FieldIdentifier: A,
 //    ValuePtr: &mut T,
@@ -1449,7 +1480,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetDescRecA<DT: DescType, MC: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
+pub fn SQLGetDescRecA<DT, MC: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
     DescriptorHandle: &mut SQLHDESC<DT>,
     RecNumber: SQLSMALLINT,
     Name: Option<&mut MC>,
@@ -1460,7 +1491,10 @@ pub fn SQLGetDescRecA<DT: DescType, MC: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
     PrecisionPtr: &mut MaybeUninit<SQLSMALLINT>,
     ScalePtr: &mut MaybeUninit<SQLSMALLINT>,
     NullablePtr: &mut MaybeUninit<NullAllowed>,
-) -> SQLRETURN {
+) -> SQLRETURN
+where
+    DT: for<'data> DescType<'data>,
+{
     let Name = Name.map_or((std::ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     unsafe {
@@ -1488,7 +1522,7 @@ pub fn SQLGetDescRecA<DT: DescType, MC: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetDescRecW<DT: DescType, MC: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(
+pub fn SQLGetDescRecW<DT, MC: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(
     DescriptorHandle: &mut SQLHDESC<DT>,
     RecNumber: SQLSMALLINT,
     Name: Option<&mut MC>,
@@ -1499,7 +1533,10 @@ pub fn SQLGetDescRecW<DT: DescType, MC: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(
     PrecisionPtr: &mut MaybeUninit<SQLSMALLINT>,
     ScalePtr: &mut MaybeUninit<SQLSMALLINT>,
     NullablePtr: &mut MaybeUninit<NullAllowed>,
-) -> SQLRETURN {
+) -> SQLRETURN
+where
+    DT: for<'data> DescType<'data>,
+{
     let Name = Name.map_or((std::ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     unsafe {
@@ -1755,14 +1792,14 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetStmtAttrA<'stmt, A: StmtAttr, T>(
-    StatementHandle: &'stmt SQLHSTMT,
+pub fn SQLGetStmtAttrA<'stmt, 'data, A: StmtAttr, T>(
+    StatementHandle: &'stmt SQLHSTMT<'_, 'data>,
     Attribute: A,
     ValuePtr: &mut T,
     StringLengthPtr: &mut MaybeUninit<T::StrLen>,
 ) -> SQLRETURN
 where
-    A: ReadStmtAttr<'stmt, T, AnsiType>,
+    A: ReadStmtAttr<'stmt, 'data, T, AnsiType>,
     T: Len<A::AttrType, SQLINTEGER>,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
@@ -1777,14 +1814,14 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetStmtAttrW<'stmt, A: StmtAttr, T>(
-    StatementHandle: &'stmt SQLHSTMT,
+pub fn SQLGetStmtAttrW<'stmt, 'data, A: StmtAttr, T>(
+    StatementHandle: &'stmt SQLHSTMT<'_, 'data>,
     Attribute: A,
     ValuePtr: &mut T,
     StringLengthPtr: &mut MaybeUninit<T::StrLen>,
 ) -> SQLRETURN
 where
-    A: ReadStmtAttr<'stmt, T, UnicodeType>,
+    A: ReadStmtAttr<'stmt, 'data, T, UnicodeType>,
     T: Len<A::AttrType, SQLINTEGER>,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
@@ -2342,7 +2379,7 @@ where
 //    DescriptorHandle: &mut SQLHDESC,
 //    RecNumber: SQLSMALLINT,
 //    FieldIdentifier: A,
-//    ValuePtr: &T,
+//    ValuePtr: Option<&T>,
 //) -> SQLRETURN
 //where
 //    A: WriteAttr<T, AnsiType>,
@@ -2376,7 +2413,7 @@ where
 //    DescriptorHandle: &mut SQLHDESC,
 //    RecNumber: SQLSMALLINT,
 //    FieldIdentifier: A,
-//    ValuePtr: &T,
+//    ValuePtr: Option<&T>,
 //) -> SQLRETURN
 //where
 //    A: WriteAttr<T, UnicodeType>,
@@ -2404,7 +2441,7 @@ where
 #[inline]
 #[allow(non_snake_case)]
 // TODO: Must not accept IRD
-pub fn SQLSetDescRec<DT: DescType, PTR: AsMutSQLPOINTER>(
+pub fn SQLSetDescRec<DT, PTR: AsMutSQLPOINTER>(
     DescriptorHandle: &mut SQLHDESC<DT>,
     RecNumber: SQLSMALLINT,
     Type: SqlType,
@@ -2413,11 +2450,12 @@ pub fn SQLSetDescRec<DT: DescType, PTR: AsMutSQLPOINTER>(
     Precision: SQLSMALLINT,
     Scale: SQLSMALLINT,
     // TODO: Input or Output for both? I guess it depends on which descriptor was given
-    DataPtr: Option<Rc<RefCell<PTR>>>,
+    DataPtr: Option<&RefCell<PTR>>,
     StringLengthPtr: &mut MaybeUninit<SQLLEN>,
     IndicatorPtr: &mut MaybeUninit<SQLLEN>,
 ) -> SQLRETURN
 where
+    DT: for<'data> DescType<'data>,
     PTR: 'static,
 {
     let sql_return = unsafe {
@@ -2507,13 +2545,13 @@ pub fn SQLSetPos(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetStmtAttrA<'conn, A: StmtAttr, T: AsSQLPOINTER>(
-    StatementHandle: &SQLHSTMT<'conn>,
+pub fn SQLSetStmtAttrA<'conn, 'data, A: StmtAttr, T: AsSQLPOINTER>(
+    StatementHandle: &SQLHSTMT<'conn, 'data>,
     Attribute: A,
     ValuePtr: &T,
 ) -> SQLRETURN
 where
-    A: WriteStmtAttr<'conn, T, AnsiType>,
+    A: WriteStmtAttr<'conn, 'data, T, AnsiType>,
     T: Len<A::AttrType, SQLINTEGER>,
 {
     let sql_return = unsafe {
@@ -2540,13 +2578,13 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetStmtAttrW<'conn, A: StmtAttr, T: AsSQLPOINTER>(
-    StatementHandle: &SQLHSTMT<'conn>,
+pub fn SQLSetStmtAttrW<'conn, 'data, A: StmtAttr, T: AsSQLPOINTER>(
+    StatementHandle: &SQLHSTMT<'conn, 'data>,
     Attribute: A,
     ValuePtr: &T,
 ) -> SQLRETURN
 where
-    A: WriteStmtAttr<'conn, T, UnicodeType>,
+    A: WriteStmtAttr<'conn, 'data, T, UnicodeType>,
     T: Len<A::AttrType, SQLINTEGER>,
 {
     let sql_return = unsafe {

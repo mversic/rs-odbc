@@ -8,25 +8,25 @@ use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::rc::Rc;
 
-pub trait WriteStmtAttr<'conn, T, C>: WriteAttr<T, C> + StmtAttr {
-    fn update_handle(_: &SQLHSTMT<'conn>, _: &T) {}
+pub trait WriteStmtAttr<'conn, 'data, T, C>: WriteAttr<T, C> + StmtAttr {
+    fn update_handle(_: &SQLHSTMT<'conn, 'data>, _: &T) {}
 }
 
-pub trait ReadStmtAttr<'stmt, T, C>: ReadAttr<T, C> + StmtAttr
+pub trait ReadStmtAttr<'stmt, 'data, T, C>: ReadAttr<T, C> + StmtAttr
 where
     T: Len<Self::AttrType, SQLINTEGER>,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     #[allow(non_snake_case)]
     unsafe fn read(
-        StatementHandle: &'stmt SQLHSTMT,
+        StatementHandle: &'stmt SQLHSTMT<'_, 'data>,
         ValuePtr: &mut T,
         StringLengthPtr: &mut MaybeUninit<T::StrLen>,
     ) -> SQLRETURN;
 
     #[allow(non_snake_case)]
     unsafe fn read_as_SQLPOINTER(
-        StatementHandle: &'stmt SQLHSTMT,
+        StatementHandle: &'stmt SQLHSTMT<'_, 'data>,
         ValuePtr: &mut T,
         StringLengthPtr: &mut MaybeUninit<T::StrLen>,
     ) -> SQLRETURN
@@ -49,14 +49,14 @@ pub trait StmtAttr: crate::Identifier<IdentType = SQLINTEGER> {
     type AttrType;
 }
 
-pub enum RefSQLHDESC<'stmt> {
+pub enum RefSQLHDESC<'stmt, 'data> {
     // TODO: Use SQLHDESC<'conn, AppDesc> if SQLHDESC is to be used after
     // statement is dropped, i.e. if unwrap method() is added on this struct
-    Implicit(&'stmt SQLHDESC<'stmt, AppDesc>),
-    Explicit(Rc<SQLHDESC<'stmt, AppDesc>>),
+    Implicit(&'stmt SQLHDESC<'stmt, AppDesc<'data>>),
+    Explicit(Rc<SQLHDESC<'stmt, AppDesc<'data>>>),
 }
-impl<'stmt> Deref for RefSQLHDESC<'stmt> {
-    type Target = SQLHDESC<'stmt, AppDesc>;
+impl<'stmt, 'data> Deref for RefSQLHDESC<'stmt, 'data> {
+    type Target = SQLHDESC<'stmt, AppDesc<'data>>;
 
     fn deref(&self) -> &Self::Target {
         match self {
@@ -65,12 +65,12 @@ impl<'stmt> Deref for RefSQLHDESC<'stmt> {
         }
     }
 }
-unsafe impl AsMutSQLPOINTER for MaybeUninit<RefSQLHDESC<'_>> {
+unsafe impl AsMutSQLPOINTER for MaybeUninit<RefSQLHDESC<'_, '_>> {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
         unimplemented!("")
     }
 }
-unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for MaybeUninit<RefSQLHDESC<'_>>
+unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for MaybeUninit<RefSQLHDESC<'_, '_>>
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -95,7 +95,7 @@ pub struct SQL_ATTR_QUERY_TIMEOUT;
 pub const SQL_QUERY_TIMEOUT_DEFAULT: SQLULEN = 0;
 unsafe impl<C> ReadAttr<MaybeUninit<SQLULEN>, C> for SQL_ATTR_QUERY_TIMEOUT {}
 unsafe impl<C> WriteAttr<SQLULEN, C> for SQL_ATTR_QUERY_TIMEOUT {}
-impl<'stmt, C> ReadStmtAttr<'stmt, MaybeUninit<SQLULEN>, C> for SQL_ATTR_QUERY_TIMEOUT {
+impl<'stmt, C> ReadStmtAttr<'stmt, '_, MaybeUninit<SQLULEN>, C> for SQL_ATTR_QUERY_TIMEOUT {
     unsafe fn read(
         StatementHandle: &'stmt SQLHSTMT,
         ValuePtr: &mut MaybeUninit<SQLULEN>,
@@ -107,7 +107,7 @@ impl<'stmt, C> ReadStmtAttr<'stmt, MaybeUninit<SQLULEN>, C> for SQL_ATTR_QUERY_T
         //ReadStmtAttr::read_as_SQLPOINTER(StatementHandle, ValuePtr, StringLengthPtr)
     }
 }
-impl<'conn, C> WriteStmtAttr<'conn, SQLULEN, C> for SQL_ATTR_QUERY_TIMEOUT {}
+impl<C> WriteStmtAttr<'_, '_, SQLULEN, C> for SQL_ATTR_QUERY_TIMEOUT {}
 
 #[derive(Identifier, StmtAttr)]
 #[identifier(SQLINTEGER, 1)]
@@ -303,13 +303,15 @@ unsafe impl<C> WriteAttr<UseBookmarks, C> for SQL_ATTR_USE_BOOKMARKS {}
 pub struct SQL_ATTR_APP_ROW_DESC;
 // Explicit descriptors must not be dropped, I think they can be shared by other
 // means and I don't think this is required
-unsafe impl<C> ReadAttr<MaybeUninit<RefSQLHDESC<'_>>, C> for SQL_ATTR_APP_ROW_DESC {}
-impl<'stmt, C> ReadStmtAttr<'stmt, MaybeUninit<RefSQLHDESC<'stmt>>, C> for SQL_ATTR_APP_ROW_DESC {
+unsafe impl<C> ReadAttr<MaybeUninit<RefSQLHDESC<'_, '_>>, C> for SQL_ATTR_APP_ROW_DESC {}
+impl<'stmt, 'data, C> ReadStmtAttr<'stmt, 'data, MaybeUninit<RefSQLHDESC<'stmt, 'data>>, C>
+    for SQL_ATTR_APP_ROW_DESC
+{
     unsafe fn read(
-        StatementHandle: &'stmt SQLHSTMT,
-        ValuePtr: &mut MaybeUninit<RefSQLHDESC<'stmt>>,
+        StatementHandle: &'stmt SQLHSTMT<'_, 'data>,
+        ValuePtr: &mut MaybeUninit<RefSQLHDESC<'stmt, 'data>>,
         StringLengthPtr: &mut MaybeUninit<
-            <MaybeUninit<RefSQLHDESC<'_>> as Len<Self::AttrType, SQLINTEGER>>::StrLen,
+            <MaybeUninit<RefSQLHDESC<'_, '_>> as Len<Self::AttrType, SQLINTEGER>>::StrLen,
         >,
     ) -> SQLRETURN {
         let explicit_ard = StatementHandle.explicit_ard.take();
@@ -327,9 +329,11 @@ impl<'stmt, C> ReadStmtAttr<'stmt, MaybeUninit<RefSQLHDESC<'stmt>>, C> for SQL_A
         SQL_SUCCESS
     }
 }
-unsafe impl<C> WriteAttr<Rc<SQLHDESC<'_, AppDesc>>, C> for SQL_ATTR_APP_ROW_DESC {}
-impl<'conn, C> WriteStmtAttr<'conn, Rc<SQLHDESC<'conn, AppDesc>>, C> for SQL_ATTR_APP_ROW_DESC {
-    fn update_handle(stmt: &SQLHSTMT<'conn>, val: &Rc<SQLHDESC<'conn, AppDesc>>) {
+unsafe impl<C> WriteAttr<Rc<SQLHDESC<'_, AppDesc<'_>>>, C> for SQL_ATTR_APP_ROW_DESC {}
+impl<'conn, 'data, C> WriteStmtAttr<'conn, 'data, Rc<SQLHDESC<'conn, AppDesc<'data>>>, C>
+    for SQL_ATTR_APP_ROW_DESC
+{
+    fn update_handle(stmt: &SQLHSTMT<'conn, 'data>, val: &Rc<SQLHDESC<'conn, AppDesc<'data>>>) {
         stmt.explicit_ard.replace(Some(Rc::clone(val)));
     }
 }
@@ -338,13 +342,15 @@ impl<'conn, C> WriteStmtAttr<'conn, Rc<SQLHDESC<'conn, AppDesc>>, C> for SQL_ATT
 #[identifier(SQLINTEGER, 10011)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_APP_PARAM_DESC;
-unsafe impl<C> ReadAttr<MaybeUninit<RefSQLHDESC<'_>>, C> for SQL_ATTR_APP_PARAM_DESC {}
-impl<'stmt, C> ReadStmtAttr<'stmt, MaybeUninit<RefSQLHDESC<'stmt>>, C> for SQL_ATTR_APP_PARAM_DESC {
+unsafe impl<C> ReadAttr<MaybeUninit<RefSQLHDESC<'_, '_>>, C> for SQL_ATTR_APP_PARAM_DESC {}
+impl<'stmt, 'data, C> ReadStmtAttr<'stmt, 'data, MaybeUninit<RefSQLHDESC<'stmt, 'data>>, C>
+    for SQL_ATTR_APP_PARAM_DESC
+{
     unsafe fn read(
-        StatementHandle: &'stmt SQLHSTMT,
-        ValuePtr: &mut MaybeUninit<RefSQLHDESC<'stmt>>,
+        StatementHandle: &'stmt SQLHSTMT<'_, 'data>,
+        ValuePtr: &mut MaybeUninit<RefSQLHDESC<'stmt, 'data>>,
         StringLengthPtr: &mut MaybeUninit<
-            <MaybeUninit<RefSQLHDESC<'_>> as Len<Self::AttrType, SQLINTEGER>>::StrLen,
+            <MaybeUninit<RefSQLHDESC<'_, '_>> as Len<Self::AttrType, SQLINTEGER>>::StrLen,
         >,
     ) -> SQLRETURN {
         let explicit_apd = StatementHandle.explicit_apd.take();
@@ -362,9 +368,11 @@ impl<'stmt, C> ReadStmtAttr<'stmt, MaybeUninit<RefSQLHDESC<'stmt>>, C> for SQL_A
         SQL_SUCCESS
     }
 }
-unsafe impl<C> WriteAttr<Rc<SQLHDESC<'_, AppDesc>>, C> for SQL_ATTR_APP_PARAM_DESC {}
-impl<'conn, C> WriteStmtAttr<'conn, Rc<SQLHDESC<'conn, AppDesc>>, C> for SQL_ATTR_APP_PARAM_DESC {
-    fn update_handle(stmt: &SQLHSTMT<'conn>, val: &Rc<SQLHDESC<'conn, AppDesc>>) {
+unsafe impl<C> WriteAttr<Rc<SQLHDESC<'_, AppDesc<'_>>>, C> for SQL_ATTR_APP_PARAM_DESC {}
+impl<'conn, 'data, C> WriteStmtAttr<'conn, 'data, Rc<SQLHDESC<'conn, AppDesc<'data>>>, C>
+    for SQL_ATTR_APP_PARAM_DESC
+{
+    fn update_handle(stmt: &SQLHSTMT<'conn, 'data>, val: &Rc<SQLHDESC<'conn, AppDesc<'data>>>) {
         stmt.explicit_apd.replace(Some(Rc::clone(val)));
     }
 }
@@ -375,7 +383,7 @@ impl<'conn, C> WriteStmtAttr<'conn, Rc<SQLHDESC<'conn, AppDesc>>, C> for SQL_ATT
 // This is read-only attribute
 pub struct SQL_ATTR_IMP_ROW_DESC;
 unsafe impl<C> ReadAttr<MaybeUninit<&SQLHDESC<'_, ImplDesc>>, C> for SQL_ATTR_IMP_ROW_DESC {}
-impl<'stmt, C> ReadStmtAttr<'stmt, MaybeUninit<&SQLHDESC<'stmt, ImplDesc>>, C>
+impl<'stmt, C> ReadStmtAttr<'stmt, '_, MaybeUninit<&SQLHDESC<'stmt, ImplDesc>>, C>
     for SQL_ATTR_IMP_ROW_DESC
 {
     unsafe fn read(
@@ -397,7 +405,7 @@ impl<'stmt, C> ReadStmtAttr<'stmt, MaybeUninit<&SQLHDESC<'stmt, ImplDesc>>, C>
 // This is read-only attribute
 pub struct SQL_ATTR_IMP_PARAM_DESC;
 unsafe impl<C> ReadAttr<MaybeUninit<&SQLHDESC<'_, ImplDesc>>, C> for SQL_ATTR_IMP_PARAM_DESC {}
-impl<'stmt, C> ReadStmtAttr<'stmt, MaybeUninit<&SQLHDESC<'stmt, ImplDesc>>, C>
+impl<'stmt, C> ReadStmtAttr<'stmt, '_, MaybeUninit<&SQLHDESC<'stmt, ImplDesc>>, C>
     for SQL_ATTR_IMP_PARAM_DESC
 {
     unsafe fn read(
