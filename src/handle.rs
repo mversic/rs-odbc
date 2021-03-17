@@ -4,15 +4,14 @@ use crate::stmt::{
     SQL_ATTR_IMP_ROW_DESC,
 };
 use crate::{
-    AsMutSQLPOINTER, AsSQLPOINTER, Identifier, Len, OdbcAttr, SQLPOINTER, SQLSMALLINT,
-    SQLUSMALLINT, SQL_SUCCESS,
+    AsMutSQLPOINTER, Identifier, IntoSQLPOINTER, Len, OdbcAttr, SQLPOINTER, SQLSMALLINT,
+    SQL_SUCCESS,
 };
-use std::any::type_name;
-use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::any::{type_name, Any};
+use std::cell::Cell;
 use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 use std::thread::panicking;
 
 pub unsafe trait AsSQLHANDLE {
@@ -41,52 +40,37 @@ pub trait SQLCancelHandle: Handle {}
 pub trait SQLCompleteAsyncHandle: Handle {}
 pub trait SQLEndTranHandle: Handle {}
 
-#[allow(non_camel_case_types)]
-pub(crate) enum SQL_DESC_DATA_PTR<'data> {
-    // TODO: Use UnsafeCell instead of RefCell? Offer a choice?
-    Owned(Weak<RefCell<dyn AsMutSQLPOINTER>>),
-    Ref(&'data RefCell<dyn AsMutSQLPOINTER>),
-}
 pub trait DescType<'data> {
     fn new() -> Self;
     fn unbind_record(&self, RecNumber: SQLSMALLINT);
-    fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: &'data RefCell<dyn AsMutSQLPOINTER>) {}
+    fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: SQL_DESC_DATA_PTR<'data>);
 }
 pub struct ImplDesc {}
-pub struct AppDesc<'data> {
-    // TODO: Couldn't Vec be used? Try using vec
-    // TODO: Check which type to use as a key?
-    // Using Weak instead of Rc because it's not possible to return the proper type
-    pub(crate) data_ptrs: Cell<HashMap<SQLSMALLINT, SQL_DESC_DATA_PTR<'data>>>,
-}
-impl AppDesc<'_> {
-    fn unbind_records(&self) {
-        self.data_ptrs.set(HashMap::new())
-    }
-}
 impl DescType<'_> for ImplDesc {
     fn new() -> Self {
         Self {}
     }
     fn unbind_record(&self, RecNumber: SQLSMALLINT) {}
-    fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: &RefCell<dyn AsMutSQLPOINTER>) {}
+    fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: SQL_DESC_DATA_PTR) {}
+}
+
+#[allow(non_camel_case_types)]
+type SQL_DESC_DATA_PTR<'data> = &'data dyn Any;
+
+pub struct AppDesc<'data> {
+    pub(crate) data_ptrs: PhantomData<SQL_DESC_DATA_PTR<'data>>,
+}
+impl AppDesc<'_> {
+    fn unbind_records(&self) {}
 }
 impl<'data> DescType<'data> for AppDesc<'data> {
     fn new() -> Self {
         Self {
-            data_ptrs: Cell::new(HashMap::new()),
+            data_ptrs: PhantomData,
         }
     }
-    fn unbind_record(&self, RecNumber: SQLSMALLINT) {
-        let mut ptrs = self.data_ptrs.take();
-        ptrs.remove(&RecNumber);
-        self.data_ptrs.set(ptrs);
-    }
-    fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: &'data RefCell<dyn AsMutSQLPOINTER>) {
-        let mut ptrs = self.data_ptrs.take();
-        ptrs.insert(RecNumber, SQL_DESC_DATA_PTR::Ref(DataPtr));
-        self.data_ptrs.set(ptrs);
-    }
+    fn unbind_record(&self, RecNumber: SQLSMALLINT) {}
+    fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: SQL_DESC_DATA_PTR<'data>) {}
 }
 
 #[derive(rs_odbc_derive::Identifier)]
@@ -338,7 +322,7 @@ impl<'data> SQLHSTMT<'_, 'data> {
     pub(crate) fn bind_param(
         &self,
         ColumnNumber: SQLSMALLINT,
-        TargetValuePtr: &'data RefCell<dyn AsMutSQLPOINTER>,
+        TargetValuePtr: SQL_DESC_DATA_PTR<'data>,
     ) {
         let explicit_apd = self.explicit_apd.take();
         if let Some(explicit_apd) = &explicit_apd {
@@ -353,7 +337,7 @@ impl<'data> SQLHSTMT<'_, 'data> {
     pub(crate) fn bind_col(
         &self,
         ColumnNumber: SQLSMALLINT,
-        ParameterValuePtr: &'data RefCell<dyn AsMutSQLPOINTER>,
+        ParameterValuePtr: SQL_DESC_DATA_PTR<'data>,
     ) {
         let explicit_ard = self.explicit_ard.take();
         if let Some(explicit_ard) = &explicit_ard {
@@ -444,21 +428,16 @@ impl Drop for SQLHSTMT<'_, '_> {
 pub struct SQLHDESC<'conn, T> {
     parent: PhantomData<&'conn ()>,
     pub(crate) handle: SQLHANDLE,
-    // TODO
-    //pub(crate) bookmark: Rc<RefCell<dyn AsMutSQLPOINTER>>,
+    // TODO: Add bookmark column. Eg:
+    //pub(crate) bookmark: Rc<UnsafeCell<dyn AsMutSQLPOINTER>>,
     pub(crate) data: T,
 }
 impl<'data, T: DescType<'data>> SQLHDESC<'_, T> {
-    #[allow(non_snake_case)]
     pub fn unbind_record(&self, RecNumber: SQLSMALLINT) {
         self.data.unbind_record(RecNumber);
     }
     #[allow(non_snake_case)]
-    pub fn bind_record(
-        &self,
-        RecNumber: SQLSMALLINT,
-        DataPtr: &'data RefCell<dyn AsMutSQLPOINTER>,
-    ) {
+    pub fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: SQL_DESC_DATA_PTR<'data>) {
         self.data.bind_record(RecNumber, DataPtr);
     }
 
@@ -488,13 +467,13 @@ unsafe impl<T> AsSQLHANDLE for SQLHDESC<'_, T> {
     }
 }
 // TODO: use derive odbc_type somehow?
-unsafe impl<'data, T: DescType<'data>> AsSQLPOINTER for Rc<SQLHDESC<'_, T>> {
-    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+unsafe impl<'data, T: DescType<'data>> IntoSQLPOINTER for &Rc<SQLHDESC<'_, T>> {
+    fn into_SQLPOINTER(self) -> SQLPOINTER {
         self.as_SQLHANDLE().cast()
     }
 }
 // TODO: This can be removed
-unsafe impl<'data, LEN: Copy, T: DescType<'data>> Len<OdbcAttr, LEN> for Rc<SQLHDESC<'_, T>>
+unsafe impl<'data, LEN: Copy, T: DescType<'data>> Len<OdbcAttr, LEN> for &Rc<SQLHDESC<'_, T>>
 where
     LEN: From<SQLSMALLINT>,
 {

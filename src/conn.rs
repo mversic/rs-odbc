@@ -3,7 +3,6 @@ use crate::{
     SQLUINTEGER, SQLWCHAR, OdbcBool
 };
 use rs_odbc_derive::{odbc_type, ConnAttr, Identifier};
-use std::mem::MaybeUninit;
 
 // Re-exported as connection attributes
 pub use crate::stmt::SQL_ATTR_ASYNC_ENABLE;
@@ -17,21 +16,21 @@ pub trait ConnAttr: crate::Identifier<IdentType = SQLINTEGER> {
 #[identifier(SQLINTEGER, 101)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_ACCESS_MODE;
-unsafe impl<C> ReadAttr<MaybeUninit<AccessMode>, C> for SQL_ATTR_ACCESS_MODE {}
+unsafe impl<C> ReadAttr<AccessMode, C> for SQL_ATTR_ACCESS_MODE {}
 unsafe impl<C> WriteAttr<AccessMode, C> for SQL_ATTR_ACCESS_MODE {}
 
 #[derive(Identifier, ConnAttr)]
 #[identifier(SQLINTEGER, 102)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_AUTOCOMMIT;
-unsafe impl<C> ReadAttr<MaybeUninit<AutoCommit>, C> for SQL_ATTR_AUTOCOMMIT {}
+unsafe impl<C> ReadAttr<AutoCommit, C> for SQL_ATTR_AUTOCOMMIT {}
 unsafe impl<C> WriteAttr<AutoCommit, C> for SQL_ATTR_AUTOCOMMIT {}
 
 #[derive(Identifier, ConnAttr)]
 #[identifier(SQLINTEGER, 113)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CONNECTION_TIMEOUT;
-unsafe impl<C> ReadAttr<MaybeUninit<SQLUINTEGER>, C> for SQL_ATTR_CONNECTION_TIMEOUT {}
+unsafe impl<C> ReadAttr<SQLUINTEGER, C> for SQL_ATTR_CONNECTION_TIMEOUT {}
 unsafe impl<C> WriteAttr<SQLUINTEGER, C> for SQL_ATTR_CONNECTION_TIMEOUT {}
 
 #[derive(Identifier, ConnAttr)]
@@ -40,8 +39,8 @@ unsafe impl<C> WriteAttr<SQLUINTEGER, C> for SQL_ATTR_CONNECTION_TIMEOUT {}
 pub struct SQL_ATTR_CURRENT_CATALOG;
 unsafe impl<T: AsMutRawSlice<SQLCHAR, SQLINTEGER>> ReadAttr<T, AnsiType> for SQL_ATTR_CURRENT_CATALOG {}
 unsafe impl<T: AsMutRawSlice<SQLWCHAR, SQLINTEGER>> ReadAttr<T, UnicodeType> for SQL_ATTR_CURRENT_CATALOG {}
-unsafe impl<T: AsRawSlice<SQLCHAR, SQLINTEGER>> WriteAttr<AnsiType, T> for SQL_ATTR_CURRENT_CATALOG {}
-unsafe impl<T: AsRawSlice<SQLWCHAR, SQLINTEGER>> WriteAttr<UnicodeType, T> for SQL_ATTR_CURRENT_CATALOG {}
+unsafe impl<T: AsRawSlice<SQLCHAR, SQLINTEGER>> WriteAttr<T, AnsiType> for SQL_ATTR_CURRENT_CATALOG {}
+unsafe impl<T: AsRawSlice<SQLWCHAR, SQLINTEGER>> WriteAttr<T, UnicodeType> for SQL_ATTR_CURRENT_CATALOG {}
 
 // TODO: Not found in documentation, only in implementation
 //#[derive(Identifier, ConnAttr)]
@@ -74,7 +73,7 @@ unsafe impl<T: AsRawSlice<SQLWCHAR, SQLINTEGER>> WriteAttr<UnicodeType, T> for S
 #[identifier(SQLINTEGER, 103)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_LOGIN_TIMEOUT;
-unsafe impl<C> ReadAttr<MaybeUninit<SQLUINTEGER>, C> for SQL_ATTR_LOGIN_TIMEOUT {}
+unsafe impl<C> ReadAttr<SQLUINTEGER, C> for SQL_ATTR_LOGIN_TIMEOUT {}
 unsafe impl<C> WriteAttr<SQLUINTEGER, C> for SQL_ATTR_LOGIN_TIMEOUT {}
 
 // TODO: Seems to be deprecated
@@ -82,7 +81,7 @@ unsafe impl<C> WriteAttr<SQLUINTEGER, C> for SQL_ATTR_LOGIN_TIMEOUT {}
 //#[identifier(SQLINTEGER, 110)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_ODBC_CURSORS;
-//impl ReadAttr<MaybeUninit<SQLULEN>> for SQL_ATTR_ODBC_CURSORS {}
+//impl ReadAttr<SQLULEN>> for SQL_ATTR_ODBC_CURSORS {}
 //impl WriteAttr<OdbcCursors> for SQL_ATTR_ODBC_CURSORS {}
 
 //#[allow(non_camel_case_types)]
@@ -97,7 +96,7 @@ unsafe impl<C> WriteAttr<SQLUINTEGER, C> for SQL_ATTR_LOGIN_TIMEOUT {}
 #[identifier(SQLINTEGER, 112)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_PACKET_SIZE;
-unsafe impl<C> ReadAttr<MaybeUninit<SQLUINTEGER>, C> for SQL_ATTR_PACKET_SIZE {}
+unsafe impl<C> ReadAttr<SQLUINTEGER, C> for SQL_ATTR_PACKET_SIZE {}
 unsafe impl<C> WriteAttr<SQLUINTEGER, C> for SQL_ATTR_PACKET_SIZE {}
 
 //#[derive(Identifier, ConnAttr)]
@@ -111,7 +110,7 @@ unsafe impl<C> WriteAttr<SQLUINTEGER, C> for SQL_ATTR_PACKET_SIZE {}
 #[identifier(SQLINTEGER, 104)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_TRACE;
-unsafe impl<C> ReadAttr<MaybeUninit<Trace>, C> for SQL_ATTR_TRACE {}
+unsafe impl<C> ReadAttr<Trace, C> for SQL_ATTR_TRACE {}
 unsafe impl<C> WriteAttr<Trace, C> for SQL_ATTR_TRACE {}
 
 #[derive(Identifier, ConnAttr)]
@@ -124,8 +123,8 @@ pub struct SQL_ATTR_TRACEFILE;
 // TODO: Has to be null-terminated
 unsafe impl<T: AsMutRawSlice<SQLCHAR, SQLINTEGER>> ReadAttr<T, AnsiType> for SQL_ATTR_TRACEFILE {}
 unsafe impl<T: AsMutRawSlice<SQLWCHAR, SQLINTEGER>> ReadAttr<T, UnicodeType> for SQL_ATTR_TRACEFILE {}
-unsafe impl<T: AsRawSlice<SQLCHAR, SQLINTEGER>> WriteAttr<AnsiType, T> for SQL_ATTR_TRACEFILE {}
-unsafe impl<T: AsRawSlice<SQLWCHAR, SQLINTEGER>> WriteAttr<UnicodeType, T> for SQL_ATTR_TRACEFILE {}
+unsafe impl<T: AsRawSlice<SQLCHAR, SQLINTEGER>> WriteAttr<T, AnsiType> for SQL_ATTR_TRACEFILE {}
+unsafe impl<T: AsRawSlice<SQLWCHAR, SQLINTEGER>> WriteAttr<T, UnicodeType> for SQL_ATTR_TRACEFILE {}
 
 #[derive(Identifier, ConnAttr)]
 #[identifier(SQLINTEGER, 106)]
@@ -142,7 +141,7 @@ unsafe impl<T: AsRawSlice<SQLCHAR, SQLINTEGER>> WriteAttr<T, UnicodeType> for SQ
 //#[derive(Identifier, ConnAttr)]
 //#[identifier(SQLINTEGER, 107)]
 //pub struct SQL_ATTR_TRANSLATE_OPTION;
-//impl ReadAttr<MaybeUninit<SQLUINTEGER>> for SQL_ATTR_TRANSLATE_OPTION {}
+//impl ReadAttr<SQLUINTEGER>> for SQL_ATTR_TRANSLATE_OPTION {}
 //impl WriteAttr<SQLUINTEGER> for SQL_ATTR_TRANSLATE_OPTION {}
 
 // TODO: Uncertain
@@ -155,7 +154,7 @@ unsafe impl<T: AsRawSlice<SQLCHAR, SQLINTEGER>> WriteAttr<T, UnicodeType> for SQ
 #[allow(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_ATTR_AUTO_IPD;
-unsafe impl<C> ReadAttr<MaybeUninit<OdbcBool>, C> for SQL_ATTR_AUTO_IPD {}
+unsafe impl<C> ReadAttr<OdbcBool, C> for SQL_ATTR_AUTO_IPD {}
 
 #[cfg(feature = "v3_8")]
 #[derive(Identifier, ConnAttr)]
@@ -163,7 +162,7 @@ unsafe impl<C> ReadAttr<MaybeUninit<OdbcBool>, C> for SQL_ATTR_AUTO_IPD {}
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE;
 #[cfg(feature = "v3_8")]
-unsafe impl<C> ReadAttr<MaybeUninit<AsyncDbcFunctionsEnable>, C> for SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE {}
+unsafe impl<C> ReadAttr<AsyncDbcFunctionsEnable, C> for SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE {}
 #[cfg(feature = "v3_8")]
 unsafe impl<C> WriteAttr<AsyncDbcFunctionsEnable, C> for SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE {}
 
@@ -189,7 +188,7 @@ unsafe impl<C> WriteAttr<AsyncDbcFunctionsEnable, C> for SQL_ATTR_ASYNC_DBC_FUNC
 #[allow(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_ATTR_CONNECTION_DEAD;
-unsafe impl<C> ReadAttr<MaybeUninit<ConnectionDead>, C> for SQL_ATTR_CONNECTION_DEAD {}
+unsafe impl<C> ReadAttr<ConnectionDead, C> for SQL_ATTR_CONNECTION_DEAD {}
 
 //*  ODBC Driver Manager sets this connection attribute to a unicode driver
 //    (which supports SQLConnectW) when the application is an ANSI application
@@ -219,7 +218,7 @@ unsafe impl<C> ReadAttr<MaybeUninit<ConnectionDead>, C> for SQL_ATTR_CONNECTION_
 //#[derive(Identifier, ConnAttr)]
 //#[identifier(SQLINTEGER, 116)]
 //pub struct SQL_ATTR_RESET_CONNECTION;
-//impl ReadAttr<MaybeUninit<SQLUINTEGER>> for SQL_ATTR_RESET_CONNECTION {}
+//impl ReadAttr<SQLUINTEGER>> for SQL_ATTR_RESET_CONNECTION {}
 //impl WriteAttr<ResetConnection> for SQL_ATTR_RESET_CONNECTION {}
 
 //#[cfg(feature = "v3_8")]

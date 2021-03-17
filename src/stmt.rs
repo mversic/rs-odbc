@@ -9,7 +9,7 @@ use std::ops::Deref;
 use std::rc::Rc;
 
 pub trait WriteStmtAttr<'conn, 'data, T, C>: WriteAttr<T, C> + StmtAttr {
-    fn update_handle(_: &SQLHSTMT<'conn, 'data>, _: &T) {}
+    fn update_handle(_: &SQLHSTMT<'conn, 'data>, _: T) {}
 }
 
 pub trait ReadStmtAttr<'stmt, 'data, T, C>: ReadAttr<T, C> + StmtAttr
@@ -93,7 +93,7 @@ enum StmtOption {
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_QUERY_TIMEOUT;
 pub const SQL_QUERY_TIMEOUT_DEFAULT: SQLULEN = 0;
-unsafe impl<C> ReadAttr<MaybeUninit<SQLULEN>, C> for SQL_ATTR_QUERY_TIMEOUT {}
+unsafe impl<C> ReadAttr<SQLULEN, C> for SQL_ATTR_QUERY_TIMEOUT {}
 unsafe impl<C> WriteAttr<SQLULEN, C> for SQL_ATTR_QUERY_TIMEOUT {}
 impl<'stmt, C> ReadStmtAttr<'stmt, '_, MaybeUninit<SQLULEN>, C> for SQL_ATTR_QUERY_TIMEOUT {
     unsafe fn read(
@@ -113,14 +113,14 @@ impl<C> WriteStmtAttr<'_, '_, SQLULEN, C> for SQL_ATTR_QUERY_TIMEOUT {}
 #[identifier(SQLINTEGER, 1)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_MAX_ROWS;
-unsafe impl<C> ReadAttr<MaybeUninit<SQLULEN>, C> for SQL_ATTR_MAX_ROWS {}
+unsafe impl<C> ReadAttr<SQLULEN, C> for SQL_ATTR_MAX_ROWS {}
 unsafe impl<C> WriteAttr<SQLULEN, C> for SQL_ATTR_MAX_ROWS {}
 
 #[derive(Identifier, StmtAttr)]
 #[identifier(SQLINTEGER, 2)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_NOSCAN;
-unsafe impl<C> ReadAttr<MaybeUninit<Noscan>, C> for SQL_ATTR_NOSCAN {}
+unsafe impl<C> ReadAttr<Noscan, C> for SQL_ATTR_NOSCAN {}
 unsafe impl<C> WriteAttr<Noscan, C> for SQL_ATTR_NOSCAN {}
 
 #[derive(Identifier, StmtAttr)]
@@ -128,21 +128,21 @@ unsafe impl<C> WriteAttr<Noscan, C> for SQL_ATTR_NOSCAN {}
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_MAX_LENGTH;
 pub const SQL_MAX_LENGTH_DEFAULT: SQLULEN = 0;
-unsafe impl<C> ReadAttr<MaybeUninit<SQLULEN>, C> for SQL_ATTR_MAX_LENGTH {}
+unsafe impl<C> ReadAttr<SQLULEN, C> for SQL_ATTR_MAX_LENGTH {}
 unsafe impl<C> WriteAttr<SQLULEN, C> for SQL_ATTR_MAX_LENGTH {}
 
 #[derive(Identifier, StmtAttr)]
 #[identifier(SQLINTEGER, 6)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CURSOR_TYPE;
-unsafe impl<C> ReadAttr<MaybeUninit<CursorType>, C> for SQL_ATTR_CURSOR_TYPE {}
+unsafe impl<C> ReadAttr<CursorType, C> for SQL_ATTR_CURSOR_TYPE {}
 unsafe impl<C> WriteAttr<CursorType, C> for SQL_ATTR_CURSOR_TYPE {}
 
 #[derive(Identifier, StmtAttr)]
 #[identifier(SQLINTEGER, 7)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CONCURRENCY;
-unsafe impl<C> ReadAttr<MaybeUninit<Concurrency>, C> for SQL_ATTR_CONCURRENCY {}
+unsafe impl<C> ReadAttr<Concurrency, C> for SQL_ATTR_CONCURRENCY {}
 unsafe impl<C> WriteAttr<Concurrency, C> for SQL_ATTR_CONCURRENCY {}
 
 #[derive(Identifier, StmtAttr)]
@@ -150,28 +150,28 @@ unsafe impl<C> WriteAttr<Concurrency, C> for SQL_ATTR_CONCURRENCY {}
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_KEYSET_SIZE;
 pub const SQL_KEYSET_SIZE_DEFAULT: SQLULEN = 0;
-unsafe impl<C> ReadAttr<MaybeUninit<SQLULEN>, C> for SQL_ATTR_KEYSET_SIZE {}
+unsafe impl<C> ReadAttr<SQLULEN, C> for SQL_ATTR_KEYSET_SIZE {}
 unsafe impl<C> WriteAttr<SQLULEN, C> for SQL_ATTR_KEYSET_SIZE {}
 
 #[derive(Identifier, StmtAttr)]
 #[identifier(SQLINTEGER, 10)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_SIMULATE_CURSOR;
-unsafe impl<C> ReadAttr<MaybeUninit<SimulateCursor>, C> for SQL_ATTR_SIMULATE_CURSOR {}
+unsafe impl<C> ReadAttr<SimulateCursor, C> for SQL_ATTR_SIMULATE_CURSOR {}
 unsafe impl<C> WriteAttr<SimulateCursor, C> for SQL_ATTR_SIMULATE_CURSOR {}
 
 #[derive(Identifier, StmtAttr)]
 #[identifier(SQLINTEGER, 11)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_RETRIEVE_DATA;
-unsafe impl<C> ReadAttr<MaybeUninit<RetrieveData>, C> for SQL_ATTR_RETRIEVE_DATA {}
+unsafe impl<C> ReadAttr<RetrieveData, C> for SQL_ATTR_RETRIEVE_DATA {}
 unsafe impl<C> WriteAttr<RetrieveData, C> for SQL_ATTR_RETRIEVE_DATA {}
 
 #[derive(Identifier, StmtAttr)]
 #[identifier(SQLINTEGER, 12)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_USE_BOOKMARKS;
-unsafe impl<C> ReadAttr<MaybeUninit<UseBookmarks>, C> for SQL_ATTR_USE_BOOKMARKS {}
+unsafe impl<C> ReadAttr<UseBookmarks, C> for SQL_ATTR_USE_BOOKMARKS {}
 unsafe impl<C> WriteAttr<UseBookmarks, C> for SQL_ATTR_USE_BOOKMARKS {}
 
 //#[derive(Identifier, StmtAttr)]
@@ -303,7 +303,7 @@ unsafe impl<C> WriteAttr<UseBookmarks, C> for SQL_ATTR_USE_BOOKMARKS {}
 pub struct SQL_ATTR_APP_ROW_DESC;
 // Explicit descriptors must not be dropped, I think they can be shared by other
 // means and I don't think this is required
-unsafe impl<C> ReadAttr<MaybeUninit<RefSQLHDESC<'_, '_>>, C> for SQL_ATTR_APP_ROW_DESC {}
+unsafe impl<C> ReadAttr<RefSQLHDESC<'_, '_>, C> for SQL_ATTR_APP_ROW_DESC {}
 impl<'stmt, 'data, C> ReadStmtAttr<'stmt, 'data, MaybeUninit<RefSQLHDESC<'stmt, 'data>>, C>
     for SQL_ATTR_APP_ROW_DESC
 {
@@ -329,8 +329,8 @@ impl<'stmt, 'data, C> ReadStmtAttr<'stmt, 'data, MaybeUninit<RefSQLHDESC<'stmt, 
         SQL_SUCCESS
     }
 }
-unsafe impl<C> WriteAttr<Rc<SQLHDESC<'_, AppDesc<'_>>>, C> for SQL_ATTR_APP_ROW_DESC {}
-impl<'conn, 'data, C> WriteStmtAttr<'conn, 'data, Rc<SQLHDESC<'conn, AppDesc<'data>>>, C>
+unsafe impl<C> WriteAttr<&Rc<SQLHDESC<'_, AppDesc<'_>>>, C> for SQL_ATTR_APP_ROW_DESC {}
+impl<'conn, 'data, C> WriteStmtAttr<'conn, 'data, &Rc<SQLHDESC<'conn, AppDesc<'data>>>, C>
     for SQL_ATTR_APP_ROW_DESC
 {
     fn update_handle(stmt: &SQLHSTMT<'conn, 'data>, val: &Rc<SQLHDESC<'conn, AppDesc<'data>>>) {
@@ -342,7 +342,7 @@ impl<'conn, 'data, C> WriteStmtAttr<'conn, 'data, Rc<SQLHDESC<'conn, AppDesc<'da
 #[identifier(SQLINTEGER, 10011)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_APP_PARAM_DESC;
-unsafe impl<C> ReadAttr<MaybeUninit<RefSQLHDESC<'_, '_>>, C> for SQL_ATTR_APP_PARAM_DESC {}
+unsafe impl<C> ReadAttr<RefSQLHDESC<'_, '_>, C> for SQL_ATTR_APP_PARAM_DESC {}
 impl<'stmt, 'data, C> ReadStmtAttr<'stmt, 'data, MaybeUninit<RefSQLHDESC<'stmt, 'data>>, C>
     for SQL_ATTR_APP_PARAM_DESC
 {
@@ -368,8 +368,8 @@ impl<'stmt, 'data, C> ReadStmtAttr<'stmt, 'data, MaybeUninit<RefSQLHDESC<'stmt, 
         SQL_SUCCESS
     }
 }
-unsafe impl<C> WriteAttr<Rc<SQLHDESC<'_, AppDesc<'_>>>, C> for SQL_ATTR_APP_PARAM_DESC {}
-impl<'conn, 'data, C> WriteStmtAttr<'conn, 'data, Rc<SQLHDESC<'conn, AppDesc<'data>>>, C>
+unsafe impl<C> WriteAttr<&Rc<SQLHDESC<'_, AppDesc<'_>>>, C> for SQL_ATTR_APP_PARAM_DESC {}
+impl<'conn, 'data, C> WriteStmtAttr<'conn, 'data, &Rc<SQLHDESC<'conn, AppDesc<'data>>>, C>
     for SQL_ATTR_APP_PARAM_DESC
 {
     fn update_handle(stmt: &SQLHSTMT<'conn, 'data>, val: &Rc<SQLHDESC<'conn, AppDesc<'data>>>) {
@@ -382,7 +382,7 @@ impl<'conn, 'data, C> WriteStmtAttr<'conn, 'data, Rc<SQLHDESC<'conn, AppDesc<'da
 #[allow(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_ATTR_IMP_ROW_DESC;
-unsafe impl<C> ReadAttr<MaybeUninit<&SQLHDESC<'_, ImplDesc>>, C> for SQL_ATTR_IMP_ROW_DESC {}
+unsafe impl<C> ReadAttr<&SQLHDESC<'_, ImplDesc>, C> for SQL_ATTR_IMP_ROW_DESC {}
 impl<'stmt, C> ReadStmtAttr<'stmt, '_, MaybeUninit<&SQLHDESC<'stmt, ImplDesc>>, C>
     for SQL_ATTR_IMP_ROW_DESC
 {
@@ -404,7 +404,7 @@ impl<'stmt, C> ReadStmtAttr<'stmt, '_, MaybeUninit<&SQLHDESC<'stmt, ImplDesc>>, 
 #[allow(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_ATTR_IMP_PARAM_DESC;
-unsafe impl<C> ReadAttr<MaybeUninit<&SQLHDESC<'_, ImplDesc>>, C> for SQL_ATTR_IMP_PARAM_DESC {}
+unsafe impl<C> ReadAttr<&SQLHDESC<'_, ImplDesc>, C> for SQL_ATTR_IMP_PARAM_DESC {}
 impl<'stmt, C> ReadStmtAttr<'stmt, '_, MaybeUninit<&SQLHDESC<'stmt, ImplDesc>>, C>
     for SQL_ATTR_IMP_PARAM_DESC
 {

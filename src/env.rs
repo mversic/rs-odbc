@@ -1,6 +1,5 @@
 use crate::{ReadAttr, WriteAttr, SQLINTEGER, SQLUINTEGER};
 use rs_odbc_derive::{odbc_type, EnvAttr, Identifier};
-use std::mem::MaybeUninit;
 
 pub trait EnvAttr: crate::Identifier<IdentType = SQLINTEGER> {}
 
@@ -8,7 +7,7 @@ pub trait EnvAttr: crate::Identifier<IdentType = SQLINTEGER> {}
 #[identifier(SQLINTEGER, 200)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_ODBC_VERSION;
-unsafe impl<C> ReadAttr<MaybeUninit<OdbcVersion>, C> for SQL_ATTR_ODBC_VERSION {}
+unsafe impl<C> ReadAttr<OdbcVersion, C> for SQL_ATTR_ODBC_VERSION {}
 unsafe impl<C> WriteAttr<OdbcVersion, C> for SQL_ATTR_ODBC_VERSION {}
 
 #[cfg(feature = "v3_8")]
@@ -17,7 +16,7 @@ unsafe impl<C> WriteAttr<OdbcVersion, C> for SQL_ATTR_ODBC_VERSION {}
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CONNECTION_POOLING;
 #[cfg(feature = "v3_8")]
-unsafe impl<C> ReadAttr<MaybeUninit<ConnectionPooling>, C> for SQL_ATTR_CONNECTION_POOLING {}
+unsafe impl<C> ReadAttr<ConnectionPooling, C> for SQL_ATTR_CONNECTION_POOLING {}
 #[cfg(feature = "v3_8")]
 unsafe impl<C> WriteAttr<ConnectionPooling, C> for SQL_ATTR_CONNECTION_POOLING {}
 
@@ -25,7 +24,7 @@ unsafe impl<C> WriteAttr<ConnectionPooling, C> for SQL_ATTR_CONNECTION_POOLING {
 #[identifier(SQLINTEGER, 202)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CP_MATCH;
-unsafe impl<C> ReadAttr<MaybeUninit<CpMatch>, C> for SQL_ATTR_CP_MATCH {}
+unsafe impl<C> ReadAttr<CpMatch, C> for SQL_ATTR_CP_MATCH {}
 unsafe impl<C> WriteAttr<CpMatch, C> for SQL_ATTR_CP_MATCH {}
 
 // TODO:
@@ -40,7 +39,7 @@ unsafe impl<C> WriteAttr<CpMatch, C> for SQL_ATTR_CP_MATCH {}
 //#[identifier(SQLINTEGER, 1001)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_OUTPUT_NTS;
-//impl ReadAttr<MaybeUninit<OdbcBool>> for SQL_ATTR_OUTPUT_NTS {}
+//impl ReadAttr<OdbcBool> for SQL_ATTR_OUTPUT_NTS {}
 //impl WriteAttr<OdbcBool> for SQL_ATTR_OUTPUT_NTS {}
 
 #[odbc_type(SQLUINTEGER)]

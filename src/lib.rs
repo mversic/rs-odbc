@@ -13,6 +13,7 @@ pub mod sqlchar_str;
 pub mod sqlreturn;
 pub mod stmt;
 
+use std::cell::{RefCell, UnsafeCell};
 use std::mem::MaybeUninit;
 
 pub use conn::{
@@ -85,10 +86,14 @@ const SQL_IS_INTEGER: SQLSMALLINT = -6;
 const SQL_IS_USMALLINT: SQLSMALLINT = -7;
 const SQL_IS_SMALLINT: SQLSMALLINT = -8;
 
-pub unsafe trait AsMutPtr<T> {
+pub trait AsMutPtr<T> {
     fn as_mut_ptr(&mut self) -> *mut T;
 }
 
+pub unsafe trait IntoSQLPOINTER where Self: Copy {
+    #[allow(non_snake_case)]
+    fn into_SQLPOINTER(self) -> SQLPOINTER;
+}
 pub unsafe trait AsSQLPOINTER {
     #[allow(non_snake_case)]
     fn as_SQLPOINTER(&self) -> SQLPOINTER;
@@ -113,7 +118,7 @@ pub unsafe trait AsMutRawSlice<T, LEN: Copy> {
     fn as_mut_raw_slice(&mut self) -> (*mut T, LEN);
 }
 
-unsafe impl<T> AsMutPtr<T> for MaybeUninit<()> {
+impl<T> AsMutPtr<T> for MaybeUninit<()> {
     fn as_mut_ptr(&mut self) -> *mut T {
         // TODO: If using dangling pointers is ok, this trait can be removed entirely and use MaybeUninit::as_mut_ptr instead as is
         // However, it is SAFER to use null pointers because it is likely that implementation will null-check before dereferencing
@@ -127,8 +132,8 @@ unsafe impl AsRawSlice<SQLCHAR, SQLSMALLINT> for str {
         (self.as_ptr(), self.len() as SQLSMALLINT)
     }
 }
-unsafe impl AsSQLPOINTER for str {
-    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+unsafe impl IntoSQLPOINTER for &str {
+    fn into_SQLPOINTER(self) -> SQLPOINTER {
         self.as_ptr() as *mut _
     }
 }
@@ -539,3 +544,5 @@ unsafe impl AsMutSQLPOINTER for MaybeUninit<usize> {
         unimplemented!()
     }
 }
+
+unsafe impl<A, T, C> ReadAttr<MaybeUninit<T>, C> for A where A: ReadAttr<T, C> {}

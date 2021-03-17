@@ -20,7 +20,7 @@ fn main() {
     let mut env = unsafe { env.assume_init() };
     println!("{:?}", res);
 
-    let res = SQLSetEnvAttr(&mut env, SQL_ATTR_ODBC_VERSION, &SQL_OV_ODBC3_80);
+    let res = SQLSetEnvAttr(&mut env, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80);
     println!("{:?}", res);
 
     let mut val = MaybeUninit::uninit();

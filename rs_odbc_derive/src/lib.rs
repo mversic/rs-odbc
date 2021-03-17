@@ -150,8 +150,8 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
             quote! {
                 #ast
 
-                unsafe impl crate::AsSQLPOINTER for #type_name {
-                    fn as_SQLPOINTER(&self) -> crate::SQLPOINTER {
+                unsafe impl crate::IntoSQLPOINTER for #type_name {
+                    fn into_SQLPOINTER(self) -> crate::SQLPOINTER {
                         self.0 as crate::SQLPOINTER
                     }
                 }
@@ -201,9 +201,9 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
             quote! {
                 #ast
 
-                unsafe impl crate::AsSQLPOINTER for #type_name {
-                    fn as_SQLPOINTER(&self) -> crate::SQLPOINTER {
-                        *self as #inner_type as crate::SQLPOINTER
+                unsafe impl crate::IntoSQLPOINTER for #type_name {
+                    fn into_SQLPOINTER(self) -> crate::SQLPOINTER {
+                        self as #inner_type as crate::SQLPOINTER
                     }
                 }
                 impl PartialEq<#inner_type> for #type_name {

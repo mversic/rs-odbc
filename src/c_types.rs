@@ -4,6 +4,7 @@ use crate::{
     SQLBIGINT, SQLCHAR, SQLDOUBLE, SQLINTEGER, SQLLEN, SQLREAL, SQLSCHAR, SQLSMALLINT, SQLUBIGINT,
     SQLUINTEGER, SQLUSMALLINT, SQLWCHAR,
 };
+use std::cell::UnsafeCell;
 use rs_odbc_derive::CType;
 use std::mem::MaybeUninit;
 
@@ -30,8 +31,8 @@ impl Identifier for SQL_C_CHAR {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_CHAR.identifier();
 }
-impl<T: AsMutRawSlice<SQLCHAR, SQLLEN>> OutCType<T> for SQL_C_CHAR {}
-impl<T: AsRawSlice<SQLCHAR, SQLLEN>> InCType<T> for SQL_C_CHAR {}
+impl<T: AsMutRawSlice<UnsafeCell<SQLCHAR>, SQLLEN>> OutCType<T> for SQL_C_CHAR {}
+impl<T: AsRawSlice<UnsafeCell<SQLCHAR>, SQLLEN>> InCType<T> for SQL_C_CHAR {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
@@ -40,8 +41,8 @@ impl Identifier for SQL_C_WCHAR {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_WCHAR.identifier();
 }
-impl<T: AsMutRawSlice<SQLWCHAR, SQLLEN>> OutCType<T> for SQL_C_WCHAR {}
-impl<T: AsRawSlice<SQLWCHAR, SQLLEN>> InCType<T> for SQL_C_WCHAR {}
+impl<T: AsMutRawSlice<UnsafeCell<SQLWCHAR>, SQLLEN>> OutCType<T> for SQL_C_WCHAR {}
+impl<T: AsRawSlice<UnsafeCell<SQLWCHAR>, SQLLEN>> InCType<T> for SQL_C_WCHAR {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
@@ -50,8 +51,8 @@ impl Identifier for SQL_C_SSHORT {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_C_SHORT + SQL_SIGNED_OFFSET;
 }
-impl OutCType<MaybeUninit<SQLSMALLINT>> for SQL_C_SSHORT {}
-impl InCType<SQLSMALLINT> for SQL_C_SSHORT {}
+impl OutCType<MaybeUninit<UnsafeCell<SQLSMALLINT>>> for SQL_C_SSHORT {}
+impl InCType<UnsafeCell<SQLSMALLINT>> for SQL_C_SSHORT {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
