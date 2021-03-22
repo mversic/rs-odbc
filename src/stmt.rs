@@ -1,6 +1,6 @@
 use crate::handle::{AppDesc, AsSQLHANDLE, ImplDesc, SQLHDESC};
 use crate::{
-    AsMutPtr, AsMutSQLPOINTER, Len, OdbcAttr, ReadAttr, WriteAttr, SQLHSTMT, SQLINTEGER,
+    AsMutPtr, AsMutSQLPOINTER, AttrLen, OdbcAttr, ReadAttr, WriteAttr, SQLHSTMT, SQLINTEGER,
     SQLPOINTER, SQLRETURN, SQLSMALLINT, SQLULEN, SQL_SUCCESS,
 };
 use rs_odbc_derive::{odbc_type, Identifier, StmtAttr};
@@ -14,7 +14,7 @@ pub trait WriteStmtAttr<'conn, 'data, T, C>: WriteAttr<T, C> + StmtAttr {
 
 pub trait ReadStmtAttr<'stmt, 'data, T, C>: ReadAttr<T, C> + StmtAttr
 where
-    T: Len<Self::AttrType, SQLINTEGER>,
+    T: AttrLen<Self::AttrType, SQLINTEGER>,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     #[allow(non_snake_case)]
@@ -65,12 +65,16 @@ impl<'stmt, 'data> Deref for RefSQLHDESC<'stmt, 'data> {
         }
     }
 }
+impl crate::Identifier for RefSQLHDESC<'_, '_> {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = crate::SQL_IS_POINTER;
+}
 unsafe impl AsMutSQLPOINTER for MaybeUninit<RefSQLHDESC<'_, '_>> {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
         unimplemented!("")
     }
 }
-unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for MaybeUninit<RefSQLHDESC<'_, '_>>
+unsafe impl<LEN: Copy> AttrLen<OdbcAttr, LEN> for MaybeUninit<RefSQLHDESC<'_, '_>>
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -100,7 +104,7 @@ impl<'stmt, C> ReadStmtAttr<'stmt, '_, MaybeUninit<SQLULEN>, C> for SQL_ATTR_QUE
         StatementHandle: &'stmt SQLHSTMT,
         ValuePtr: &mut MaybeUninit<SQLULEN>,
         StringLengthPtr: &mut MaybeUninit<
-            <MaybeUninit<SQLULEN> as Len<Self::AttrType, SQLINTEGER>>::StrLen,
+            <MaybeUninit<SQLULEN> as AttrLen<Self::AttrType, SQLINTEGER>>::StrLen,
         >,
     ) -> SQLRETURN {
         SQL_SUCCESS
@@ -311,7 +315,7 @@ impl<'stmt, 'data, C> ReadStmtAttr<'stmt, 'data, MaybeUninit<RefSQLHDESC<'stmt, 
         StatementHandle: &'stmt SQLHSTMT<'_, 'data>,
         ValuePtr: &mut MaybeUninit<RefSQLHDESC<'stmt, 'data>>,
         StringLengthPtr: &mut MaybeUninit<
-            <MaybeUninit<RefSQLHDESC<'_, '_>> as Len<Self::AttrType, SQLINTEGER>>::StrLen,
+            <MaybeUninit<RefSQLHDESC<'_, '_>> as AttrLen<Self::AttrType, SQLINTEGER>>::StrLen,
         >,
     ) -> SQLRETURN {
         let explicit_ard = StatementHandle.explicit_ard.take();
@@ -350,7 +354,7 @@ impl<'stmt, 'data, C> ReadStmtAttr<'stmt, 'data, MaybeUninit<RefSQLHDESC<'stmt, 
         StatementHandle: &'stmt SQLHSTMT<'_, 'data>,
         ValuePtr: &mut MaybeUninit<RefSQLHDESC<'stmt, 'data>>,
         StringLengthPtr: &mut MaybeUninit<
-            <MaybeUninit<RefSQLHDESC<'_, '_>> as Len<Self::AttrType, SQLINTEGER>>::StrLen,
+            <MaybeUninit<RefSQLHDESC<'_, '_>> as AttrLen<Self::AttrType, SQLINTEGER>>::StrLen,
         >,
     ) -> SQLRETURN {
         let explicit_apd = StatementHandle.explicit_apd.take();
@@ -390,7 +394,7 @@ impl<'stmt, C> ReadStmtAttr<'stmt, '_, MaybeUninit<&SQLHDESC<'stmt, ImplDesc>>, 
         StatementHandle: &'stmt SQLHSTMT,
         ValuePtr: &mut MaybeUninit<&SQLHDESC<'stmt, ImplDesc>>,
         StringLengthPtr: &mut MaybeUninit<
-            <MaybeUninit<&SQLHDESC<'_, ImplDesc>> as Len<Self::AttrType, SQLINTEGER>>::StrLen,
+            <MaybeUninit<&SQLHDESC<'_, ImplDesc>> as AttrLen<Self::AttrType, SQLINTEGER>>::StrLen,
         >,
     ) -> SQLRETURN {
         std::ptr::write(ValuePtr.as_mut_ptr(), &StatementHandle.ird);
@@ -412,7 +416,7 @@ impl<'stmt, C> ReadStmtAttr<'stmt, '_, MaybeUninit<&SQLHDESC<'stmt, ImplDesc>>, 
         StatementHandle: &'stmt SQLHSTMT,
         ValuePtr: &mut MaybeUninit<&SQLHDESC<'stmt, ImplDesc>>,
         StringLengthPtr: &mut MaybeUninit<
-            <MaybeUninit<&SQLHDESC<'_, ImplDesc>> as Len<Self::AttrType, SQLINTEGER>>::StrLen,
+            <MaybeUninit<&SQLHDESC<'_, ImplDesc>> as AttrLen<Self::AttrType, SQLINTEGER>>::StrLen,
         >,
     ) -> SQLRETURN {
         std::ptr::write(ValuePtr.as_mut_ptr(), &StatementHandle.ipd);

@@ -2,12 +2,12 @@ use crate::sql_types::*;
 use crate::{AsMutRawSlice, AsRawSlice, Identifier};
 use crate::{
     SQLBIGINT, SQLCHAR, SQLDOUBLE, SQLINTEGER, SQLLEN, SQLREAL, SQLSCHAR, SQLSMALLINT, SQLUBIGINT,
-    SQLUINTEGER, SQLUSMALLINT, SQLWCHAR,
+    SQLUINTEGER, SQLUSMALLINT, SQLWCHAR, IntoSQLPOINTER, SQLPOINTER
 };
 use std::cell::UnsafeCell;
 use rs_odbc_derive::CType;
-use std::mem::MaybeUninit;
 
+// TODO: Make these traits unsafe
 pub trait CType: Identifier<IdentType = SQLSMALLINT> {}
 pub trait InCType<T>: CType {}
 pub trait OutCType<T>: CType {}
@@ -32,7 +32,7 @@ impl Identifier for SQL_C_CHAR {
     const IDENTIFIER: Self::IdentType = SQL_CHAR.identifier();
 }
 impl<T: AsMutRawSlice<UnsafeCell<SQLCHAR>, SQLLEN>> OutCType<T> for SQL_C_CHAR {}
-impl<T: AsRawSlice<UnsafeCell<SQLCHAR>, SQLLEN>> InCType<T> for SQL_C_CHAR {}
+impl<T: AsRawSlice<SQLCHAR, SQLLEN>> InCType<T> for SQL_C_CHAR {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
@@ -42,7 +42,7 @@ impl Identifier for SQL_C_WCHAR {
     const IDENTIFIER: Self::IdentType = SQL_WCHAR.identifier();
 }
 impl<T: AsMutRawSlice<UnsafeCell<SQLWCHAR>, SQLLEN>> OutCType<T> for SQL_C_WCHAR {}
-impl<T: AsRawSlice<UnsafeCell<SQLWCHAR>, SQLLEN>> InCType<T> for SQL_C_WCHAR {}
+impl<T: AsRawSlice<SQLWCHAR, SQLLEN>> InCType<T> for SQL_C_WCHAR {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
@@ -51,8 +51,8 @@ impl Identifier for SQL_C_SSHORT {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_C_SHORT + SQL_SIGNED_OFFSET;
 }
-impl OutCType<MaybeUninit<UnsafeCell<SQLSMALLINT>>> for SQL_C_SSHORT {}
-impl InCType<UnsafeCell<SQLSMALLINT>> for SQL_C_SSHORT {}
+impl OutCType<UnsafeCell<SQLSMALLINT>> for SQL_C_SSHORT {}
+impl InCType<SQLSMALLINT> for SQL_C_SSHORT {}
 
 #[derive(CType)]
 #[allow(non_camel_case_types)]
@@ -61,7 +61,7 @@ impl Identifier for SQL_C_USHORT {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_C_SHORT + SQL_UNSIGNED_OFFSET;
 }
-impl OutCType<MaybeUninit<SQLUSMALLINT>> for SQL_C_USHORT {}
+impl OutCType<UnsafeCell<SQLUSMALLINT>> for SQL_C_USHORT {}
 impl InCType<SQLUSMALLINT> for SQL_C_USHORT {}
 
 #[derive(CType)]
@@ -71,7 +71,7 @@ impl Identifier for SQL_C_SLONG {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_C_LONG + SQL_SIGNED_OFFSET;
 }
-impl OutCType<MaybeUninit<SQLINTEGER>> for SQL_C_SLONG {}
+impl OutCType<UnsafeCell<SQLINTEGER>> for SQL_C_SLONG {}
 impl InCType<SQLINTEGER> for SQL_C_SLONG {}
 
 #[derive(CType)]
@@ -81,7 +81,7 @@ impl Identifier for SQL_C_ULONG {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_C_LONG + SQL_UNSIGNED_OFFSET;
 }
-impl OutCType<MaybeUninit<SQLUINTEGER>> for SQL_C_ULONG {}
+impl OutCType<UnsafeCell<SQLUINTEGER>> for SQL_C_ULONG {}
 impl InCType<SQLUINTEGER> for SQL_C_ULONG {}
 
 #[derive(CType)]
@@ -91,7 +91,7 @@ impl Identifier for SQL_C_FLOAT {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_REAL.identifier();
 }
-impl OutCType<MaybeUninit<SQLREAL>> for SQL_C_FLOAT {}
+impl OutCType<UnsafeCell<SQLREAL>> for SQL_C_FLOAT {}
 impl InCType<SQLREAL> for SQL_C_FLOAT {}
 
 #[derive(CType)]
@@ -101,7 +101,7 @@ impl Identifier for SQL_C_DOUBLE {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_DOUBLE.identifier();
 }
-impl OutCType<MaybeUninit<SQLDOUBLE>> for SQL_C_DOUBLE {}
+impl OutCType<UnsafeCell<SQLDOUBLE>> for SQL_C_DOUBLE {}
 impl InCType<SQLDOUBLE> for SQL_C_DOUBLE {}
 
 #[derive(CType)]
@@ -111,7 +111,7 @@ impl Identifier for SQL_C_BIT {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_BIT.identifier();
 }
-impl OutCType<MaybeUninit<SQLCHAR>> for SQL_C_BIT {}
+impl OutCType<UnsafeCell<SQLCHAR>> for SQL_C_BIT {}
 impl InCType<SQLCHAR> for SQL_C_BIT {}
 
 #[derive(CType)]
@@ -121,7 +121,7 @@ impl Identifier for SQL_C_STINYINT {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_C_TINYINT + SQL_SIGNED_OFFSET;
 }
-impl OutCType<MaybeUninit<SQLSCHAR>> for SQL_C_STINYINT {}
+impl OutCType<UnsafeCell<SQLSCHAR>> for SQL_C_STINYINT {}
 impl InCType<SQLSCHAR> for SQL_C_STINYINT {}
 
 #[derive(CType)]
@@ -131,7 +131,7 @@ impl Identifier for SQL_C_UTINYINT {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_C_TINYINT + SQL_UNSIGNED_OFFSET;
 }
-impl OutCType<MaybeUninit<SQLCHAR>> for SQL_C_UTINYINT {}
+impl OutCType<UnsafeCell<SQLCHAR>> for SQL_C_UTINYINT {}
 impl InCType<SQLCHAR> for SQL_C_UTINYINT {}
 
 #[derive(CType)]
@@ -141,7 +141,7 @@ impl Identifier for SQL_C_SBIGINT {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_BIGINT.identifier() + SQL_SIGNED_OFFSET;
 }
-impl OutCType<MaybeUninit<SQLBIGINT>> for SQL_C_SBIGINT {}
+impl OutCType<UnsafeCell<SQLBIGINT>> for SQL_C_SBIGINT {}
 impl InCType<SQLBIGINT> for SQL_C_SBIGINT {}
 
 #[derive(CType)]
@@ -151,7 +151,7 @@ impl Identifier for SQL_C_UBIGINT {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_BIGINT.identifier() + SQL_UNSIGNED_OFFSET;
 }
-impl OutCType<MaybeUninit<SQLUBIGINT>> for SQL_C_UBIGINT {}
+impl OutCType<UnsafeCell<SQLUBIGINT>> for SQL_C_UBIGINT {}
 impl InCType<SQLUBIGINT> for SQL_C_UBIGINT {}
 
 #[derive(CType)]
@@ -161,7 +161,8 @@ impl Identifier for SQL_C_BINARY {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_BINARY.identifier();
 }
-impl<T: AsMutRawSlice<SQLCHAR, SQLLEN>> OutCType<T> for SQL_C_BINARY {}
+// TODO: Has to be SQLCHAR * actually, not string
+impl<T: AsMutRawSlice<UnsafeCell<SQLCHAR>, SQLLEN>> OutCType<T> for SQL_C_BINARY {}
 impl<T: AsRawSlice<SQLCHAR, SQLLEN>> InCType<T> for SQL_C_BINARY {}
 
 // TODO: Weird?
@@ -174,7 +175,7 @@ impl Identifier for SQL_C_NUMERIC {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_NUMERIC.identifier();
 }
-impl OutCType<MaybeUninit<SQL_NUMERIC_STRUCT>> for SQL_C_NUMERIC {}
+impl OutCType<UnsafeCell<SQL_NUMERIC_STRUCT>> for SQL_C_NUMERIC {}
 impl InCType<SQL_NUMERIC_STRUCT> for SQL_C_NUMERIC {}
 
 #[derive(CType)]
@@ -185,7 +186,7 @@ impl Identifier for SQL_C_GUID {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_GUID.identifier();
 }
-impl OutCType<MaybeUninit<SQLGUID>> for SQL_C_GUID {}
+impl OutCType<UnsafeCell<SQLGUID>> for SQL_C_GUID {}
 impl InCType<SQLGUID> for SQL_C_GUID {}
 
 #[derive(CType)]
@@ -195,7 +196,7 @@ impl Identifier for SQL_C_TYPE_DATE {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_TYPE_DATE.identifier();
 }
-impl OutCType<MaybeUninit<SQL_DATE_STRUCT>> for SQL_C_TYPE_DATE {}
+impl OutCType<UnsafeCell<SQL_DATE_STRUCT>> for SQL_C_TYPE_DATE {}
 impl InCType<SQL_DATE_STRUCT> for SQL_C_TYPE_DATE {}
 
 #[derive(CType)]
@@ -205,7 +206,7 @@ impl Identifier for SQL_C_TYPE_TIME {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_TYPE_TIME.identifier();
 }
-impl OutCType<MaybeUninit<SQL_TIME_STRUCT>> for SQL_C_TYPE_TIME {}
+impl OutCType<UnsafeCell<SQL_TIME_STRUCT>> for SQL_C_TYPE_TIME {}
 impl InCType<SQL_TIME_STRUCT> for SQL_C_TYPE_TIME {}
 
 #[derive(CType)]
@@ -215,7 +216,7 @@ impl Identifier for SQL_C_TYPE_TIMESTAMP {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_TYPE_TIMESTAMP.identifier();
 }
-impl OutCType<MaybeUninit<SQL_TIMESTAMP_STRUCT>> for SQL_C_TYPE_TIMESTAMP {}
+impl OutCType<UnsafeCell<SQL_TIMESTAMP_STRUCT>> for SQL_C_TYPE_TIMESTAMP {}
 impl InCType<SQL_TIMESTAMP_STRUCT> for SQL_C_TYPE_TIMESTAMP {}
 
 #[derive(CType)]
@@ -228,7 +229,7 @@ impl Identifier for SQL_C_TYPE_TIME_WITH_TIMEZONE {
     const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIME_WITH_TIMEZONE.identifier();
 }
 #[cfg(feature = "v4")]
-impl OutCType<MaybeUninit<SQL_TIME_WITH_TIMEZONE_STRUCT>> for SQL_C_TYPE_TIME_WITH_TIMEZONE {}
+impl OutCType<UnsafeCell<SQL_TIME_WITH_TIMEZONE_STRUCT>> for SQL_C_TYPE_TIME_WITH_TIMEZONE {}
 #[cfg(feature = "v4")]
 impl InCType<SQL_TIME_WITH_TIMEZONE_STRUCT> for SQL_C_TYPE_TIME_WITH_TIMEZONE {}
 
@@ -242,7 +243,7 @@ impl Identifier for SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE {
     const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIMESTAMP_WITH_TIMEZONE.identifier();
 }
 #[cfg(feature = "v4")]
-impl OutCType<MaybeUninit<SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT>>
+impl OutCType<UnsafeCell<SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT>>
     for SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE
 {
 }
@@ -256,7 +257,7 @@ impl Identifier for SQL_C_INTERVAL_YEAR {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_INTERVAL_YEAR.identifier();
 }
-impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_YEAR {}
+impl OutCType<UnsafeCell<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_YEAR {}
 impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_YEAR {}
 
 #[derive(CType)]
@@ -266,7 +267,7 @@ impl Identifier for SQL_C_INTERVAL_MONTH {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_INTERVAL_MONTH.identifier();
 }
-impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_MONTH {}
+impl OutCType<UnsafeCell<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_MONTH {}
 impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_MONTH {}
 
 #[derive(CType)]
@@ -276,7 +277,7 @@ impl Identifier for SQL_C_INTERVAL_DAY {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_INTERVAL_DAY.identifier();
 }
-impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_DAY {}
+impl OutCType<UnsafeCell<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_DAY {}
 impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_DAY {}
 
 #[derive(CType)]
@@ -286,7 +287,7 @@ impl Identifier for SQL_C_INTERVAL_HOUR {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_INTERVAL_HOUR.identifier();
 }
-impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_HOUR {}
+impl OutCType<UnsafeCell<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_HOUR {}
 impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_HOUR {}
 
 #[derive(CType)]
@@ -296,7 +297,7 @@ impl Identifier for SQL_C_INTERVAL_MINUTE {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_INTERVAL_MINUTE.identifier();
 }
-impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_MINUTE {}
+impl OutCType<UnsafeCell<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_MINUTE {}
 impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_MINUTE {}
 
 #[derive(CType)]
@@ -306,7 +307,7 @@ impl Identifier for SQL_C_INTERVAL_SECOND {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_INTERVAL_SECOND.identifier();
 }
-impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_SECOND {}
+impl OutCType<UnsafeCell<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_SECOND {}
 impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_SECOND {}
 
 #[derive(CType)]
@@ -316,7 +317,7 @@ impl Identifier for SQL_C_INTERVAL_YEAR_TO_MONTH {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_INTERVAL_YEAR_TO_MONTH.identifier();
 }
-impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_YEAR_TO_MONTH {}
+impl OutCType<UnsafeCell<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_YEAR_TO_MONTH {}
 impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_YEAR_TO_MONTH {}
 
 #[derive(CType)]
@@ -326,7 +327,7 @@ impl Identifier for SQL_C_INTERVAL_DAY_TO_HOUR {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_INTERVAL_DAY_TO_HOUR.identifier();
 }
-impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_DAY_TO_HOUR {}
+impl OutCType<UnsafeCell<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_DAY_TO_HOUR {}
 impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_DAY_TO_HOUR {}
 
 #[derive(CType)]
@@ -336,7 +337,7 @@ impl Identifier for SQL_C_INTERVAL_DAY_TO_MINUTE {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_INTERVAL_DAY_TO_MINUTE.identifier();
 }
-impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_DAY_TO_MINUTE {}
+impl OutCType<UnsafeCell<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_DAY_TO_MINUTE {}
 impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_DAY_TO_MINUTE {}
 
 #[derive(CType)]
@@ -346,7 +347,7 @@ impl Identifier for SQL_C_INTERVAL_DAY_TO_SECOND {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_INTERVAL_DAY_TO_SECOND.identifier();
 }
-impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_DAY_TO_SECOND {}
+impl OutCType<UnsafeCell<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_DAY_TO_SECOND {}
 impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_DAY_TO_SECOND {}
 
 #[derive(CType)]
@@ -356,7 +357,7 @@ impl Identifier for SQL_C_INTERVAL_HOUR_TO_MINUTE {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_INTERVAL_HOUR_TO_MINUTE.identifier();
 }
-impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_HOUR_TO_MINUTE {}
+impl OutCType<UnsafeCell<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_HOUR_TO_MINUTE {}
 impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_HOUR_TO_MINUTE {}
 
 #[derive(CType)]
@@ -366,7 +367,7 @@ impl Identifier for SQL_C_INTERVAL_HOUR_TO_SECOND {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_INTERVAL_HOUR_TO_SECOND.identifier();
 }
-impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_HOUR_TO_SECOND {}
+impl OutCType<UnsafeCell<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_HOUR_TO_SECOND {}
 impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_HOUR_TO_SECOND {}
 
 #[derive(CType)]
@@ -376,7 +377,7 @@ impl Identifier for SQL_C_INTERVAL_MINUTE_TO_SECOND {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: Self::IdentType = SQL_INTERVAL_MINUTE_TO_SECOND.identifier();
 }
-impl OutCType<MaybeUninit<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_MINUTE_TO_SECOND {}
+impl OutCType<UnsafeCell<SQL_INTERVAL_STRUCT>> for SQL_C_INTERVAL_MINUTE_TO_SECOND {}
 impl InCType<SQL_INTERVAL_STRUCT> for SQL_C_INTERVAL_MINUTE_TO_SECOND {}
 
 // =================================================================================== //
@@ -538,4 +539,18 @@ struct SQL_DAY_SECOND_STRUCT {
     pub minute: SQLUINTEGER,
     pub second: SQLUINTEGER,
     pub fraction: SQLUINTEGER,
+}
+
+// TODO: How to implement for uninitialized data. How does UnsafeCell compose with MaybeUninit?
+// impl<A, T> OutCType<std::mem::MaybeUninit<T>> for A where A: OutCType<T> {}
+
+impl<A: InCType<T>, T: Identifier> InCType<UnsafeCell<T>> for A {}
+
+unsafe impl<T: Identifier> IntoSQLPOINTER for &UnsafeCell<T> {
+    fn into_SQLPOINTER(self) -> SQLPOINTER {
+        // Transforming into reference can cause UB so it is avoided under the assumption
+        // that the underlaying type T has the same representation as SQLPOINTER
+        // which should be true for any type implementing Identifier trait
+        self.get().cast()
+    }
 }

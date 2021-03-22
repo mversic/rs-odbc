@@ -13,7 +13,6 @@ pub mod sqlchar_str;
 pub mod sqlreturn;
 pub mod stmt;
 
-use std::cell::{RefCell, UnsafeCell};
 use std::mem::MaybeUninit;
 
 pub use conn::{
@@ -94,10 +93,6 @@ pub unsafe trait IntoSQLPOINTER where Self: Copy {
     #[allow(non_snake_case)]
     fn into_SQLPOINTER(self) -> SQLPOINTER;
 }
-pub unsafe trait AsSQLPOINTER {
-    #[allow(non_snake_case)]
-    fn as_SQLPOINTER(&self) -> SQLPOINTER;
-}
 /// If type implementing this trait is a reference allocated inside Driver Manager, then
 /// it must be constrained by the given lifetime parameter 'a. Such references are never
 /// owned (and therefore never dropped) by the Rust code
@@ -105,7 +100,7 @@ pub unsafe trait AsMutSQLPOINTER {
     #[allow(non_snake_case)]
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER;
 }
-pub unsafe trait Len<AT, LEN: Copy> {
+pub unsafe trait AttrLen<AT, LEN: Copy> {
     type StrLen;
     // TODO: consider returning MaybeUninit here. This should be entirely valid
     // It could be difficult to implement because of conflict with odbc_type macro
@@ -118,6 +113,11 @@ pub unsafe trait AsMutRawSlice<T, LEN: Copy> {
     fn as_mut_raw_slice(&mut self) -> (*mut T, LEN);
 }
 
+impl AsMutPtr<SQLLEN> for MaybeUninit<SQLLEN> {
+    fn as_mut_ptr(&mut self) -> *mut SQLLEN {
+        self.as_mut_ptr()
+    }
+}
 impl<T> AsMutPtr<T> for MaybeUninit<()> {
     fn as_mut_ptr(&mut self) -> *mut T {
         // TODO: If using dangling pointers is ok, this trait can be removed entirely and use MaybeUninit::as_mut_ptr instead as is
@@ -126,10 +126,12 @@ impl<T> AsMutPtr<T> for MaybeUninit<()> {
     }
 }
 
-unsafe impl AsRawSlice<SQLCHAR, SQLSMALLINT> for str {
-    fn as_raw_slice(&self) -> (*const SQLCHAR, SQLSMALLINT) {
+unsafe impl<LEN: Copy> AsRawSlice<SQLCHAR, LEN> for str
+where
+    LEN: std::convert::TryFrom<usize> {
+    fn as_raw_slice(&self) -> (*const SQLCHAR, LEN) {
         // TODO: This cast is problematic
-        (self.as_ptr(), self.len() as SQLSMALLINT)
+        (self.as_ptr(), LEN::try_from(self.len()).ok().unwrap())
     }
 }
 unsafe impl IntoSQLPOINTER for &str {
@@ -165,7 +167,7 @@ impl Identifier for SQLPOINTER {
     type IdentType = SQLSMALLINT;
     const IDENTIFIER: SQLSMALLINT = SQL_IS_POINTER;
 }
-unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for SQLSMALLINT
+unsafe impl<LEN: Copy> AttrLen<OdbcAttr, LEN> for SQLSMALLINT
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -175,7 +177,7 @@ where
         LEN::from(SQLSMALLINT::IDENTIFIER)
     }
 }
-unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for SQLUSMALLINT
+unsafe impl<LEN: Copy> AttrLen<OdbcAttr, LEN> for SQLUSMALLINT
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -185,7 +187,7 @@ where
         LEN::from(SQLUSMALLINT::IDENTIFIER)
     }
 }
-unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for SQLINTEGER
+unsafe impl<LEN: Copy> AttrLen<OdbcAttr, LEN> for SQLINTEGER
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -195,7 +197,7 @@ where
         LEN::from(SQLINTEGER::IDENTIFIER)
     }
 }
-unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for SQLUINTEGER
+unsafe impl<LEN: Copy> AttrLen<OdbcAttr, LEN> for SQLUINTEGER
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -205,7 +207,7 @@ where
         LEN::from(SQLUINTEGER::IDENTIFIER)
     }
 }
-unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for SQLLEN
+unsafe impl<LEN: Copy> AttrLen<OdbcAttr, LEN> for SQLLEN
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -215,7 +217,7 @@ where
         LEN::from(SQLLEN::IDENTIFIER)
     }
 }
-unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for SQLULEN
+unsafe impl<LEN: Copy> AttrLen<OdbcAttr, LEN> for SQLULEN
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -225,7 +227,7 @@ where
         LEN::from(SQLULEN::IDENTIFIER)
     }
 }
-unsafe impl<LEN: Copy> Len<DriverAttr, LEN> for SQLSMALLINT
+unsafe impl<LEN: Copy> AttrLen<DriverAttr, LEN> for SQLSMALLINT
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -235,7 +237,7 @@ where
         LEN::from(SQLSMALLINT::IDENTIFIER)
     }
 }
-unsafe impl<LEN: Copy> Len<DriverAttr, LEN> for SQLUSMALLINT
+unsafe impl<LEN: Copy> AttrLen<DriverAttr, LEN> for SQLUSMALLINT
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -245,7 +247,7 @@ where
         LEN::from(SQLUSMALLINT::IDENTIFIER)
     }
 }
-unsafe impl<LEN: Copy> Len<DriverAttr, LEN> for SQLINTEGER
+unsafe impl<LEN: Copy> AttrLen<DriverAttr, LEN> for SQLINTEGER
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -255,7 +257,7 @@ where
         LEN::from(SQLINTEGER::IDENTIFIER)
     }
 }
-unsafe impl<LEN: Copy> Len<DriverAttr, LEN> for SQLUINTEGER
+unsafe impl<LEN: Copy> AttrLen<DriverAttr, LEN> for SQLUINTEGER
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -265,7 +267,7 @@ where
         LEN::from(SQLUINTEGER::IDENTIFIER)
     }
 }
-unsafe impl<LEN: Copy> Len<DriverAttr, LEN> for SQLLEN
+unsafe impl<LEN: Copy> AttrLen<DriverAttr, LEN> for SQLLEN
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -275,7 +277,7 @@ where
         LEN::from(SQLLEN::IDENTIFIER)
     }
 }
-unsafe impl<LEN: Copy> Len<DriverAttr, LEN> for SQLULEN
+unsafe impl<LEN: Copy> AttrLen<DriverAttr, LEN> for SQLULEN
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -289,6 +291,7 @@ where
 pub enum OdbcAttr {}
 pub enum DriverAttr {}
 
+/// Implementing type must have the same representation as SQLPOINTER
 pub trait Identifier {
     type IdentType: Copy;
 
@@ -530,7 +533,7 @@ impl TableType {
 pub const TABLE: TableType = TableType("TABLE");
 pub const VIEW: TableType = TableType("VIEW");
 
-unsafe impl Len<OdbcAttr, i32> for MaybeUninit<usize> {
+unsafe impl AttrLen<OdbcAttr, i32> for MaybeUninit<usize> {
     type StrLen = ();
     // TODO: consider returning MaybeUninit here. This should be entirely valid
     // It could be difficult to implement because of conflict with odbc_type macro
@@ -545,4 +548,23 @@ unsafe impl AsMutSQLPOINTER for MaybeUninit<usize> {
     }
 }
 
-unsafe impl<A, T, C> ReadAttr<MaybeUninit<T>, C> for A where A: ReadAttr<T, C> {}
+unsafe impl<A: ReadAttr<T, C>, T: Identifier, C> ReadAttr<MaybeUninit<T>, C> for A {}
+
+pub trait BufLen {
+    fn len(&self) -> SQLLEN;
+}
+impl<T> BufLen for T where T: AttrLen<OdbcAttr, SQLSMALLINT> {
+    fn len(&self) -> SQLLEN {
+        SQLLEN::from(self.len())
+    }
+}
+
+unsafe impl AttrLen<OdbcAttr, SQLSMALLINT> for std::cell::UnsafeCell<i32> {
+    type StrLen = ();
+    // TODO: consider returning MaybeUninit here. This should be entirely valid
+    // It could be difficult to implement because of conflict with odbc_type macro
+    fn len(&self) -> SQLSMALLINT {
+        0 as SQLSMALLINT
+    }
+}
+

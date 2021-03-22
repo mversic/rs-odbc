@@ -56,7 +56,7 @@ fn main() {
     let mut outstr = SQLCHARString::<SQLSMALLINT>::with_capacity(200);
     let mut outstrlen = MaybeUninit::uninit();
     let res = SQLDriverConnectA(
-        &mut conn,
+        &conn,
         None,
         conn_string,
         &mut outstr,
@@ -74,31 +74,41 @@ fn main() {
     let mut stmt = unsafe { stmt.assume_init() };
     println!("{:?}", res);
 
-    let mut col_cnt = MaybeUninit::uninit();
-    SQLTablesA(&mut stmt, "", "", "", &[TABLE, VIEW]);
-    SQLNumResultCols(&mut stmt, &mut col_cnt);
-    let col_cnt = unsafe { col_cnt.assume_init() };
+    //let mut col_cnt = MaybeUninit::uninit();
+    //SQLTablesA(&mut stmt, "", "", "T", &[TABLE]);
+    //SQLNumResultCols(&mut stmt, &mut col_cnt);
+    let val = std::cell::UnsafeCell::new(12);
+    let ref_val = &val;
+    let Statement = "SELECT a from test.T";
+    let k = rs_odbc::SQLPrepareA(&stmt, Statement);
+    println!("PREPARE: {:?}", k);
+    let mut kita = MaybeUninit::uninit();
+    let k = rs_odbc::SQLBindCol(&stmt, 1, rs_odbc::c_types::SQL_C_SLONG, Some(ref_val), &mut kita);
+    //let col_cnt = unsafe { col_cnt.assume_init() };
+    //println!("col_cnt: {}", col_cnt);
     let mut row = 0;
-    while SQL_SUCCEEDED(SQLFetch(&mut stmt)) {
-        println!("Row {}\n", row);
+    let x = SQLFetch(&stmt);
+    println!("{:?}", x);
+    while SQL_SUCCEEDED(x) {
+        println!("Row {}, val: {:?}\n", row, val);
 
         //for i in 1..col_cnt {
-        //    let mut outstr = SQLCHARString::<SQLLEN>::with_capacity(200);
-        //    let indicator;
+        //    //let mut outstr = SQLCHARString::<SQLLEN>::with_capacity(200);
+        //    //let indicator;
 
-        //    if SQL_SUCCEEDED(SQLGetData(&mut stmt, i, SQL_C_CHAR, outstr, &indicator)) {
-        //        /* Handle null columns */
-        //        if (indicator == SQL_NULL_DATA) {
-        //            strcpy(buf, "NULL");
-        //        }
-        //        println!("Column {}: {}\n", i, buf);
-        //    }
+        //    //if SQL_SUCCEEDED(SQLGetData(&mut stmt, i, SQL_C_CHAR, outstr, &indicator)) {
+        //    //    ///* Handle null columns */
+        //    //    //if (indicator == SQL_NULL_DATA) {
+        //    //    //    strcpy(buf, "NULL");
+        //    //    //}
+        //    //    println!("Column {}: {}\n", i, buf);
+        //    //}
         //}
 
         row += 1;
     }
 
-    let res = SQLSetStmtAttrA(&mut stmt, rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC, &desc);
+    let res = SQLSetStmtAttrA(&stmt, rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC, &desc);
     println!("{:?}", res);
 
     let mut read_desc = MaybeUninit::uninit();

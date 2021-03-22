@@ -1,4 +1,9 @@
-use crate::SQLSMALLINT;
+use crate::{WriteAttr, SQLHDESC, SQLSMALLINT};
+
+pub trait WriteDescField<DT, T, C>: WriteAttr<T, C> {
+    // TODO: Implement for buffers to bind their lifetimes
+    fn update_handle(_: &SQLHDESC<DT>, _: Option<T>) {}
+}
 
 pub trait DescField: crate::Identifier<IdentType = SQLSMALLINT> {
     type AttrType;

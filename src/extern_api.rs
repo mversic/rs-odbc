@@ -13,10 +13,10 @@ impl crate::Identifier for ConstSQLPOINTER {
     const IDENTIFIER: SQLSMALLINT = crate::SQL_IS_POINTER;
 }
 
-// TODO static linking is not currently supported here for windows
-#[cfg_attr(windows, link(name = "odbc32"))]
-#[cfg_attr(all(not(windows), not(r#static)), link(name = "odbc"))]
-#[cfg_attr(all(not(windows), r#static), link(name = "odbc", kind = "static"))]
+// TODO: static linking is not supported for windows
+#[cfg_attr(windows, link(name = "odbc32", kind = "dylib"))]
+#[cfg_attr(all(not(windows), feature = "static"), link(name = "odbc", kind = "static"))]
+#[cfg_attr(all(not(windows), not(feature = "static")), link(name = "odbc", kind = "dylib"))]
 extern "system" {
     pub(crate) fn SQLAllocHandle(
         HandleType: SQLSMALLINT,
@@ -26,7 +26,7 @@ extern "system" {
 
     pub(crate) fn SQLBindCol(
         StatementHandle: HSTMT,
-        ColumnNumber: SQLSMALLINT,
+        ColumnNumber: SQLUSMALLINT,
         TargetType: SQLSMALLINT,
         TargetValuePtr: MutSQLPOINTER,
         BufferLength: SQLLEN,
@@ -35,7 +35,7 @@ extern "system" {
 
     pub(crate) fn SQLBindParameter(
         StatementHandle: HSTMT,
-        ParameterNumber: SQLSMALLINT,
+        ParameterNumber: SQLUSMALLINT,
         InputOutputType: SQLSMALLINT,
         ValueType: SQLSMALLINT,
         ParameterType: SQLSMALLINT,

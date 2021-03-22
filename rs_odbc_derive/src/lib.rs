@@ -166,14 +166,7 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
                     }
                 }
 
-                unsafe impl<LEN: Copy> crate::Len<crate::OdbcAttr, LEN> for std::mem::MaybeUninit<#type_name> where LEN: From<crate::SQLSMALLINT> {
-                    type StrLen = ();
-
-                    fn len(&self) -> LEN {
-                        LEN::from(<#inner_type as crate::Identifier>::IDENTIFIER)
-                    }
-                }
-                unsafe impl<LEN: Copy> crate::Len<crate::DriverAttr, LEN> for std::mem::MaybeUninit<#type_name> where LEN: From<crate::SQLSMALLINT> {
+                unsafe impl<AT, LEN: Copy> crate::AttrLen<AT, LEN> for std::mem::MaybeUninit<#type_name> where LEN: From<crate::SQLSMALLINT> {
                     type StrLen = ();
 
                     fn len(&self) -> LEN {
@@ -234,18 +227,16 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     ret.extend(quote! {
-        unsafe impl<LEN: Copy> crate::Len<crate::OdbcAttr, LEN> for #type_name where LEN: From<crate::SQLSMALLINT> {
-            type StrLen = ();
-
-            fn len(&self) -> LEN {
-                LEN::from(<#inner_type as crate::Identifier>::IDENTIFIER)
-            }
+        impl crate::Identifier for #type_name {
+            type IdentType = <#inner_type as crate::Identifier>::IdentType;
+            const IDENTIFIER: Self::IdentType = <#inner_type as crate::Identifier>::IDENTIFIER;
         }
-        unsafe impl<LEN: Copy> crate::Len<crate::DriverAttr, LEN> for #type_name where LEN: From<crate::SQLSMALLINT> {
+
+        unsafe impl<AT, LEN: Copy> crate::AttrLen<AT, LEN> for #type_name where LEN: From<crate::SQLSMALLINT> {
             type StrLen = ();
 
             fn len(&self) -> LEN {
-                LEN::from(<#inner_type as crate::Identifier>::IDENTIFIER)
+                LEN::from(<Self as crate::Identifier>::IDENTIFIER)
             }
         }
 

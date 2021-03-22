@@ -4,7 +4,7 @@ use crate::stmt::{
     SQL_ATTR_IMP_ROW_DESC,
 };
 use crate::{
-    AsMutSQLPOINTER, Identifier, IntoSQLPOINTER, Len, OdbcAttr, SQLPOINTER, SQLSMALLINT,
+    AsMutSQLPOINTER, Identifier, IntoSQLPOINTER, AttrLen, OdbcAttr, SQLPOINTER, SQLSMALLINT,
     SQL_SUCCESS,
 };
 use std::any::{type_name, Any};
@@ -25,7 +25,7 @@ pub trait Handle {
 
 // TODO: Should be unsafe?
 // TODO: Where to require Drop? I could make a generic Drop implementation, hmmmm
-pub unsafe trait Allocate<'src>: Handle {
+pub unsafe trait Allocate<'src>: Handle + Drop {
     type SrcHandle: AsSQLHANDLE;
     fn from_raw(handle: SQLHANDLE) -> Self;
     fn uninit() -> MaybeUninit<Self>
@@ -40,38 +40,14 @@ pub trait SQLCancelHandle: Handle {}
 pub trait SQLCompleteAsyncHandle: Handle {}
 pub trait SQLEndTranHandle: Handle {}
 
-pub trait DescType<'data> {
-    fn new() -> Self;
-    fn unbind_record(&self, RecNumber: SQLSMALLINT);
-    fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: SQL_DESC_DATA_PTR<'data>);
-}
+pub trait DescType<'data> {}
 pub struct ImplDesc {}
-impl DescType<'_> for ImplDesc {
-    fn new() -> Self {
-        Self {}
-    }
-    fn unbind_record(&self, RecNumber: SQLSMALLINT) {}
-    fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: SQL_DESC_DATA_PTR) {}
-}
-
-#[allow(non_camel_case_types)]
-type SQL_DESC_DATA_PTR<'data> = &'data dyn Any;
+impl DescType<'_> for ImplDesc {}
 
 pub struct AppDesc<'data> {
-    pub(crate) data_ptrs: PhantomData<SQL_DESC_DATA_PTR<'data>>,
+    pub(crate) data_ptrs: PhantomData<&'data ()>,
 }
-impl AppDesc<'_> {
-    fn unbind_records(&self) {}
-}
-impl<'data> DescType<'data> for AppDesc<'data> {
-    fn new() -> Self {
-        Self {
-            data_ptrs: PhantomData,
-        }
-    }
-    fn unbind_record(&self, RecNumber: SQLSMALLINT) {}
-    fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: SQL_DESC_DATA_PTR<'data>) {}
-}
+impl<'data> DescType<'data> for AppDesc<'data> {}
 
 #[derive(rs_odbc_derive::Identifier)]
 #[identifier(SQLSMALLINT, 1)]
@@ -273,83 +249,6 @@ impl SQLHSTMT<'_, '_> {
 
         descriptor_handle.assume_init()
     }
-    #[allow(non_snake_case)]
-    pub(crate) fn unbind_param(&self, ColumnNumber: SQLSMALLINT) {
-        let explicit_apd = self.explicit_apd.take();
-        if let Some(explicit_apd) = &explicit_apd {
-            explicit_apd.data.unbind_record(ColumnNumber);
-        } else {
-            self.apd.data.unbind_record(ColumnNumber);
-        }
-
-        self.explicit_apd.set(explicit_apd);
-    }
-    #[allow(non_snake_case)]
-    pub(crate) fn unbind_col(&self, ColumnNumber: SQLSMALLINT) {
-        let explicit_ard = self.explicit_ard.take();
-        if let Some(explicit_ard) = &explicit_ard {
-            explicit_ard.data.unbind_record(ColumnNumber);
-        } else {
-            self.ard.data.unbind_record(ColumnNumber);
-        }
-
-        self.explicit_ard.set(explicit_ard);
-    }
-    pub(crate) fn unbind_cols(&self) {
-        let explicit_ard = self.explicit_ard.take();
-        if let Some(explicit_ard) = &explicit_ard {
-            explicit_ard.data.unbind_records();
-        } else {
-            self.ard.data.unbind_records();
-        }
-
-        self.explicit_ard.set(explicit_ard);
-    }
-    pub(crate) fn unbind_params(&self) {
-        let explicit_apd = self.explicit_apd.take();
-        if let Some(explicit_apd) = &explicit_apd {
-            explicit_apd.data.unbind_records();
-        } else {
-            self.apd.data.unbind_records();
-        }
-
-        self.explicit_apd.set(explicit_apd);
-    }
-}
-
-impl<'data> SQLHSTMT<'_, 'data> {
-    #[allow(non_snake_case)]
-    pub(crate) fn bind_param(
-        &self,
-        ColumnNumber: SQLSMALLINT,
-        TargetValuePtr: SQL_DESC_DATA_PTR<'data>,
-    ) {
-        let explicit_apd = self.explicit_apd.take();
-        if let Some(explicit_apd) = &explicit_apd {
-            explicit_apd.data.bind_record(ColumnNumber, TargetValuePtr);
-        } else {
-            self.apd.data.bind_record(ColumnNumber, TargetValuePtr);
-        }
-
-        self.explicit_apd.set(explicit_apd);
-    }
-    #[allow(non_snake_case)]
-    pub(crate) fn bind_col(
-        &self,
-        ColumnNumber: SQLSMALLINT,
-        ParameterValuePtr: SQL_DESC_DATA_PTR<'data>,
-    ) {
-        let explicit_ard = self.explicit_ard.take();
-        if let Some(explicit_ard) = &explicit_ard {
-            explicit_ard
-                .data
-                .bind_record(ColumnNumber, ParameterValuePtr);
-        } else {
-            self.ard.data.bind_record(ColumnNumber, ParameterValuePtr);
-        }
-
-        self.explicit_ard.set(explicit_ard);
-    }
 }
 
 impl Handle for SQLHSTMT<'_, '_> {
@@ -428,25 +327,15 @@ impl Drop for SQLHSTMT<'_, '_> {
 pub struct SQLHDESC<'conn, T> {
     parent: PhantomData<&'conn ()>,
     pub(crate) handle: SQLHANDLE,
-    // TODO: Add bookmark column. Eg:
-    //pub(crate) bookmark: Rc<UnsafeCell<dyn AsMutSQLPOINTER>>,
-    pub(crate) data: T,
+    pub(crate) data: PhantomData<T>,
 }
 impl<'data, T: DescType<'data>> SQLHDESC<'_, T> {
-    pub fn unbind_record(&self, RecNumber: SQLSMALLINT) {
-        self.data.unbind_record(RecNumber);
-    }
-    #[allow(non_snake_case)]
-    pub fn bind_record(&self, RecNumber: SQLSMALLINT, DataPtr: SQL_DESC_DATA_PTR<'data>) {
-        self.data.bind_record(RecNumber, DataPtr);
-    }
-
     // TODO: Can I return Rc as well? To make it all transparent to the user
     fn from_raw(handle: SQLHANDLE) -> Self {
         SQLHDESC {
             handle,
             parent: PhantomData,
-            data: T::new(),
+            data: PhantomData,
         }
     }
 }
@@ -466,6 +355,10 @@ unsafe impl<T> AsSQLHANDLE for SQLHDESC<'_, T> {
         self.handle
     }
 }
+impl<T> crate::Identifier for &SQLHDESC<'_, T> {
+    type IdentType = SQLSMALLINT;
+    const IDENTIFIER: Self::IdentType = crate::SQL_IS_POINTER;
+}
 // TODO: use derive odbc_type somehow?
 unsafe impl<'data, T: DescType<'data>> IntoSQLPOINTER for &Rc<SQLHDESC<'_, T>> {
     fn into_SQLPOINTER(self) -> SQLPOINTER {
@@ -473,7 +366,7 @@ unsafe impl<'data, T: DescType<'data>> IntoSQLPOINTER for &Rc<SQLHDESC<'_, T>> {
     }
 }
 // TODO: This can be removed
-unsafe impl<'data, LEN: Copy, T: DescType<'data>> Len<OdbcAttr, LEN> for &Rc<SQLHDESC<'_, T>>
+unsafe impl<'data, LEN: Copy, T: DescType<'data>> AttrLen<OdbcAttr, LEN> for &Rc<SQLHDESC<'_, T>>
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -489,7 +382,7 @@ unsafe impl AsMutSQLPOINTER for MaybeUninit<&SQLHDESC<'_, ImplDesc>> {
         unimplemented!()
     }
 }
-unsafe impl<LEN: Copy> Len<OdbcAttr, LEN> for MaybeUninit<&SQLHDESC<'_, ImplDesc>>
+unsafe impl<LEN: Copy> AttrLen<OdbcAttr, LEN> for MaybeUninit<&SQLHDESC<'_, ImplDesc>>
 where
     LEN: From<SQLSMALLINT>,
 {
