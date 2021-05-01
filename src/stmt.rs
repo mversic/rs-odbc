@@ -68,8 +68,8 @@ pub trait StmtAttr<'stmt, 'data, A: Ident>:
 
 pub struct RefSQLHDESC<'stmt, T>(&'stmt SQLHDESC<'stmt, T>);
 impl<'stmt, T> Ident for RefSQLHDESC<'stmt, T> {
-    type Type = <&'stmt SQLHDESC<'stmt, T> as Ident>::Type;
-    const IDENTIFIER: Self::Type = <&SQLHDESC<T>>::IDENTIFIER;
+    type Type = <Option<&'stmt SQLHDESC<'stmt, T>> as Ident>::Type;
+    const IDENTIFIER: Self::Type = <Option<&SQLHDESC<T>>>::IDENTIFIER;
 }
 unsafe impl<'data, T: crate::handle::DescType<'data>> AsMutSQLPOINTER for MaybeUninit<RefSQLHDESC<'_, T>> {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
@@ -323,16 +323,16 @@ impl StmtAttr<'_, '_, SQL_ATTR_USE_BOOKMARKS> for UseBookmarks {}
 #[identifier(SQLINTEGER, 10010)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_APP_ROW_DESC;
-unsafe impl Attr<SQL_ATTR_APP_ROW_DESC> for &SQLHDESC<'_, AppDesc<'_>> {
+unsafe impl Attr<SQL_ATTR_APP_ROW_DESC> for Option<&SQLHDESC<'_, AppDesc<'_>>> {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
 // TODO: I think this should be implemented only for MaybeUninit<RefSQLHDESC>
 unsafe impl<'stmt, 'data> Attr<SQL_ATTR_APP_ROW_DESC> for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>> {
     type DefinedBy =
-        <&'stmt SQLHDESC<'stmt, AppDesc<'data>> as Attr<SQL_ATTR_APP_ROW_DESC>>::DefinedBy;
+        <Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>> as Attr<SQL_ATTR_APP_ROW_DESC>>::DefinedBy;
     type NonBinary =
-        <&'stmt SQLHDESC<'stmt, AppDesc<'data>> as Attr<SQL_ATTR_APP_ROW_DESC>>::NonBinary;
+        <Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>> as Attr<SQL_ATTR_APP_ROW_DESC>>::NonBinary;
 }
 impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_ROW_DESC>
     for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>>
@@ -367,7 +367,7 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_ROW_DESC>
     }
 }
 impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_ROW_DESC>
-    for &'stmt SQLHDESC<'_, AppDesc<'data>>
+    for Option<&'stmt SQLHDESC<'_, AppDesc<'data>>>
 {
     #[cfg(feature = "odbc_debug")]
     fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'data>) {
@@ -375,21 +375,21 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_ROW_DESC>
     }
 }
 unsafe impl AttrRead<SQL_ATTR_APP_ROW_DESC> for MaybeUninit<RefSQLHDESC<'_, AppDesc<'_>>> {}
-unsafe impl AttrWrite<SQL_ATTR_APP_ROW_DESC> for &SQLHDESC<'_, AppDesc<'_>> {}
+unsafe impl AttrWrite<SQL_ATTR_APP_ROW_DESC> for Option<&SQLHDESC<'_, AppDesc<'_>>> {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 10011)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_APP_PARAM_DESC;
-unsafe impl Attr<SQL_ATTR_APP_PARAM_DESC> for &SQLHDESC<'_, AppDesc<'_>> {
+unsafe impl Attr<SQL_ATTR_APP_PARAM_DESC> for Option<&SQLHDESC<'_, AppDesc<'_>>> {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
 unsafe impl<'stmt, 'data> Attr<SQL_ATTR_APP_PARAM_DESC> for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>> {
     type DefinedBy =
-        <&'stmt SQLHDESC<'stmt, AppDesc<'data>> as Attr<SQL_ATTR_APP_PARAM_DESC>>::DefinedBy;
+        <Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>> as Attr<SQL_ATTR_APP_PARAM_DESC>>::DefinedBy;
     type NonBinary =
-        <&'stmt SQLHDESC<'stmt, AppDesc<'data>> as Attr<SQL_ATTR_APP_PARAM_DESC>>::NonBinary;
+        <Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>> as Attr<SQL_ATTR_APP_PARAM_DESC>>::NonBinary;
 }
 impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_PARAM_DESC>
     for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>>
@@ -422,7 +422,7 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_PARAM_DESC>
     }
 }
 impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_PARAM_DESC>
-    for &'stmt SQLHDESC<'_, AppDesc<'data>>
+    for Option<&'stmt SQLHDESC<'_, AppDesc<'data>>>
 {
     #[cfg(feature = "odbc_debug")]
     fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'data>) {
@@ -430,7 +430,7 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_PARAM_DESC>
     }
 }
 unsafe impl AttrRead<SQL_ATTR_APP_PARAM_DESC> for MaybeUninit<RefSQLHDESC<'_, AppDesc<'_>>> {}
-unsafe impl AttrWrite<SQL_ATTR_APP_PARAM_DESC> for &SQLHDESC<'_, AppDesc<'_>> {}
+unsafe impl AttrWrite<SQL_ATTR_APP_PARAM_DESC> for Option<&SQLHDESC<'_, AppDesc<'_>>> {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 10012)]

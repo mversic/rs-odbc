@@ -219,10 +219,8 @@ pub struct SQLHSTMT<'conn, 'stmt, 'data> {
     pub(crate) handle: SQLHANDLE,
 
     #[cfg(feature = "odbc_debug")]
-    // TODO: Is 'data lifetime ok?
     pub(crate) explicit_ard: Cell<Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>>>,
     #[cfg(feature = "odbc_debug")]
-    // TODO: Is 'data lifetime ok?
     pub(crate) explicit_apd: Cell<Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>>>,
 
     #[cfg(feature = "odbc_debug")]
@@ -408,15 +406,15 @@ unsafe impl<T> AsSQLHANDLE for SQLHDESC<'_, T> {
         self.handle
     }
 }
-impl<T> crate::Ident for &SQLHDESC<'_, T> {
+impl<T> crate::Ident for Option<&SQLHDESC<'_, T>> {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = crate::SQL_IS_POINTER;
 }
-impl<T> crate::AnsiType for &SQLHDESC<'_, T> {}
-impl<T> crate::UnicodeType for &SQLHDESC<'_, T> {}
-unsafe impl<'data, T: DescType<'data>> IntoSQLPOINTER for &SQLHDESC<'_, T> {
+impl<T> crate::AnsiType for Option<&SQLHDESC<'_, T>> {}
+impl<T> crate::UnicodeType for Option<&SQLHDESC<'_, T>> {}
+unsafe impl<'data, T: DescType<'data>> IntoSQLPOINTER for Option<&SQLHDESC<'_, T>> {
     fn into_SQLPOINTER(self) -> SQLPOINTER {
-        self.as_SQLHANDLE().cast()
+        self.map_or_else(std::ptr::null_mut, |handle| handle.as_SQLHANDLE().cast())
     }
 }
 impl<T> Drop for SQLHDESC<'_, T> {

@@ -672,3 +672,5 @@ unsafe impl<T> IntoSQLPOINTER for &[T] {
         (self.as_ptr() as *mut T).cast()
     }
 }
+
+// TODO: Instead of implementing traits for every Option<T>, consider making a blanket impl for all T

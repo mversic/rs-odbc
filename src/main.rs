@@ -111,7 +111,7 @@ fn main() {
         row += 1;
     }
 
-    let res = SQLSetStmtAttrA(&stmt, rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC, &desc);
+    let res = SQLSetStmtAttrA(&stmt, rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC, Some(&desc));
     println!("{:?}", res);
 
     let mut read_desc = MaybeUninit::uninit();
