@@ -1,19 +1,13 @@
-use crate::{ReadAttr, SQLLEN, SQLSMALLINT, OdbcAttr};
-use rs_odbc_derive::{DiagField, Identifier};
+use crate::{handle::Handle, Attr, AttrLen, AttrRead, Ident, SQLLEN, SQLSMALLINT};
+use rs_odbc_derive::{DiagField, Ident};
 
-pub trait DiagField<H: crate::Identifier>: crate::Identifier<IdentType = SQLSMALLINT> {
-    type AttrType;
-}
+pub trait DiagField<H: Handle, D: Ident>: Attr<D> + AttrLen<<Self as Attr<D>>::DefinedBy, <Self as Attr<D>>::NonBinary, SQLSMALLINT> {}
 
 // Header fields -----------------------------------------------------------------
-#[derive(Identifier)]
+#[derive(Ident)]
 #[identifier(SQLSMALLINT, -1249)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DIAG_CURSOR_ROW_COUNT;
-impl DiagField<crate::handle::SQL_HANDLE_STMT> for SQL_DIAG_CURSOR_ROW_COUNT {
-    type AttrType = OdbcAttr;
-}
-unsafe impl<C> ReadAttr<SQLLEN, C> for SQL_DIAG_CURSOR_ROW_COUNT {}
 
 //#[identifier(7)]
 //#[derive(DiagField)]
@@ -96,3 +90,16 @@ unsafe impl<C> ReadAttr<SQLLEN, C> for SQL_DIAG_CURSOR_ROW_COUNT {}
 //#[derive(DiagField)]
 //pub struct SQL_DIAG_SUBCLASS_ORIGIN;
 //impl<T: AsMutRawCharSlice> ReadAttr<T> for SQL_DIAG_SUBCLASS_ORIGIN {}
+
+impl<H: Handle, D: Ident, T: Ident> DiagField<H, D> for std::mem::MaybeUninit<T>
+where
+    T: DiagField<H, D>,
+    Self: Attr<D> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
+impl<'a, H: Handle, D: Ident, T> DiagField<H, D> for &'a [std::mem::MaybeUninit<T>]
+where
+    &'a [T]: DiagField<H, D>,
+    Self: Attr<D> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}

@@ -8,9 +8,9 @@ use crate::{
 // they are used to avoid provenance related errors during initial development
 type ConstSQLPOINTER = *const std::ffi::c_void;
 type MutSQLPOINTER = *mut std::ffi::c_void;
-impl crate::Identifier for ConstSQLPOINTER {
-    type IdentType = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = crate::SQL_IS_POINTER;
+impl crate::Ident for ConstSQLPOINTER {
+    type Type = SQLSMALLINT;
+    const IDENTIFIER: Self::Type = crate::SQL_IS_POINTER;
 }
 
 // TODO: static linking is not supported for windows

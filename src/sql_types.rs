@@ -1,5 +1,5 @@
 pub use crate::SQLSMALLINT;
-pub use rs_odbc_derive::{odbc_type, Identifier};
+pub use rs_odbc_derive::odbc_type;
 
 #[odbc_type(SQLSMALLINT)]
 #[allow(non_camel_case_types)]

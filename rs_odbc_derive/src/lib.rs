@@ -3,6 +3,11 @@ use proc_macro2::{Ident, Span};
 use quote::quote;
 use syn::{self, parse::Parse, parse::Parser};
 
+#[proc_macro_derive(ScalarCtype)]
+pub fn scalar_ctype_derive(input: TokenStream) -> TokenStream {
+    empty_trait_derive(input, Ident::new("ScalarCType", Span::call_site()))
+}
+
 #[proc_macro_derive(EnvAttr)]
 pub fn env_attr_derive(input: TokenStream) -> TokenStream {
     empty_trait_derive(input, Ident::new("EnvAttr", Span::call_site()))
@@ -33,12 +38,7 @@ pub fn diag_field_derive(input: TokenStream) -> TokenStream {
     attr_derive(input, Ident::new("DiagField", Span::call_site()))
 }
 
-#[proc_macro_derive(CType)]
-pub fn c_type_derive(input: TokenStream) -> TokenStream {
-    empty_trait_derive(input, Ident::new("CType", Span::call_site()))
-}
-
-#[proc_macro_derive(Identifier, attributes(identifier))]
+#[proc_macro_derive(Ident, attributes(identifier))]
 pub fn into_identifier(input: TokenStream) -> TokenStream {
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
 
@@ -67,9 +67,9 @@ pub fn into_identifier(input: TokenStream) -> TokenStream {
     }
 
     let gen = quote! {
-        impl #impl_generics crate::Identifier for #type_name #ty_generics #where_clause {
-            type IdentType = crate::#identifier_type;
-            const IDENTIFIER: Self::IdentType = #identifier;
+        impl #impl_generics crate::Ident for #type_name #ty_generics #where_clause {
+            type Type = crate::#identifier_type;
+            const IDENTIFIER: Self::Type = #identifier;
         }
     };
 
@@ -96,10 +96,7 @@ fn attr_derive(input: TokenStream, attr_name: Ident) -> TokenStream {
     let type_name = &ast.ident;
 
     let gen = quote! {
-        impl #impl_generics #attr_name for #type_name #ty_generics #where_clause {
-            // TODO: try not to hard code type
-            type AttrType = crate::OdbcAttr;
-        }
+        impl #impl_generics #attr_name for #type_name #ty_generics #where_clause {}
     };
 
     gen.into()
@@ -109,6 +106,7 @@ fn attr_derive(input: TokenStream, attr_name: Ident) -> TokenStream {
 pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut ast: syn::DeriveInput = syn::parse(input).unwrap();
     let mut args = args.into_iter();
+    // TODO:
     let inner_type: Ident = syn::parse(args.next().unwrap().into()).expect("KAR");
 
     match inner_type.to_string().as_str() {
@@ -152,25 +150,17 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
 
                 unsafe impl crate::IntoSQLPOINTER for #type_name {
                     fn into_SQLPOINTER(self) -> crate::SQLPOINTER {
-                        self.0 as crate::SQLPOINTER
+                        self.0 as _
                     }
                 }
                 unsafe impl crate::AsMutSQLPOINTER for #type_name {
                     fn as_mut_SQLPOINTER(&mut self) -> crate::SQLPOINTER {
-                        self as *mut _ as crate::SQLPOINTER
+                        (self as *mut Self).cast()
                     }
                 }
                 unsafe impl crate::AsMutSQLPOINTER for std::mem::MaybeUninit<#type_name> {
                     fn as_mut_SQLPOINTER(&mut self) -> crate::SQLPOINTER {
                         self.as_mut_ptr().cast()
-                    }
-                }
-
-                unsafe impl<AT, LEN: Copy> crate::AttrLen<AT, LEN> for std::mem::MaybeUninit<#type_name> where LEN: From<crate::SQLSMALLINT> {
-                    type StrLen = ();
-
-                    fn len(&self) -> LEN {
-                        LEN::from(<#inner_type as crate::Identifier>::IDENTIFIER)
                     }
                 }
 
@@ -196,7 +186,7 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
 
                 unsafe impl crate::IntoSQLPOINTER for #type_name {
                     fn into_SQLPOINTER(self) -> crate::SQLPOINTER {
-                        self as #inner_type as crate::SQLPOINTER
+                        self as #inner_type as _
                     }
                 }
                 impl PartialEq<#inner_type> for #type_name {
@@ -227,18 +217,13 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     ret.extend(quote! {
-        impl crate::Identifier for #type_name {
-            type IdentType = <#inner_type as crate::Identifier>::IdentType;
-            const IDENTIFIER: Self::IdentType = <#inner_type as crate::Identifier>::IDENTIFIER;
+        impl crate::Ident for #type_name {
+            type Type = <#inner_type as crate::Ident>::Type;
+            const IDENTIFIER: Self::Type = <#inner_type as crate::Ident>::IDENTIFIER;
         }
 
-        unsafe impl<AT, LEN: Copy> crate::AttrLen<AT, LEN> for #type_name where LEN: From<crate::SQLSMALLINT> {
-            type StrLen = ();
-
-            fn len(&self) -> LEN {
-                LEN::from(<Self as crate::Identifier>::IDENTIFIER)
-            }
-        }
+        impl crate::AnsiType for #type_name {}
+        impl crate::UnicodeType for #type_name {}
 
         impl PartialEq<#type_name> for #inner_type {
             fn eq(&self, other: &#type_name) -> bool {

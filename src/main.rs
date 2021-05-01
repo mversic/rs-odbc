@@ -1,10 +1,10 @@
 use rs_odbc::{
-    env::OdbcVersion, handle::Allocate, SQLAllocHandle, SQLCHARString, SQLDisconnect,
+    env::OdbcVersion, handle::Allocate, SQLAllocHandle, SQLDisconnect,
     SQLDriverConnectA, SQLFetch, SQLGetData, SQLGetEnvAttr, SQLNumResultCols, SQLSetEnvAttr,
-    SQLTablesA, SQLHDBC, SQLHENV, SQLHSTMT, SQLSMALLINT, SQL_ATTR_ODBC_VERSION,
+    SQLTablesA, SQLHDBC, SQLHENV, SQLHSTMT, SQLSMALLINT, SQL_ATTR_ODBC_VERSION, SQLCHAR,
     SQL_DRIVER_COMPLETE, SQL_HANDLE_DBC, SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE,
     SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_SUCCEEDED, TABLE, VIEW, SQLHDESC, SQL_HANDLE_DESC, SQLSetStmtAttrA, SQLGetStmtAttrA,
-    SQLFreeHandle
+    SQLFreeHandle, StrLenOrInd
 };
 use std::convert::TryInto;
 use std::mem::MaybeUninit;
@@ -53,22 +53,25 @@ fn main() {
     println!("{:?}", res);
 
     let conn_string = "Driver=mysql;User=kita;Password=moja;Database=test;";
-    let mut outstr = SQLCHARString::<SQLSMALLINT>::with_capacity(200);
-    let mut outstrlen = MaybeUninit::uninit();
+    let mut outstr: [MaybeUninit<SQLCHAR>; 200] = unsafe { MaybeUninit::uninit().assume_init() };
+    let cap = outstr.len();
+    let outstrr: &mut [MaybeUninit<SQLCHAR>] = &mut outstr;
+    let mut outstrlen = 0;
     let res = SQLDriverConnectA(
         &conn,
         None,
-        conn_string,
-        &mut outstr,
+        conn_string.as_bytes(),
+        outstrr,
         &mut outstrlen,
         SQL_DRIVER_COMPLETE,
     );
+    let outstr = unsafe {String::from_raw_parts(std::mem::ManuallyDrop::new(Box::new(outstr)).as_mut_ptr().cast(), outstrlen as usize, cap)};
+    //let outstr = std::mem::ManuallyDrop::new(outstr);
+    println!("KITA: {:?}", &outstr);
     println!("KITA: {:?}", res);
 
-    println!("{:?}", unsafe { outstr.assume_init() });
-
     let res = SQLAllocHandle(SQL_HANDLE_DESC, &conn, &mut desc);
-    let mut desc = std::rc::Rc::new(unsafe { desc.assume_init() });
+    let mut desc = unsafe { desc.assume_init() };
     println!("{:?}", res);
     let res = SQLAllocHandle(SQL_HANDLE_STMT, &conn, &mut stmt);
     let mut stmt = unsafe { stmt.assume_init() };
@@ -80,10 +83,10 @@ fn main() {
     let val = std::cell::UnsafeCell::new(12);
     let ref_val = &val;
     let Statement = "SELECT a from test.T";
-    let k = rs_odbc::SQLPrepareA(&stmt, Statement);
+    let k = rs_odbc::SQLPrepareA(&stmt, Statement.as_bytes());
     println!("PREPARE: {:?}", k);
-    let mut kita = MaybeUninit::uninit();
-    let k = rs_odbc::SQLBindCol(&stmt, 1, rs_odbc::c_types::SQL_C_SLONG, Some(ref_val), &mut kita);
+    //let mut kita = MaybeUninit::uninit();
+    //let k = rs_odbc::SQLBindCol(&stmt, 1, rs_odbc::c_types::SQL_C_SLONG, Some(ref_val), &mut kita);
     //let col_cnt = unsafe { col_cnt.assume_init() };
     //println!("col_cnt: {}", col_cnt);
     let mut row = 0;
@@ -113,13 +116,13 @@ fn main() {
 
     let mut read_desc = MaybeUninit::uninit();
     let res = SQLGetStmtAttrA(&stmt, rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC, &mut read_desc, &mut MaybeUninit::uninit());
-    let read_desc = unsafe {read_desc.assume_init() };
+    let read_desc: rs_odbc::stmt::RefSQLHDESC<_> = unsafe {read_desc.assume_init() };
     SQLFetch(&stmt);
     println!("KARA: {:?}", res);
 
     std::mem::drop(read_desc);
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
-    SQLFreeHandle(SQL_HANDLE_DESC, std::rc::Rc::try_unwrap(desc).ok().unwrap());
+    SQLFreeHandle(SQL_HANDLE_DESC, desc);
     let res = SQLDisconnect(&mut conn);
     println!("{:?}", res);
 

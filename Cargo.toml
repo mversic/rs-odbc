@@ -13,6 +13,7 @@ rs_odbc_derive = {path = "./rs_odbc_derive", version = "*"}
 ucs2 = "0.3.2"
 
 [features]
+odbc_debug = []
 default = ["v3_8"]
 static = []
 

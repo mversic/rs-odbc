@@ -1,46 +1,68 @@
-use crate::{ReadAttr, WriteAttr, SQLINTEGER, SQLUINTEGER};
-use rs_odbc_derive::{odbc_type, EnvAttr, Identifier};
+use crate::{
+    Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcDefined, True, SQLINTEGER, SQLUINTEGER,
+};
+use rs_odbc_derive::{odbc_type, Ident};
 
-pub trait EnvAttr: crate::Identifier<IdentType = SQLINTEGER> {}
+pub trait EnvAttr<A: Ident>:
+    Attr<A, DefinedBy = OdbcDefined> + AttrLen<OdbcDefined, <Self as Attr<A>>::NonBinary, SQLINTEGER>
+{
+}
 
-#[derive(Identifier, EnvAttr)]
+#[derive(Ident)]
 #[identifier(SQLINTEGER, 200)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_ODBC_VERSION;
-unsafe impl<C> ReadAttr<OdbcVersion, C> for SQL_ATTR_ODBC_VERSION {}
-unsafe impl<C> WriteAttr<OdbcVersion, C> for SQL_ATTR_ODBC_VERSION {}
+unsafe impl Attr<SQL_ATTR_ODBC_VERSION> for OdbcVersion {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+impl EnvAttr<SQL_ATTR_ODBC_VERSION> for OdbcVersion {}
+unsafe impl AttrRead<SQL_ATTR_ODBC_VERSION> for OdbcVersion {}
+unsafe impl AttrWrite<SQL_ATTR_ODBC_VERSION> for OdbcVersion {}
 
 #[cfg(feature = "v3_8")]
-#[derive(Identifier, EnvAttr)]
+#[derive(Ident)]
 #[identifier(SQLINTEGER, 201)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CONNECTION_POOLING;
 #[cfg(feature = "v3_8")]
-unsafe impl<C> ReadAttr<ConnectionPooling, C> for SQL_ATTR_CONNECTION_POOLING {}
+unsafe impl Attr<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
 #[cfg(feature = "v3_8")]
-unsafe impl<C> WriteAttr<ConnectionPooling, C> for SQL_ATTR_CONNECTION_POOLING {}
+impl EnvAttr<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {}
+#[cfg(feature = "v3_8")]
+unsafe impl AttrRead<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {}
+#[cfg(feature = "v3_8")]
+unsafe impl AttrWrite<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {}
 
-#[derive(Identifier, EnvAttr)]
+#[derive(Ident)]
 #[identifier(SQLINTEGER, 202)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CP_MATCH;
-unsafe impl<C> ReadAttr<CpMatch, C> for SQL_ATTR_CP_MATCH {}
-unsafe impl<C> WriteAttr<CpMatch, C> for SQL_ATTR_CP_MATCH {}
+unsafe impl Attr<SQL_ATTR_CP_MATCH> for CpMatch {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+impl EnvAttr<SQL_ATTR_CP_MATCH> for CpMatch {}
+unsafe impl AttrRead<SQL_ATTR_CP_MATCH> for CpMatch {}
+unsafe impl AttrWrite<SQL_ATTR_CP_MATCH> for CpMatch {}
 
 // TODO:
 //For private driver manager
-//#[derive(Identifier, EnvAttr)]
-//#[identifier(SQLINTEGER, 203)]
+//#[derive(Ident, EnvAttr)]
+//#[ident(SQLINTEGER, 203)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_APPLICATION_KEY;
+//unsafe impl<L> EnvAttr<SQL_ATTR_APPLICATION_KEY, L> for ApplicationKey {}
 
 // TODO: Is this used in V3.x?
-//#[derive(Identifier, EnvAttr)]
-//#[identifier(SQLINTEGER, 1001)]
+//#[derive(Ident, EnvAttr)]
+//#[ident(SQLINTEGER, 1001)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_OUTPUT_NTS;
-//impl ReadAttr<OdbcBool> for SQL_ATTR_OUTPUT_NTS {}
-//impl WriteAttr<OdbcBool> for SQL_ATTR_OUTPUT_NTS {}
+//unsafe impl<L> EnvAttr<SQL_ATTR_APPLICATION_KEY, L> for OdbcBool {}
 
 #[odbc_type(SQLUINTEGER)]
 pub struct OdbcVersion;
@@ -67,3 +89,16 @@ pub struct CpMatch;
 pub const SQL_CP_STRICT_MATCH: CpMatch = CpMatch(0);
 pub const SQL_CP_RELAXED_MATCH: CpMatch = CpMatch(1);
 pub use SQL_CP_STRICT_MATCH as SQL_CP_MATCH_DEFAULT;
+
+impl<A: Ident, T: Ident> EnvAttr<A> for std::mem::MaybeUninit<T>
+where
+    T: EnvAttr<A>,
+    Self: Attr<A, DefinedBy = OdbcDefined> + AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
+{
+}
+impl<'a, A: Ident, T> EnvAttr<A> for &'a [std::mem::MaybeUninit<T>]
+where
+    &'a [T]: EnvAttr<A>,
+    Self: Attr<A, DefinedBy = OdbcDefined> + AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
+{
+}

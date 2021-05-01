@@ -1,13 +1,11 @@
-use crate::{WriteAttr, SQLHDESC, SQLSMALLINT};
+use crate::{Attr, AttrWrite, Ident, SQLHDESC, SQLINTEGER, IntoSQLPOINTER, AttrLen};
 
-pub trait WriteDescField<DT, T, C>: WriteAttr<T, C> {
+pub trait WriteDescField<DT, A: Ident>: Attr<A> + AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER> + IntoSQLPOINTER {
     // TODO: Implement for buffers to bind their lifetimes
-    fn update_handle(_: &SQLHDESC<DT>, _: Option<T>) {}
+    fn update_handle(&self, _: &SQLHDESC<DT>) {}
 }
 
-pub trait DescField: crate::Identifier<IdentType = SQLSMALLINT> {
-    type AttrType;
-}
+pub trait DescField<A: crate::Ident>: Attr<A> + AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER> {}
 
 //    pub enum DescFieldIdentifier {
 //        // Header fields

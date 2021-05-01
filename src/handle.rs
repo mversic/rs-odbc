@@ -1,13 +1,13 @@
 use crate::extern_api;
 use crate::stmt::{
-    StmtAttr, SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC,
+    SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC,
     SQL_ATTR_IMP_ROW_DESC,
 };
 use crate::{
-    AsMutSQLPOINTER, Identifier, IntoSQLPOINTER, AttrLen, OdbcAttr, SQLPOINTER, SQLSMALLINT,
+    AsMutSQLPOINTER, Ident, IntoSQLPOINTER, AttrLen, OdbcDefined, SQLPOINTER, SQLSMALLINT,
     SQL_SUCCESS,
 };
-use std::any::{type_name, Any};
+use std::any::type_name;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
@@ -20,7 +20,7 @@ pub unsafe trait AsSQLHANDLE {
 }
 
 pub trait Handle {
-    type Identifier: crate::Identifier<IdentType = SQLSMALLINT>;
+    type Ident: crate::Ident<Type = SQLSMALLINT>;
 }
 
 // TODO: Should be unsafe?
@@ -49,22 +49,22 @@ pub struct AppDesc<'data> {
 }
 impl<'data> DescType<'data> for AppDesc<'data> {}
 
-#[derive(rs_odbc_derive::Identifier)]
+#[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 1)]
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_ENV;
 
-#[derive(rs_odbc_derive::Identifier)]
+#[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 2)]
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_DBC;
 
-#[derive(rs_odbc_derive::Identifier)]
+#[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 3)]
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_STMT;
 
-#[derive(rs_odbc_derive::Identifier)]
+#[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 4)]
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_DESC;
@@ -106,7 +106,7 @@ pub struct SQLHENV {
     pub(crate) handle: SQLHANDLE,
 }
 impl Handle for SQLHENV {
-    type Identifier = SQL_HANDLE_ENV;
+    type Ident = SQL_HANDLE_ENV;
 }
 unsafe impl Allocate<'_> for SQLHENV {
     type SrcHandle = SQL_NULL_HANDLE;
@@ -158,7 +158,7 @@ pub struct SQLHDBC<'env> {
     pub(crate) handle: SQLHANDLE,
 }
 impl Handle for SQLHDBC<'_> {
-    type Identifier = SQL_HANDLE_DBC;
+    type Ident = SQL_HANDLE_DBC;
 }
 unsafe impl<'env> Allocate<'env> for SQLHDBC<'env> {
     type SrcHandle = SQLHENV;
@@ -214,27 +214,50 @@ impl Drop for SQLHDBC<'_> {
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/statement-handles
-pub struct SQLHSTMT<'conn, 'data> {
+pub struct SQLHSTMT<'conn, 'stmt, 'data> {
     parent: PhantomData<&'conn ()>,
     pub(crate) handle: SQLHANDLE,
 
-    pub(crate) ard: ManuallyDrop<SQLHDESC<'conn, AppDesc<'data>>>,
-    pub(crate) apd: ManuallyDrop<SQLHDESC<'conn, AppDesc<'data>>>,
-    pub(crate) ird: ManuallyDrop<SQLHDESC<'conn, ImplDesc>>,
-    pub(crate) ipd: ManuallyDrop<SQLHDESC<'conn, ImplDesc>>,
+    #[cfg(feature = "odbc_debug")]
+    // TODO: Is 'data lifetime ok?
+    pub(crate) explicit_ard: Cell<Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>>>,
+    #[cfg(feature = "odbc_debug")]
+    // TODO: Is 'data lifetime ok?
+    pub(crate) explicit_apd: Cell<Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>>>,
 
-    // TODO: If compliance with ODBC standard is desired, use Weak<_> instead of Option<Rc<_>>
-    // Current implementation is expected to be less surprising to a naive user of the library
-    pub(crate) explicit_ard: Cell<Option<Rc<SQLHDESC<'conn, AppDesc<'data>>>>>,
-    pub(crate) explicit_apd: Cell<Option<Rc<SQLHDESC<'conn, AppDesc<'data>>>>>,
+    #[cfg(feature = "odbc_debug")]
+    pub(crate) ard: ManuallyDrop<SQLHDESC<'stmt, AppDesc<'data>>>,
+    #[cfg(feature = "odbc_debug")]
+    pub(crate) apd: ManuallyDrop<SQLHDESC<'stmt, AppDesc<'data>>>,
+    #[cfg(feature = "odbc_debug")]
+    pub(crate) ird: ManuallyDrop<SQLHDESC<'stmt, ImplDesc>>,
+    #[cfg(feature = "odbc_debug")]
+    pub(crate) ipd: ManuallyDrop<SQLHDESC<'stmt, ImplDesc>>,
+
+    #[allow(dead_code)]
+    #[cfg(not(feature = "odbc_debug"))]
+    pub(crate) explicit_ard: Cell<PhantomData<&'stmt SQLHDESC<'stmt, AppDesc<'data>>>>,
+    #[allow(dead_code)]
+    #[cfg(not(feature = "odbc_debug"))]
+    pub(crate) explicit_apd: Cell<PhantomData<&'stmt SQLHDESC<'stmt, AppDesc<'data>>>>,
+
+    #[cfg(not(feature = "odbc_debug"))]
+    pub(crate) ard: PhantomData<SQLHDESC<'stmt, AppDesc<'data>>>,
+    #[cfg(not(feature = "odbc_debug"))]
+    pub(crate) apd: PhantomData<SQLHDESC<'stmt, AppDesc<'data>>>,
+    #[cfg(not(feature = "odbc_debug"))]
+    pub(crate) ird: PhantomData<SQLHDESC<'stmt, ImplDesc>>,
+    #[cfg(not(feature = "odbc_debug"))]
+    pub(crate) ipd: PhantomData<SQLHDESC<'stmt, ImplDesc>>,
 }
-impl SQLHSTMT<'_, '_> {
-    unsafe fn get_descriptor_handle<T: StmtAttr>(handle: SQLHANDLE) -> SQLHANDLE {
+impl SQLHSTMT<'_, '_, '_> {
+    #[cfg(feature = "odbc_debug")]
+    unsafe fn get_descriptor_handle<A: Ident<Type=crate::SQLINTEGER>>(handle: SQLHANDLE) -> SQLHANDLE {
         let mut descriptor_handle = MaybeUninit::uninit();
 
         let sql_return = extern_api::SQLGetStmtAttrA(
             handle,
-            T::IDENTIFIER,
+            A::IDENTIFIER,
             descriptor_handle.as_mut_ptr() as SQLPOINTER,
             0,
             &mut 0,
@@ -242,7 +265,7 @@ impl SQLHSTMT<'_, '_> {
         if sql_return != SQL_SUCCESS {
             panic!(
                 "{}: SQLGetStmtAttr returned {:?}",
-                type_name::<T>(),
+                type_name::<A>(),
                 sql_return
             );
         }
@@ -251,13 +274,14 @@ impl SQLHSTMT<'_, '_> {
     }
 }
 
-impl Handle for SQLHSTMT<'_, '_> {
-    type Identifier = SQL_HANDLE_STMT;
+impl Handle for SQLHSTMT<'_, '_, '_> {
+    type Ident = SQL_HANDLE_STMT;
 }
-unsafe impl<'conn> Allocate<'conn> for SQLHSTMT<'conn, '_> {
+unsafe impl<'conn> Allocate<'conn> for SQLHSTMT<'conn, '_, '_> {
     // Valid because SQLHDBC is covariant
     type SrcHandle = SQLHDBC<'conn>;
 
+    #[cfg(feature = "odbc_debug")]
     fn from_raw(handle: SQLHANDLE) -> Self {
         unsafe {
             let ard = SQLHSTMT::get_descriptor_handle::<SQL_ATTR_APP_ROW_DESC>(handle);
@@ -279,15 +303,31 @@ unsafe impl<'conn> Allocate<'conn> for SQLHSTMT<'conn, '_> {
             }
         }
     }
+
+    #[cfg(not(feature = "odbc_debug"))]
+    fn from_raw(handle: SQLHANDLE) -> Self {
+        SQLHSTMT {
+            parent: PhantomData,
+            handle,
+
+            ard: PhantomData,
+            apd: PhantomData,
+            ird: PhantomData,
+            ipd: PhantomData,
+
+            explicit_ard: Cell::new(PhantomData),
+            explicit_apd: Cell::new(PhantomData),
+        }
+    }
 }
-impl SQLCancelHandle for SQLHSTMT<'_, '_> {}
-impl SQLCompleteAsyncHandle for SQLHSTMT<'_, '_> {}
-unsafe impl AsSQLHANDLE for SQLHSTMT<'_, '_> {
+impl SQLCancelHandle for SQLHSTMT<'_, '_, '_> {}
+impl SQLCompleteAsyncHandle for SQLHSTMT<'_, '_, '_> {}
+unsafe impl AsSQLHANDLE for SQLHSTMT<'_, '_, '_> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.handle
     }
 }
-impl Drop for SQLHSTMT<'_, '_> {
+impl Drop for SQLHSTMT<'_, '_, '_> {
     fn drop(&mut self) {
         let sql_return =
             unsafe { extern_api::SQLFreeHandle(SQL_HANDLE_STMT::IDENTIFIER, self.as_SQLHANDLE()) };
@@ -327,10 +367,23 @@ impl Drop for SQLHSTMT<'_, '_> {
 pub struct SQLHDESC<'conn, T> {
     parent: PhantomData<&'conn ()>,
     pub(crate) handle: SQLHANDLE,
+
+    // TODO: Implement properly
+    //#[cfg(feature = "odbc_debug")]
+    //pub(crate) data: HashMap<SQLINTEGER, >,
+    #[cfg(not(feature = "odbc_debug"))]
     pub(crate) data: PhantomData<T>,
 }
 impl<'data, T: DescType<'data>> SQLHDESC<'_, T> {
-    // TODO: Can I return Rc as well? To make it all transparent to the user
+    #[cfg(not(feature = "odbc_debug"))]
+    fn from_raw(handle: SQLHANDLE) -> Self {
+        SQLHDESC {
+            handle,
+            parent: PhantomData,
+            data: PhantomData,
+        }
+    }
+    #[cfg(feature = "odbc_debug")]
     fn from_raw(handle: SQLHANDLE) -> Self {
         SQLHDESC {
             handle,
@@ -340,7 +393,7 @@ impl<'data, T: DescType<'data>> SQLHDESC<'_, T> {
     }
 }
 impl<'data, T: DescType<'data>> Handle for SQLHDESC<'_, T> {
-    type Identifier = SQL_HANDLE_DESC;
+    type Ident = SQL_HANDLE_DESC;
 }
 unsafe impl<'conn, 'data> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'data>> {
     // Valid because SQLHDBC is covariant
@@ -355,41 +408,15 @@ unsafe impl<T> AsSQLHANDLE for SQLHDESC<'_, T> {
         self.handle
     }
 }
-impl<T> crate::Identifier for &SQLHDESC<'_, T> {
-    type IdentType = SQLSMALLINT;
-    const IDENTIFIER: Self::IdentType = crate::SQL_IS_POINTER;
+impl<T> crate::Ident for &SQLHDESC<'_, T> {
+    type Type = SQLSMALLINT;
+    const IDENTIFIER: Self::Type = crate::SQL_IS_POINTER;
 }
-// TODO: use derive odbc_type somehow?
-unsafe impl<'data, T: DescType<'data>> IntoSQLPOINTER for &Rc<SQLHDESC<'_, T>> {
+impl<T> crate::AnsiType for &SQLHDESC<'_, T> {}
+impl<T> crate::UnicodeType for &SQLHDESC<'_, T> {}
+unsafe impl<'data, T: DescType<'data>> IntoSQLPOINTER for &SQLHDESC<'_, T> {
     fn into_SQLPOINTER(self) -> SQLPOINTER {
         self.as_SQLHANDLE().cast()
-    }
-}
-// TODO: This can be removed
-unsafe impl<'data, LEN: Copy, T: DescType<'data>> AttrLen<OdbcAttr, LEN> for &Rc<SQLHDESC<'_, T>>
-where
-    LEN: From<SQLSMALLINT>,
-{
-    type StrLen = ();
-
-    fn len(&self) -> LEN {
-        LEN::from(crate::SQL_IS_POINTER)
-    }
-}
-// TODO: This can be removed
-unsafe impl AsMutSQLPOINTER for MaybeUninit<&SQLHDESC<'_, ImplDesc>> {
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        unimplemented!()
-    }
-}
-unsafe impl<LEN: Copy> AttrLen<OdbcAttr, LEN> for MaybeUninit<&SQLHDESC<'_, ImplDesc>>
-where
-    LEN: From<SQLSMALLINT>,
-{
-    type StrLen = ();
-
-    fn len(&self) -> LEN {
-        LEN::from(crate::SQL_IS_POINTER)
     }
 }
 impl<T> Drop for SQLHDESC<'_, T> {
