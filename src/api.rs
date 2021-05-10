@@ -14,8 +14,8 @@ use crate::{
     sql_types::SqlType,
     stmt::StmtAttr,
     AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsPtr, AsRawSlice, AttrRead, AttrWrite,
-    BufLen, BulkOperation, CompletionType, DriverCompletion, FreeStmtOption, FunctionId, Ident,
-    IdentifierType, IntoSQLPOINTER, LockType, NullAllowed, OdbcDefined, Operation, ParameterType,
+    Buf, BulkOperation, CompletionType, DriverCompletion, FreeStmtOption, FunctionId, Ident,
+    IdentifierType, IntoSQLPOINTER, LockType, NullAllowed, Operation, ParameterType,
     Reserved, Scope, StrLenOrInd, TableType, UnicodeType, Unique, RETCODE, SQLCHAR, SQLHDBC,
     SQLHDESC, SQLHENV, SQLHSTMT, SQLINTEGER, SQLLEN, SQLPOINTER, SQLRETURN, SQLSETPOSIROW,
     SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR, SQL_DESC_DATETIME_INTERVAL_CODE, SQL_SUCCEEDED,
@@ -78,13 +78,13 @@ pub fn SQLBindCol<
     TargetValuePtr: Option<&'data B>,
     StrLen_or_IndPtr: &'data LEN,
 ) -> SQLRETURN {
-    let TargetValuePtr = TargetValuePtr
-        .as_ref()
-        .map_or((std::ptr::null_mut(), Default::default()), |&v| {
-            (v.as_SQLPOINTER(), v.len())
-        });
+    let sql_return = unsafe {
+        let TargetValuePtr = TargetValuePtr
+            .as_ref()
+            .map_or((std::ptr::null_mut(), Default::default()), |&v| {
+                (v.as_SQLPOINTER(), v.len())
+            });
 
-    unsafe {
         extern_api::SQLBindCol(
             StatementHandle.as_SQLHANDLE(),
             ColumnNumber,
@@ -93,7 +93,13 @@ pub fn SQLBindCol<
             TargetValuePtr.1,
             StrLen_or_IndPtr.as_ptr().cast(),
         )
+    };
+
+    if SQL_SUCCEEDED(sql_return) {
+        StatementHandle.bind_col(TargetValuePtr);
     }
+
+    sql_return
 }
 
 /// Binds a buffer to a parameter marker in an SQL statement. **SQLBindParameter** supports binding to a Unicode C data type, even if the underlying driver does not support Unicode data.
@@ -123,13 +129,13 @@ pub fn SQLBindParameter<
     ParameterValuePtr: Option<&'data B>,
     StrLen_or_IndPtr: &'data LEN,
 ) -> SQLRETURN {
-    let ParameterValuePtr = ParameterValuePtr
-        .as_ref()
-        .map_or((std::ptr::null_mut(), Default::default()), |&v| {
-            (v.as_SQLPOINTER(), v.len())
-        });
+    let sql_return = unsafe {
+        let ParameterValuePtr = ParameterValuePtr
+            .as_ref()
+            .map_or((std::ptr::null_mut(), Default::default()), |&v| {
+                (v.as_SQLPOINTER(), v.len())
+            });
 
-    unsafe {
         extern_api::SQLBindParameter(
             StatementHandle.as_SQLHANDLE(),
             ParameterNumber,
@@ -142,7 +148,13 @@ pub fn SQLBindParameter<
             ParameterValuePtr.1,
             StrLen_or_IndPtr.as_ptr().cast(),
         )
+    };
+
+    if SQL_SUCCEEDED(sql_return) {
+        StatementHandle.bind_param(ParameterValuePtr);
     }
+
+    sql_return
 }
 /// Supports an iterative method of discovering and enumerating the attributes and attribute values required to connect to a data source. Each call to **SQLBrowseConnect** returns successive levels of attributes and attribute values. When all levels have been enumerated, a connection to the data source is completed and a complete connection string is returned by **SQLBrowseConnect**. A return code of SQL_SUCCESS or SQL_SUCCESS_WITH_INFO indicates that all connection information has been specified and the application is now connected to the data source.
 ///
@@ -2148,7 +2160,10 @@ pub fn SQLProceduresW(
 #[inline]
 #[allow(non_snake_case)]
 // TODO: This function is incredibly unsafe. How to know which type to provide and panic at runtime if incorrect?
-pub unsafe fn SQLPutData<B: BufLen>(StatementHandle: &SQLHSTMT, DataPtr: &B) -> SQLRETURN
+pub unsafe fn SQLPutData<TT: Ident, B: Buf<TT>>(
+    StatementHandle: &SQLHSTMT,
+    DataPtr: &B,
+) -> SQLRETURN
 where
     for<'data> &'data B: IntoSQLPOINTER,
 {

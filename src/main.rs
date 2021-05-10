@@ -1,10 +1,10 @@
 use rs_odbc::{
-    env::OdbcVersion, handle::Allocate, SQLAllocHandle, SQLDisconnect,
-    SQLDriverConnectA, SQLFetch, SQLGetData, SQLGetEnvAttr, SQLNumResultCols, SQLSetEnvAttr,
-    SQLTablesA, SQLHDBC, SQLHENV, SQLHSTMT, SQLSMALLINT, SQL_ATTR_ODBC_VERSION, SQLCHAR,
-    SQL_DRIVER_COMPLETE, SQL_HANDLE_DBC, SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE,
-    SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_SUCCEEDED, TABLE, VIEW, SQLHDESC, SQL_HANDLE_DESC, SQLSetStmtAttrA, SQLGetStmtAttrA,
-    SQLFreeHandle, StrLenOrInd
+    env::OdbcVersion, handle::Allocate, SQLAllocHandle, SQLDisconnect, SQLDriverConnectA, SQLFetch,
+    SQLFreeHandle, SQLGetData, SQLGetEnvAttr, SQLGetStmtAttrA, SQLNumResultCols, SQLSetEnvAttr,
+    SQLSetStmtAttrA, SQLTablesA, StrLenOrInd, SQLCHAR, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT,
+    SQLSMALLINT, SQL_ATTR_ODBC_VERSION, SQL_DRIVER_COMPLETE, SQL_HANDLE_DBC, SQL_HANDLE_DESC,
+    SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_SUCCEEDED,
+    TABLE, VIEW,
 };
 use std::convert::TryInto;
 use std::mem::MaybeUninit;
@@ -65,7 +65,15 @@ fn main() {
         &mut outstrlen,
         SQL_DRIVER_COMPLETE,
     );
-    let outstr = unsafe {String::from_raw_parts(std::mem::ManuallyDrop::new(Box::new(outstr)).as_mut_ptr().cast(), outstrlen as usize, cap)};
+    let outstr = unsafe {
+        String::from_raw_parts(
+            std::mem::ManuallyDrop::new(Box::new(outstr))
+                .as_mut_ptr()
+                .cast(),
+            outstrlen as usize,
+            cap,
+        )
+    };
     //let outstr = std::mem::ManuallyDrop::new(outstr);
     println!("KITA: {:?}", &outstr);
     println!("KITA: {:?}", res);
@@ -115,8 +123,13 @@ fn main() {
     println!("{:?}", res);
 
     let mut read_desc = MaybeUninit::uninit();
-    let res = SQLGetStmtAttrA(&stmt, rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC, &mut read_desc, &mut MaybeUninit::uninit());
-    let read_desc: rs_odbc::stmt::RefSQLHDESC<_> = unsafe {read_desc.assume_init() };
+    let res = SQLGetStmtAttrA(
+        &stmt,
+        rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC,
+        &mut read_desc,
+        &mut MaybeUninit::uninit(),
+    );
+    let read_desc: rs_odbc::stmt::RefSQLHDESC<_> = unsafe { read_desc.assume_init() };
     SQLFetch(&stmt);
     println!("KARA: {:?}", res);
 

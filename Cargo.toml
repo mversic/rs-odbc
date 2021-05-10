@@ -14,7 +14,7 @@ ucs2 = "0.3.2"
 
 [features]
 odbc_debug = []
-default = ["v3_8"]
+default = ["v3_8", "odbc_debug"]
 static = []
 
 v3_5 = []

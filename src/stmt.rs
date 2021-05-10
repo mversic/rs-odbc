@@ -371,7 +371,7 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_ROW_DESC>
 {
     #[cfg(feature = "odbc_debug")]
     fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'data>) {
-        StatementHandle.explicit_ard.set(Some(self));
+        StatementHandle.explicit_ard.set(*self);
     }
 }
 unsafe impl AttrRead<SQL_ATTR_APP_ROW_DESC> for MaybeUninit<RefSQLHDESC<'_, AppDesc<'_>>> {}
@@ -426,7 +426,7 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_PARAM_DESC>
 {
     #[cfg(feature = "odbc_debug")]
     fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'data>) {
-        StatementHandle.explicit_apd.set(Some(self));
+        StatementHandle.explicit_apd.set(*self);
     }
 }
 unsafe impl AttrRead<SQL_ATTR_APP_PARAM_DESC> for MaybeUninit<RefSQLHDESC<'_, AppDesc<'_>>> {}

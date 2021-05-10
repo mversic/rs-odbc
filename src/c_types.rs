@@ -1,21 +1,27 @@
 use crate::sql_types::*;
+use crate::Ident;
 use crate::{
     AsMutSQLPOINTER, AsSQLPOINTER, SQLBIGINT, SQLCHAR, SQLDOUBLE, SQLINTEGER, SQLLEN, SQLPOINTER,
     SQLREAL, SQLSCHAR, SQLSMALLINT, SQLUBIGINT, SQLUINTEGER, SQLUSMALLINT, SQLWCHAR,
 };
-use crate::{AttrLen, Ident, OdbcDefined};
 use std::cell::UnsafeCell;
 use std::convert::TryInto;
 use std::mem::MaybeUninit;
 
+pub trait Buf<TT: Ident>: BufLen {}
 // TODO: If mutable reference is coerced to shared and then to SQLPOINTER this is WRONG!
 // This could easily be the case
 pub trait OutBuf<TT: Ident>: BufLen + AsMutSQLPOINTER {}
-pub trait DeferredBuf<TT: Ident>: BufLen + AsSQLPOINTER {}
 
-pub trait ScalarCType {}
+/// Care must be taken because references to DeferredBuf might be written to.
+/// This means that DeferredBuf should be implemented on UnsafeCell<T>.
+pub unsafe trait DeferredBuf<TT: Ident>: BufLen + AsSQLPOINTER {}
+
+/// ScalarCType must have SQLPOINTER representation
+pub unsafe trait ScalarCType {}
 
 pub trait BufLen {
+    // TODO: Return MaybeUninit? len is not used for scalar types
     fn len(&self) -> SQLLEN;
 }
 
@@ -62,7 +68,7 @@ impl Ident for SQL_C_CHAR {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_CHAR.identifier();
 }
-impl OutBuf<SQL_C_CHAR> for [SQLCHAR] {}
+impl Buf<SQL_C_CHAR> for [SQLCHAR] {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_WCHAR;
@@ -70,7 +76,7 @@ impl Ident for SQL_C_WCHAR {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_WCHAR.identifier();
 }
-impl OutBuf<SQL_C_WCHAR> for [SQLWCHAR] {}
+impl Buf<SQL_C_WCHAR> for [SQLWCHAR] {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_SSHORT;
@@ -78,7 +84,7 @@ impl Ident for SQL_C_SSHORT {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_C_SHORT + SQL_SIGNED_OFFSET;
 }
-impl OutBuf<SQL_C_SSHORT> for SQLSMALLINT {}
+impl Buf<SQL_C_SSHORT> for SQLSMALLINT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_USHORT;
@@ -86,7 +92,7 @@ impl Ident for SQL_C_USHORT {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_C_SHORT + SQL_UNSIGNED_OFFSET;
 }
-impl OutBuf<SQL_C_USHORT> for SQLUSMALLINT {}
+impl Buf<SQL_C_USHORT> for SQLUSMALLINT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_SLONG;
@@ -94,7 +100,7 @@ impl Ident for SQL_C_SLONG {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_C_LONG + SQL_SIGNED_OFFSET;
 }
-impl OutBuf<SQL_C_SLONG> for SQLINTEGER {}
+impl Buf<SQL_C_SLONG> for SQLINTEGER {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_ULONG;
@@ -102,7 +108,7 @@ impl Ident for SQL_C_ULONG {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_C_LONG + SQL_UNSIGNED_OFFSET;
 }
-impl OutBuf<SQL_C_ULONG> for SQLUINTEGER {}
+impl Buf<SQL_C_ULONG> for SQLUINTEGER {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_FLOAT;
@@ -110,7 +116,7 @@ impl Ident for SQL_C_FLOAT {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_REAL.identifier();
 }
-impl OutBuf<SQL_C_FLOAT> for SQLREAL {}
+impl Buf<SQL_C_FLOAT> for SQLREAL {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_DOUBLE;
@@ -118,7 +124,7 @@ impl Ident for SQL_C_DOUBLE {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_DOUBLE.identifier();
 }
-impl OutBuf<SQL_C_DOUBLE> for SQLDOUBLE {}
+impl Buf<SQL_C_DOUBLE> for SQLDOUBLE {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_BIT;
@@ -126,7 +132,7 @@ impl Ident for SQL_C_BIT {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_BIT.identifier();
 }
-impl OutBuf<SQL_C_BIT> for SQLCHAR {}
+impl Buf<SQL_C_BIT> for SQLCHAR {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_STINYINT;
@@ -134,7 +140,7 @@ impl Ident for SQL_C_STINYINT {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_C_TINYINT + SQL_SIGNED_OFFSET;
 }
-impl OutBuf<SQL_C_STINYINT> for SQLSCHAR {}
+impl Buf<SQL_C_STINYINT> for SQLSCHAR {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_UTINYINT;
@@ -142,7 +148,7 @@ impl Ident for SQL_C_UTINYINT {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_C_TINYINT + SQL_UNSIGNED_OFFSET;
 }
-impl OutBuf<SQL_C_UTINYINT> for SQLCHAR {}
+impl Buf<SQL_C_UTINYINT> for SQLCHAR {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_SBIGINT;
@@ -150,7 +156,7 @@ impl Ident for SQL_C_SBIGINT {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_BIGINT.identifier() + SQL_SIGNED_OFFSET;
 }
-impl OutBuf<SQL_C_SBIGINT> for SQLBIGINT {}
+impl Buf<SQL_C_SBIGINT> for SQLBIGINT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_UBIGINT;
@@ -158,7 +164,7 @@ impl Ident for SQL_C_UBIGINT {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_BIGINT.identifier() + SQL_UNSIGNED_OFFSET;
 }
-impl OutBuf<SQL_C_UBIGINT> for SQLUBIGINT {}
+impl Buf<SQL_C_UBIGINT> for SQLUBIGINT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_BINARY;
@@ -166,7 +172,7 @@ impl Ident for SQL_C_BINARY {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_BINARY.identifier();
 }
-impl OutBuf<SQL_C_BINARY> for [SQLCHAR] {}
+impl Buf<SQL_C_BINARY> for [SQLCHAR] {}
 
 // TODO: Weird?
 pub use SQL_C_BINARY as SQL_C_VARBOOKMARK;
@@ -177,7 +183,7 @@ impl Ident for SQL_C_NUMERIC {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_NUMERIC.identifier();
 }
-impl OutBuf<SQL_C_NUMERIC> for SQL_NUMERIC_STRUCT {}
+impl Buf<SQL_C_NUMERIC> for SQL_NUMERIC_STRUCT {}
 
 #[cfg(feature = "v3_5")]
 #[allow(non_camel_case_types)]
@@ -186,7 +192,7 @@ impl Ident for SQL_C_GUID {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_GUID.identifier();
 }
-impl OutBuf<SQL_C_GUID> for SQLGUID {}
+impl Buf<SQL_C_GUID> for SQLGUID {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_DATE;
@@ -194,7 +200,7 @@ impl Ident for SQL_C_TYPE_DATE {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_TYPE_DATE.identifier();
 }
-impl OutBuf<SQL_C_TYPE_DATE> for SQL_DATE_STRUCT {}
+impl Buf<SQL_C_TYPE_DATE> for SQL_DATE_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIME;
@@ -202,7 +208,7 @@ impl Ident for SQL_C_TYPE_TIME {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_TYPE_TIME.identifier();
 }
-impl OutBuf<SQL_C_TYPE_TIME> for SQL_TIME_STRUCT {}
+impl Buf<SQL_C_TYPE_TIME> for SQL_TIME_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIMESTAMP;
@@ -210,7 +216,7 @@ impl Ident for SQL_C_TYPE_TIMESTAMP {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_TYPE_TIMESTAMP.identifier();
 }
-impl OutBuf<SQL_C_TYPE_TIMESTAMP> for SQL_TIMESTAMP_STRUCT {}
+impl Buf<SQL_C_TYPE_TIMESTAMP> for SQL_TIMESTAMP_STRUCT {}
 
 #[cfg(feature = "v4")]
 #[allow(non_camel_case_types)]
@@ -221,7 +227,7 @@ impl Ident for SQL_C_TYPE_TIME_WITH_TIMEZONE {
     const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIME_WITH_TIMEZONE.identifier();
 }
 #[cfg(feature = "v4")]
-impl OutBuf<SQL_C_TYPE_TIME_WITH_TIMEZONE> for SQL_TIME_WITH_TIMEZONE_STRUCT {}
+impl Buf<SQL_C_TYPE_TIME_WITH_TIMEZONE> for SQL_TIME_WITH_TIMEZONE_STRUCT {}
 
 #[cfg(feature = "v4")]
 #[allow(non_camel_case_types)]
@@ -232,7 +238,7 @@ impl Ident for SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE {
     const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIMESTAMP_WITH_TIMEZONE.identifier();
 }
 #[cfg(feature = "v4")]
-impl OutBuf<SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE> for SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT {}
+impl Buf<SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE> for SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_YEAR;
@@ -240,7 +246,7 @@ impl Ident for SQL_C_INTERVAL_YEAR {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_INTERVAL_YEAR.identifier();
 }
-impl OutBuf<SQL_C_INTERVAL_YEAR> for SQL_INTERVAL_STRUCT {}
+impl Buf<SQL_C_INTERVAL_YEAR> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_MONTH;
@@ -248,7 +254,7 @@ impl Ident for SQL_C_INTERVAL_MONTH {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_INTERVAL_MONTH.identifier();
 }
-impl OutBuf<SQL_C_INTERVAL_MONTH> for SQL_INTERVAL_STRUCT {}
+impl Buf<SQL_C_INTERVAL_MONTH> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_DAY;
@@ -256,7 +262,7 @@ impl Ident for SQL_C_INTERVAL_DAY {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_INTERVAL_DAY.identifier();
 }
-impl OutBuf<SQL_C_INTERVAL_DAY> for SQL_INTERVAL_STRUCT {}
+impl Buf<SQL_C_INTERVAL_DAY> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_HOUR;
@@ -264,7 +270,7 @@ impl Ident for SQL_C_INTERVAL_HOUR {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_INTERVAL_HOUR.identifier();
 }
-impl OutBuf<SQL_C_INTERVAL_HOUR> for SQL_INTERVAL_STRUCT {}
+impl Buf<SQL_C_INTERVAL_HOUR> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_MINUTE;
@@ -272,7 +278,7 @@ impl Ident for SQL_C_INTERVAL_MINUTE {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_INTERVAL_MINUTE.identifier();
 }
-impl OutBuf<SQL_C_INTERVAL_MINUTE> for SQL_INTERVAL_STRUCT {}
+impl Buf<SQL_C_INTERVAL_MINUTE> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_SECOND;
@@ -280,7 +286,7 @@ impl Ident for SQL_C_INTERVAL_SECOND {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_INTERVAL_SECOND.identifier();
 }
-impl OutBuf<SQL_C_INTERVAL_SECOND> for SQL_INTERVAL_STRUCT {}
+impl Buf<SQL_C_INTERVAL_SECOND> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_YEAR_TO_MONTH;
@@ -288,7 +294,7 @@ impl Ident for SQL_C_INTERVAL_YEAR_TO_MONTH {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_INTERVAL_YEAR_TO_MONTH.identifier();
 }
-impl OutBuf<SQL_C_INTERVAL_YEAR_TO_MONTH> for SQL_INTERVAL_STRUCT {}
+impl Buf<SQL_C_INTERVAL_YEAR_TO_MONTH> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_DAY_TO_HOUR;
@@ -296,7 +302,7 @@ impl Ident for SQL_C_INTERVAL_DAY_TO_HOUR {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_INTERVAL_DAY_TO_HOUR.identifier();
 }
-impl OutBuf<SQL_C_INTERVAL_DAY_TO_HOUR> for SQL_INTERVAL_STRUCT {}
+impl Buf<SQL_C_INTERVAL_DAY_TO_HOUR> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_DAY_TO_MINUTE;
@@ -304,7 +310,7 @@ impl Ident for SQL_C_INTERVAL_DAY_TO_MINUTE {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_INTERVAL_DAY_TO_MINUTE.identifier();
 }
-impl OutBuf<SQL_C_INTERVAL_DAY_TO_MINUTE> for SQL_INTERVAL_STRUCT {}
+impl Buf<SQL_C_INTERVAL_DAY_TO_MINUTE> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_DAY_TO_SECOND;
@@ -312,7 +318,7 @@ impl Ident for SQL_C_INTERVAL_DAY_TO_SECOND {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_INTERVAL_DAY_TO_SECOND.identifier();
 }
-impl OutBuf<SQL_C_INTERVAL_DAY_TO_SECOND> for SQL_INTERVAL_STRUCT {}
+impl Buf<SQL_C_INTERVAL_DAY_TO_SECOND> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_HOUR_TO_MINUTE;
@@ -320,7 +326,7 @@ impl Ident for SQL_C_INTERVAL_HOUR_TO_MINUTE {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_INTERVAL_HOUR_TO_MINUTE.identifier();
 }
-impl OutBuf<SQL_C_INTERVAL_HOUR_TO_MINUTE> for SQL_INTERVAL_STRUCT {}
+impl Buf<SQL_C_INTERVAL_HOUR_TO_MINUTE> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_HOUR_TO_SECOND;
@@ -328,7 +334,7 @@ impl Ident for SQL_C_INTERVAL_HOUR_TO_SECOND {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_INTERVAL_HOUR_TO_SECOND.identifier();
 }
-impl OutBuf<SQL_C_INTERVAL_HOUR_TO_SECOND> for SQL_INTERVAL_STRUCT {}
+impl Buf<SQL_C_INTERVAL_HOUR_TO_SECOND> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_MINUTE_TO_SECOND;
@@ -336,7 +342,7 @@ impl Ident for SQL_C_INTERVAL_MINUTE_TO_SECOND {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_INTERVAL_MINUTE_TO_SECOND.identifier();
 }
-impl OutBuf<SQL_C_INTERVAL_MINUTE_TO_SECOND> for SQL_INTERVAL_STRUCT {}
+impl Buf<SQL_C_INTERVAL_MINUTE_TO_SECOND> for SQL_INTERVAL_STRUCT {}
 
 // =================================================================================== //
 
@@ -499,56 +505,26 @@ struct SQL_DAY_SECOND_STRUCT {
     pub fraction: SQLUINTEGER,
 }
 
-impl<TT: Ident, T> OutBuf<TT> for [MaybeUninit<T>] where [T]: OutBuf<TT> {}
-
-// DeferredBuf is basically OutBuf but witin UnsafeCell
-// TODO: This might not work for strings and MaybeUninit with UnsafeCell
-//impl<TT: Ident, B: OutBuf<TT>> DeferredBuf<TT> for std::cell::UnsafeCell<B> {}
-//impl DeferredBuf<SQL_C_CHAR> for [UnsafeCell<SQLCHAR>] {}
-//impl DeferredBuf<SQL_C_WCHAR> for [UnsafeCell<SQLWCHAR>] {}
-//impl DeferredBuf<SQL_C_BINARY> for [UnsafeCell<SQLCHAR>] {}
-
-// Out types can be given initialized or uninitialized as MaybeUninit
-//impl<TT: Ident, T: DeferredBuf<TT>> DeferredBuf<TT> for std::mem::MaybeUninit<T> {}
-
-// In types can be defined before use or have interior mutability
-
-//unsafe impl<TT: Ident> AsSQLPOINTER for &DeferredBuf<TT> {
-//    fn into_SQLPOINTER(self) -> SQLPOINTER {
-//        self as SQLPOINTER
-//    }
-//}
-//
-// TODO: Very suspicious
-//unsafe impl<T: Ident> AsSQLPOINTER for &UnsafeCell<T> {
-//    fn into_SQLPOINTER(self) -> SQLPOINTER {
-//        // Transforming into reference can cause UB so it is avoided under the assumption
-//        // that the underlaying type T has the same representation as SQLPOINTER
-//        // which should be true for any type implementing Identifier trait
-//        self.get().cast()
-//    }
-//}
-
-impl ScalarCType for SQLSMALLINT {}
-impl ScalarCType for SQLUSMALLINT {}
-impl ScalarCType for SQLUINTEGER {}
-impl ScalarCType for SQLINTEGER {}
-impl ScalarCType for SQL_INTERVAL_STRUCT {}
-impl ScalarCType for SQLREAL {}
-impl ScalarCType for SQLDOUBLE {}
-impl ScalarCType for SQLCHAR {}
-impl ScalarCType for SQLSCHAR {}
-impl ScalarCType for SQLBIGINT {}
-impl ScalarCType for SQL_NUMERIC_STRUCT {}
-impl ScalarCType for SQLGUID {}
-impl ScalarCType for SQL_DATE_STRUCT {}
-impl ScalarCType for SQL_TIME_STRUCT {}
-impl ScalarCType for SQL_TIMESTAMP_STRUCT {}
-impl ScalarCType for SQLUBIGINT {}
+unsafe impl ScalarCType for SQLSMALLINT {}
+unsafe impl ScalarCType for SQLUSMALLINT {}
+unsafe impl ScalarCType for SQLUINTEGER {}
+unsafe impl ScalarCType for SQLINTEGER {}
+unsafe impl ScalarCType for SQL_INTERVAL_STRUCT {}
+unsafe impl ScalarCType for SQLREAL {}
+unsafe impl ScalarCType for SQLDOUBLE {}
+unsafe impl ScalarCType for SQLCHAR {}
+unsafe impl ScalarCType for SQLSCHAR {}
+unsafe impl ScalarCType for SQLBIGINT {}
+unsafe impl ScalarCType for SQL_NUMERIC_STRUCT {}
+unsafe impl ScalarCType for SQLGUID {}
+unsafe impl ScalarCType for SQL_DATE_STRUCT {}
+unsafe impl ScalarCType for SQL_TIME_STRUCT {}
+unsafe impl ScalarCType for SQL_TIMESTAMP_STRUCT {}
+unsafe impl ScalarCType for SQLUBIGINT {}
 #[cfg(feature = "v4")]
-impl ScalarCType for SQL_TIME_WITH_TIMEZONE_STRUCT {}
+unsafe impl ScalarCType for SQL_TIME_WITH_TIMEZONE_STRUCT {}
 #[cfg(feature = "v4")]
-impl ScalarCType for SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT {}
+unsafe impl ScalarCType for SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT {}
 
 impl<T> BufLen for [T] {
     fn len(&self) -> SQLLEN {
@@ -562,16 +538,60 @@ impl<T: ScalarCType> BufLen for T {
         0
     }
 }
+impl<T: ScalarCType> BufLen for MaybeUninit<T> {
+    fn len(&self) -> SQLLEN {
+        0
+    }
+}
+impl<T: ScalarCType> BufLen for UnsafeCell<T> {
+    fn len(&self) -> SQLLEN {
+        0
+    }
+}
+
+unsafe impl<T: ScalarCType> AsSQLPOINTER for UnsafeCell<T> {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+        // Transforming into reference can cause UB so it is avoided under the assumption
+        // that the underlaying type T has the same representation as SQLPOINTER
+        // which should hold true for any type implementing ScalarCType trait
+        self.get().cast()
+    }
+}
+unsafe impl<T: ScalarCType> AsSQLPOINTER for UnsafeCell<MaybeUninit<T>> {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+        self.get().cast()
+    }
+}
 
 unsafe impl<T: ScalarCType> AsMutSQLPOINTER for T {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
+        // It is assumed that ScalarCType is repr(transraprent) or repr(C)
+        (self as *mut Self).cast()
+    }
+}
+unsafe impl<T: ScalarCType> AsMutSQLPOINTER for MaybeUninit<T> {
+    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
+        // It is assumed that ScalarCType is repr(transraprent) or repr(C)
         (self as *mut Self).cast()
     }
 }
 
-impl<B: BufLen> BufLen for std::cell::UnsafeCell<B> {
-    fn len(&self) -> SQLLEN {
-        // TODO: This shouldn't be unsafe
-        unsafe { self.get().as_ref().expect("KITA").len() as SQLLEN }
-    }
-}
+impl<TT: Ident, T> Buf<TT> for [MaybeUninit<T>] {}
+impl<TT: Ident, T: ScalarCType> Buf<TT> for MaybeUninit<T> {}
+
+impl<TT: Ident, T> OutBuf<TT> for [T] where [T]: Buf<TT> {}
+impl<TT: Ident, T: ScalarCType> OutBuf<TT> for T where T: Buf<TT> {}
+
+unsafe impl<TT: Ident, T> DeferredBuf<TT> for [UnsafeCell<T>] where [T]: Buf<TT> {}
+unsafe impl<TT: Ident, T: ScalarCType> DeferredBuf<TT> for UnsafeCell<T> where T: Buf<TT> {}
+
+// TODO: Also, should these be implemented for SQLBindCol?
+//unsafe impl AsSQLPOINTER for SQLINTEGER {
+//    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+//        self as *const _ as SQLPOINTER
+//    }
+//}
+//
+//// TODO: Is this to be implemented for SQLLEN? Documentation states it should be implemented for 32-bit value
+//// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/sending-long-data?view=sql-server-ver15
+//unsafe impl<TT: Ident> DeferredBuf<TT> for SQLINTEGER {}

@@ -85,6 +85,7 @@ const SQL_IS_INTEGER: SQLSMALLINT = -6;
 const SQL_IS_USMALLINT: SQLSMALLINT = -7;
 const SQL_IS_SMALLINT: SQLSMALLINT = -8;
 
+// TODO: Remove these
 // WARNING: These are not mentioned in ODBC
 const SQL_IS_LEN: SQLSMALLINT = SQL_IS_INTEGER;
 const SQL_IS_ULEN: SQLSMALLINT = SQL_IS_UINTEGER;
@@ -110,16 +111,18 @@ where
     }
 }
 
-pub trait AsMutPtr<T> {
+/// Implementing types must support all possible values for T because
+/// any valid T value can be written to the obtained raw mut pointer
+pub unsafe trait AsMutPtr<T> {
     fn as_mut_ptr(&mut self) -> *mut T;
 }
 
-impl<T> AsMutPtr<T> for T {
+unsafe impl<T> AsMutPtr<T> for T {
     fn as_mut_ptr(&mut self) -> *mut T {
         self
     }
 }
-impl<T> AsMutPtr<T> for MaybeUninit<T>
+unsafe impl<T> AsMutPtr<T> for MaybeUninit<T>
 where
     T: AsMutPtr<T>,
 {
@@ -127,6 +130,20 @@ where
         self.as_mut_ptr()
     }
 }
+unsafe impl<T> AsMutPtr<SQLPOINTER> for &mut T {
+    fn as_mut_ptr(&mut self) -> *mut SQLPOINTER {
+        (self as *mut Self).cast()
+    }
+}
+// TODO: This may become unnecessary
+unsafe impl AsMutPtr<SQLINTEGER> for MaybeUninit<()> {
+    fn as_mut_ptr(&mut self) -> *mut SQLINTEGER {
+        // TODO: If using dangling pointers is ok, this trait can be removed entirely and use MaybeUninit::as_mut_ptr instead as is
+        // However, it is SAFER to use null pointers because it is likely that implementation will null-check before dereferencing
+        std::ptr::null_mut()
+    }
+}
+
 pub unsafe trait AsSQLPOINTER {
     #[allow(non_snake_case)]
     fn as_SQLPOINTER(&self) -> SQLPOINTER;
@@ -583,15 +600,6 @@ where
 {
     fn as_mut_raw_slice(&mut self) -> (*mut C, LEN) {
         (self.as_mut_ptr().cast(), slice_len(self))
-    }
-}
-
-// TODO: This may become unnecessary
-impl AsMutPtr<SQLINTEGER> for MaybeUninit<()> {
-    fn as_mut_ptr(&mut self) -> *mut SQLINTEGER {
-        // TODO: If using dangling pointers is ok, this trait can be removed entirely and use MaybeUninit::as_mut_ptr instead as is
-        // However, it is SAFER to use null pointers because it is likely that implementation will null-check before dereferencing
-        std::ptr::null_mut()
     }
 }
 

@@ -1,4 +1,5 @@
 use crate::extern_api;
+use crate::c_types::DeferredBuf;
 use crate::stmt::{
     SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC,
     SQL_ATTR_IMP_ROW_DESC,
@@ -270,6 +271,21 @@ impl SQLHSTMT<'_, '_, '_> {
 
         descriptor_handle.assume_init()
     }
+
+    #[cfg(not(feature = "odbc_debug"))]
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>) {}
+    #[cfg(not(feature = "odbc_debug"))]
+    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>) {}
+
+    #[cfg(feature = "odbc_debug")]
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>) {
+        // TODO:
+        unimplemented!();
+    }
+    #[cfg(feature = "odbc_debug")]
+    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>) {
+        unimplemented!();
+    }
 }
 
 impl Handle for SQLHSTMT<'_, '_, '_> {
@@ -366,9 +382,9 @@ pub struct SQLHDESC<'conn, T> {
     parent: PhantomData<&'conn ()>,
     pub(crate) handle: SQLHANDLE,
 
+    #[cfg(feature = "odbc_debug")]
     // TODO: Implement properly
-    //#[cfg(feature = "odbc_debug")]
-    //pub(crate) data: HashMap<SQLINTEGER, >,
+    pub(crate) data: PhantomData<T>,
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) data: PhantomData<T>,
 }
