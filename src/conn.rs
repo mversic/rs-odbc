@@ -321,7 +321,7 @@ pub const SQL_CD_TRUE: ConnectionDead = ConnectionDead(1);
 
 impl<A: Ident> ConnAttr<A> for [SQLWCHAR]
 where
-    [SQLCHAR]: ConnAttr<A>,
+    [SQLCHAR]: ConnAttr<A, NonBinary = True>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }

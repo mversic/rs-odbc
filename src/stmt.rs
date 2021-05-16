@@ -576,7 +576,7 @@ pub use SQL_UB_OFF as SQL_UB_DEFAULT;
 
 impl<'stmt, 'data, A: Ident> StmtAttr<'stmt, 'data, A> for [SQLWCHAR]
 where
-    [SQLCHAR]: StmtAttr<'stmt, 'data, A>,
+    [SQLCHAR]: StmtAttr<'stmt, 'data, A, NonBinary = True>,
     Self: AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER>,
 {
 }

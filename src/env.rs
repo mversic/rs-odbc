@@ -94,7 +94,7 @@ pub use SQL_CP_STRICT_MATCH as SQL_CP_MATCH_DEFAULT;
 
 impl<A: Ident> EnvAttr<A> for [SQLWCHAR]
 where
-    [SQLCHAR]: EnvAttr<A>,
+    [SQLCHAR]: EnvAttr<A, NonBinary = True>,
     Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
 {
 }

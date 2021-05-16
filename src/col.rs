@@ -199,24 +199,24 @@ pub struct SQL_DESC_OCTET_LENGTH;
 // TODO: These are unknown, find their values
 // SQL_DESC_NUM_PREC_RADIX, SQL_DESC_CONCISE_TYPE, SQL_DESC_TYPE
 
-//impl<A: Ident> ColAttr<A> for [SQLWCHAR]
-//where
-//    [SQLCHAR]: ColAttr<A>,
-//    [SQLWCHAR]: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-//{
-//}
-//impl<A: Ident> ColAttr<A> for [MaybeUninit<SQLCHAR>]
-//where
-//    [SQLCHAR]: ColAttr<A>,
-//    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-//{
-//}
-//impl<A: Ident> ColAttr<A> for [MaybeUninit<SQLWCHAR>]
-//where
-//    [SQLWCHAR]: ColAttr<A>,
-//    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-//{
-//}
+impl<A: Ident> ColAttr<A> for [SQLWCHAR]
+where
+    [SQLCHAR]: ColAttr<A, NonBinary = True>,
+    [SQLWCHAR]: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
+impl<A: Ident> ColAttr<A> for [MaybeUninit<SQLCHAR>]
+where
+    [SQLCHAR]: ColAttr<A>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
+impl<A: Ident> ColAttr<A> for [MaybeUninit<SQLWCHAR>]
+where
+    [SQLWCHAR]: ColAttr<A>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
 impl<A: Ident, T: Ident> ColAttr<A> for MaybeUninit<T>
 where
     T: ColAttr<A>,

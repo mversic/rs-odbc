@@ -288,7 +288,7 @@ pub use SQL_MAX_IDENTIFIER_LEN as SQL_MAXIMUM_IDENTIFIER_LENGTH;
 
 impl<I: Ident> InfoType<I> for [SQLWCHAR]
 where
-    [SQLCHAR]: InfoType<I>,
+    [SQLCHAR]: InfoType<I, NonBinary = True>,
     [SQLWCHAR]: AttrLen<<Self as Attr<I>>::DefinedBy, <Self as Attr<I>>::NonBinary, SQLSMALLINT>,
 {
 }

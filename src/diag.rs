@@ -1,4 +1,4 @@
-use crate::{handle::Handle, Attr, AttrLen, Ident, SQLCHAR, SQLSMALLINT, SQLWCHAR};
+use crate::{handle::Handle, Attr, AttrLen, Ident, True, SQLCHAR, SQLSMALLINT, SQLWCHAR};
 use rs_odbc_derive::Ident;
 use std::mem::MaybeUninit;
 
@@ -95,24 +95,24 @@ pub struct SQL_DIAG_CURSOR_ROW_COUNT;
 //pub struct SQL_DIAG_SUBCLASS_ORIGIN;
 //impl<T: AsMutRawCharSlice> ReadAttr<T> for SQL_DIAG_SUBCLASS_ORIGIN {}
 
-//impl<H: Handle, D: Ident> DiagField<H, D> for [SQLWCHAR]
-//where
-//    [SQLCHAR]: DiagField<H, D>,
-//    [SQLWCHAR]: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-//{
-//}
-//impl<H: Handle, D: Ident> DiagField<H, D> for [MaybeUninit<SQLCHAR>]
-//where
-//    [SQLCHAR]: DiagField<H, D>,
-//    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-//{
-//}
-//impl<H: Handle, D: Ident> DiagField<H, D> for [MaybeUninit<SQLWCHAR>]
-//where
-//    [SQLWCHAR]: DiagField<H, D>,
-//    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-//{
-//}
+impl<H: Handle, D: Ident> DiagField<H, D> for [SQLWCHAR]
+where
+    [SQLCHAR]: DiagField<H, D, NonBinary = True>,
+    [SQLWCHAR]: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
+impl<H: Handle, D: Ident> DiagField<H, D> for [MaybeUninit<SQLCHAR>]
+where
+    [SQLCHAR]: DiagField<H, D>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
+impl<H: Handle, D: Ident> DiagField<H, D> for [MaybeUninit<SQLWCHAR>]
+where
+    [SQLWCHAR]: DiagField<H, D>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
 impl<H: Handle, D: Ident, T: Ident> DiagField<H, D> for MaybeUninit<T>
 where
     T: DiagField<H, D>,

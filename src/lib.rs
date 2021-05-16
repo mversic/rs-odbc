@@ -266,11 +266,16 @@ impl<T> Ident for Option<&mut T> {
 
 pub unsafe trait Attr<A: Ident> {
     type DefinedBy: Def;
+
+    // Documentation says that binary buffers are allowed as ValuePtr arguments
+    // and in the case of driver-defined attributes size of such values is specially defined.
+    // Since SQLCHAR and binary are both represented with u8, this type is used
+    // in order to disambiguate between [SQLCHAR] and binary buffers
     type NonBinary: Bool;
 }
 unsafe impl<A: Ident> Attr<A> for [SQLWCHAR]
 where
-    [SQLCHAR]: Attr<A>,
+    [SQLCHAR]: Attr<A, NonBinary=True>,
 {
     type DefinedBy = <[SQLCHAR] as Attr<A>>::DefinedBy;
     type NonBinary = <[SQLCHAR] as Attr<A>>::NonBinary;
@@ -280,11 +285,6 @@ where
     T: Attr<A>,
 {
     type DefinedBy = T::DefinedBy;
-
-    // Documentation says that binary buffers are allowed as ValuePtr arguments
-    // and in the case of driver-defined attributes size of such values is specially defined.
-    // Since SQLCHAR and binary are both represented with u8, this type is used
-    // in order to disambiguate between [SQLCHAR] and binary buffers
     type NonBinary = T::NonBinary;
 }
 unsafe impl<A: Ident> Attr<A> for [MaybeUninit<SQLCHAR>]
@@ -373,17 +373,17 @@ where
         <[MaybeUninit<SQLCHAR>] as AttrLen<AD, NB, LEN>>::len(unsafe { std::mem::transmute(self) })
     }
 }
-unsafe impl<AD: Def, NB: Bool, LEN: Copy> AttrLen<AD, NB, LEN> for [SQLWCHAR]
+unsafe impl<AD: Def, LEN: Copy> AttrLen<AD, True, LEN> for [SQLWCHAR]
 where
     LEN: TryFrom<usize>,
     LEN::Error: Debug,
-    [MaybeUninit<SQLWCHAR>]: AttrLen<AD, NB, LEN>,
+    [MaybeUninit<SQLWCHAR>]: AttrLen<AD, True, LEN>,
 {
-    type StrLen = <[MaybeUninit<SQLWCHAR>] as AttrLen<AD, NB, LEN>>::StrLen;
+    type StrLen = <[MaybeUninit<SQLWCHAR>] as AttrLen<AD, True, LEN>>::StrLen;
 
     fn len(&self) -> LEN {
         // Transmute is safe because MaybeUninit<T> has the same size and alignment as T
-        <[MaybeUninit<SQLWCHAR>] as AttrLen<AD, NB, LEN>>::len(unsafe { std::mem::transmute(self) })
+        <[MaybeUninit<SQLWCHAR>] as AttrLen<AD, True, LEN>>::len(unsafe { std::mem::transmute(self) })
     }
 }
 unsafe impl<AD: Def, LEN: Copy> AttrLen<AD, True, LEN> for [MaybeUninit<SQLCHAR>]
