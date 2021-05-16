@@ -4,7 +4,7 @@ use rs_odbc::{
     SQLSetStmtAttrA, SQLTablesA, StrLenOrInd, SQLCHAR, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT,
     SQLSMALLINT, SQL_ATTR_ODBC_VERSION, SQL_DRIVER_COMPLETE, SQL_HANDLE_DBC, SQL_HANDLE_DESC,
     SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_SUCCEEDED,
-    TABLE, VIEW, SQLGetConnectAttrA, SQLWCHAR, SQLSetConnectAttrA
+    TABLE, VIEW, SQLGetConnectAttrW, SQLWCHAR, SQLSetConnectAttrW
 };
 use std::convert::TryInto;
 use std::mem::MaybeUninit;
@@ -122,14 +122,14 @@ fn main() {
     let mut slice: [SQLCHAR; 0] = [];
     let mut slice: &mut [SQLCHAR] = &mut slice;
     let mut slice2 = [MaybeUninit::uninit(),MaybeUninit::uninit(),MaybeUninit::uninit(),MaybeUninit::uninit(),MaybeUninit::uninit()];
-    let mut slice3: &mut [MaybeUninit<SQLCHAR>] = &mut slice2;
+    let mut slice3: &mut [_] = &mut slice2;
     let mut len = MaybeUninit::uninit();
-    let res = SQLGetConnectAttrA(&conn, rs_odbc::conn::SQL_ATTR_CURRENT_CATALOG, Some(slice3), Some(&mut len));
-    let slice2: [SQLCHAR; 5] = unsafe {std::mem::transmute(slice2)};
+    let res = SQLGetConnectAttrW(&conn, rs_odbc::conn::SQL_ATTR_CURRENT_CATALOG, Some(slice3), Some(&mut len));
+    let slice2: [SQLWCHAR; 5] = unsafe {std::mem::transmute(slice2)};
     let slice2: &[_] = &slice2;
     println!("{:?}", slice2);
     println!("{:?}", unsafe {len.assume_init()});
-    let res = SQLSetConnectAttrA(&conn, rs_odbc::conn::SQL_ATTR_CURRENT_CATALOG, slice2);
+    let res = SQLSetConnectAttrW(&conn, rs_odbc::conn::SQL_ATTR_CURRENT_CATALOG, slice2);
 
     let res = SQLSetStmtAttrA(&stmt, rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC, Some(&desc));
     println!("{:?}", res);

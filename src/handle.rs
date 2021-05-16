@@ -1,11 +1,10 @@
-use crate::extern_api;
 use crate::c_types::DeferredBuf;
+use crate::extern_api;
 use crate::stmt::{
-    SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC,
-    SQL_ATTR_IMP_ROW_DESC,
+    SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC, SQL_ATTR_IMP_ROW_DESC,
 };
 use crate::{
-    AsMutSQLPOINTER, Ident, IntoSQLPOINTER, AttrLen, OdbcDefined, SQLPOINTER, SQLSMALLINT,
+    AsMutSQLPOINTER, AttrLen, Ident, IntoSQLPOINTER, OdbcDefined, SQLPOINTER, SQLSMALLINT,
     SQL_SUCCESS,
 };
 use std::any::type_name;
@@ -251,7 +250,9 @@ pub struct SQLHSTMT<'conn, 'stmt, 'data> {
 }
 impl SQLHSTMT<'_, '_, '_> {
     #[cfg(feature = "odbc_debug")]
-    unsafe fn get_descriptor_handle<A: Ident<Type=crate::SQLINTEGER>>(handle: SQLHANDLE) -> SQLHANDLE {
+    unsafe fn get_descriptor_handle<A: Ident<Type = crate::SQLINTEGER>>(
+        handle: SQLHANDLE,
+    ) -> SQLHANDLE {
         let mut descriptor_handle = MaybeUninit::uninit();
 
         let sql_return = extern_api::SQLGetStmtAttrA(
@@ -273,17 +274,31 @@ impl SQLHSTMT<'_, '_, '_> {
     }
 
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>) {}
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>)
+    where
+        B: ?Sized,
+    {
+    }
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>) {}
+    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>)
+    where
+        B: ?Sized,
+    {
+    }
 
     #[cfg(feature = "odbc_debug")]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>) {
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>)
+    where
+        B: ?Sized,
+    {
         // TODO:
         unimplemented!();
     }
     #[cfg(feature = "odbc_debug")]
-    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>) {
+    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>)
+    where
+        B: ?Sized,
+    {
         unimplemented!();
     }
 }

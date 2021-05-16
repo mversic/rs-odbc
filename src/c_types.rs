@@ -13,8 +13,8 @@ pub trait Buf<TT: Ident>: BufLen {}
 // This could easily be the case
 pub trait OutBuf<TT: Ident>: BufLen + AsMutSQLPOINTER {}
 
-/// Care must be taken because references to DeferredBuf might be written to.
-/// This means that DeferredBuf should be implemented on UnsafeCell<T>.
+/// Care must be taken because references to DeferredBuf might be written to. This usually
+/// means that DeferredBuf should only be implemented on UnsafeCell<T> or [UnsafeCell<T>].
 pub unsafe trait DeferredBuf<TT: Ident>: BufLen + AsSQLPOINTER {}
 
 /// ScalarCType must have SQLPOINTER representation
@@ -26,7 +26,7 @@ pub trait BufLen {
 }
 
 #[repr(transparent)]
-pub struct StrLenOrInd(SQLLEN);
+pub struct StrLenOrInd(pub(crate) SQLLEN);
 impl StrLenOrInd {
     pub unsafe fn set_len(&mut self, len: SQLLEN) {
         if len < 0 {
@@ -554,11 +554,6 @@ unsafe impl<T: ScalarCType> AsSQLPOINTER for UnsafeCell<T> {
         // Transforming into reference can cause UB so it is avoided under the assumption
         // that the underlaying type T has the same representation as SQLPOINTER
         // which should hold true for any type implementing ScalarCType trait
-        self.get().cast()
-    }
-}
-unsafe impl<T: ScalarCType> AsSQLPOINTER for UnsafeCell<MaybeUninit<T>> {
-    fn as_SQLPOINTER(&self) -> SQLPOINTER {
         self.get().cast()
     }
 }

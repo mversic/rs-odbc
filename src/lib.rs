@@ -90,33 +90,13 @@ const SQL_IS_INTEGER: SQLSMALLINT = -6;
 const SQL_IS_USMALLINT: SQLSMALLINT = -7;
 const SQL_IS_SMALLINT: SQLSMALLINT = -8;
 
-// TODO: Remove these
+// TODO: Remove these and implement traits directly on
+// SQLLEN/SQLULEN like `impl Attr<A> for SQLLEN`
 // WARNING: These are not mentioned in ODBC
 const SQL_IS_LEN: SQLSMALLINT = SQL_IS_INTEGER;
 const SQL_IS_ULEN: SQLSMALLINT = SQL_IS_UINTEGER;
 
 const SLICE_LEN_TOO_LARGE_MSG: &str = "Slice len too large";
-
-pub trait AsPtr<T> {
-    fn as_ptr(&self) -> *mut T;
-}
-
-impl<T> AsPtr<T> for std::cell::UnsafeCell<T>
-where
-    T: AsPtr<T>,
-{
-    fn as_ptr(&self) -> *mut T {
-        self.get()
-    }
-}
-impl<T> AsPtr<T> for MaybeUninit<std::cell::UnsafeCell<T>>
-where
-    T: AsPtr<T>,
-{
-    fn as_ptr(&self) -> *mut T {
-        self.as_ptr() as *mut _
-    }
-}
 
 /// Implementing types must support all possible values for T because
 /// any valid T value can be written to the obtained raw mut pointer
@@ -124,7 +104,7 @@ pub unsafe trait AsMutPtr<T> {
     fn as_mut_ptr(&mut self) -> *mut T;
 }
 
-unsafe impl<T: Ident> AsMutPtr<T> for MaybeUninit<T> {
+unsafe impl<T> AsMutPtr<T> for MaybeUninit<T> {
     fn as_mut_ptr(&mut self) -> *mut T {
         self.as_mut_ptr()
     }
@@ -138,12 +118,17 @@ unsafe impl<T: Ident> AsMutPtr<T> for MaybeUninit<Void> {
         std::ptr::null_mut()
     }
 }
-// TODO: Is this required and is this correct?
-//unsafe impl<T> AsMutPtr<SQLPOINTER> for &mut T {
-//    fn as_mut_ptr(&mut self) -> *mut SQLPOINTER {
-//        (self as *mut Self).cast()
-//    }
-//}
+unsafe impl AsMutPtr<SQLLEN> for MaybeUninit<StrLenOrInd> {
+    fn as_mut_ptr(&mut self) -> *mut SQLLEN {
+        self.as_mut_ptr().cast()
+    }
+}
+unsafe impl AsMutPtr<SQLLEN> for std::cell::UnsafeCell<StrLenOrInd> {
+    fn as_mut_ptr(&mut self) -> *mut SQLLEN {
+        self.get().cast()
+    }
+}
+/// Invariant: SQLPOINTER obtained through this trait is never written to
 pub unsafe trait AsSQLPOINTER {
     #[allow(non_snake_case)]
     fn as_SQLPOINTER(&self) -> SQLPOINTER;
@@ -193,7 +178,8 @@ where
     type StrLen = Void;
 
     fn len(&self) -> LEN {
-        LEN::from(0)
+        // This transmute is safe because MaybeUninit<T> has the same size and alignment as T
+        <MaybeUninit<T> as AttrLen<AD, NB, LEN>>::len(unsafe { std::mem::transmute(self) })
     }
 }
 unsafe impl<NB: Bool, LEN: Copy, T: Ident> AttrLen<OdbcDefined, NB, LEN> for MaybeUninit<T>
@@ -682,6 +668,11 @@ where
     T: Attr<A>,
 {
     type DefinedBy = T::DefinedBy;
+
+    // Documentation says that binary buffers are allowed as ValuePtr arguments
+    // and in the case of driver-defined attributes size of such values is specially defined.
+    // Since SQLCHAR and binary are both represented with u8, this type is used
+    // in order to disambiguate between [SQLCHAR] and binary buffers
     type NonBinary = T::NonBinary;
 }
 unsafe impl<A: Ident> Attr<A> for [MaybeUninit<SQLCHAR>]
@@ -738,7 +729,7 @@ unsafe impl<T> AsSQLPOINTER for [T] {
     fn as_SQLPOINTER(&self) -> SQLPOINTER {
         // TODO: Check this
         // Casting from const to mutable raw pointer is ok because of the invariant
-        // that SQLPOINTER obtained through IntoSQLPOINTER will never be written to
+        // that SQLPOINTER obtained through AsSQLPOINTER will never be written to
         (self.as_ptr() as *mut T).cast()
     }
 }

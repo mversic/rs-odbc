@@ -286,10 +286,10 @@ pub struct SQL_MAX_IDENTIFIER_LEN;
 
 pub use SQL_MAX_IDENTIFIER_LEN as SQL_MAXIMUM_IDENTIFIER_LENGTH;
 
-impl<A: Ident> InfoType<A> for [SQLWCHAR]
+impl<I: Ident> InfoType<I> for [SQLWCHAR]
 where
-    [SQLCHAR]: InfoType<A>,
-    [SQLWCHAR]: AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLSMALLINT>,
+    [SQLCHAR]: InfoType<I>,
+    [SQLWCHAR]: AttrLen<<Self as Attr<I>>::DefinedBy, <Self as Attr<I>>::NonBinary, SQLSMALLINT>,
 {
 }
 

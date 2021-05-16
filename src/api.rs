@@ -1,5 +1,6 @@
 use crate::extern_api;
 use crate::handle::*;
+use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
 
 use crate::{
@@ -13,8 +14,8 @@ use crate::{
     info::InfoType,
     sql_types::SqlType,
     stmt::StmtAttr,
-    AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsPtr, AsRawSlice, AttrRead, AttrWrite,
-    Buf, BulkOperation, CompletionType, DriverCompletion, FreeStmtOption, FunctionId, Ident,
+    AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AttrRead, AttrWrite, Buf,
+    BulkOperation, CompletionType, DriverCompletion, FreeStmtOption, FunctionId, Ident,
     IdentifierType, IntoSQLPOINTER, LockType, NullAllowed, Operation, ParameterType, Reserved,
     Scope, StrLenOrInd, TableType, UnicodeType, Unique, RETCODE, SQLCHAR, SQLHDBC, SQLHDESC,
     SQLHENV, SQLHSTMT, SQLINTEGER, SQLLEN, SQLPOINTER, SQLRETURN, SQLSETPOSIROW, SQLSMALLINT,
@@ -64,19 +65,17 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLBindCol<
-    'stmt,
-    'data,
-    TT: Ident<Type = SQLSMALLINT>,
-    B: DeferredBuf<TT>,
-    LEN: AsPtr<StrLenOrInd>,
->(
+pub fn SQLBindCol<'stmt, 'data, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<TT>>(
     StatementHandle: &'stmt SQLHSTMT<'_, 'stmt, 'data>,
     ColumnNumber: SQLUSMALLINT,
     TargetType: TT,
+    // TODO: Should it be able to provide tokens for streamed parameters as SQLBindParam?
     TargetValuePtr: Option<&'data B>,
-    StrLen_or_IndPtr: &'data LEN,
-) -> SQLRETURN {
+    StrLen_or_IndPtr: Option<&'data UnsafeCell<StrLenOrInd>>,
+) -> SQLRETURN
+where
+    B: ?Sized,
+{
     let sql_return = unsafe {
         let TargetValuePtr = TargetValuePtr
             .as_ref()
@@ -90,7 +89,7 @@ pub fn SQLBindCol<
             TT::IDENTIFIER,
             TargetValuePtr.0,
             TargetValuePtr.1,
-            StrLen_or_IndPtr.as_ptr().cast(),
+            StrLen_or_IndPtr.map_or_else(std::ptr::null_mut, |x| x.get().cast()),
         )
     };
 
@@ -109,13 +108,7 @@ pub fn SQLBindCol<
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLBindParameter<
-    'stmt,
-    'data,
-    TT: Ident<Type = SQLSMALLINT>,
-    B: DeferredBuf<TT>,
-    LEN: AsPtr<StrLenOrInd>,
->(
+pub fn SQLBindParameter<'stmt, 'data, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<TT>>(
     StatementHandle: &'stmt SQLHSTMT<'_, 'stmt, 'data>,
     ParameterNumber: SQLUSMALLINT,
     InputOutputType: ParameterType,
@@ -126,8 +119,11 @@ pub fn SQLBindParameter<
     DecimalDigits: SQLSMALLINT,
     // TODO: Must be able to provide tokens for streamed parameters
     ParameterValuePtr: Option<&'data B>,
-    StrLen_or_IndPtr: &'data LEN,
-) -> SQLRETURN {
+    StrLen_or_IndPtr: Option<&'data UnsafeCell<StrLenOrInd>>,
+) -> SQLRETURN
+where
+    B: ?Sized,
+{
     let sql_return = unsafe {
         let ParameterValuePtr = ParameterValuePtr
             .as_ref()
@@ -145,7 +141,7 @@ pub fn SQLBindParameter<
             DecimalDigits,
             ParameterValuePtr.0,
             ParameterValuePtr.1,
-            StrLen_or_IndPtr.as_ptr().cast(),
+            StrLen_or_IndPtr.map_or_else(std::ptr::null_mut, |x| x.get().cast()),
         )
     };
 
@@ -1301,16 +1297,17 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetData<TT: Ident<Type = SQLSMALLINT>, B: OutBuf<TT>, LEN: AsPtr<StrLenOrInd>>(
+pub fn SQLGetData<TT: Ident<Type = SQLSMALLINT>, B: OutBuf<TT>>(
     // Function doesn't bind the buffer
     StatementHandle: &SQLHSTMT,
     Col_or_Param_Num: SQLUSMALLINT,
     TargetType: TT,
     TargetValuePtr: &mut B,
-    StrLen_or_IndPtr: &mut LEN,
+    StrLen_or_IndPtr: Option<&mut MaybeUninit<StrLenOrInd>>,
 ) -> SQLRETURN
 where
     B: ?Sized,
+    MaybeUninit<StrLenOrInd>: AsMutPtr<SQLLEN>,
 {
     unsafe {
         extern_api::SQLGetData(
@@ -1319,7 +1316,7 @@ where
             TT::IDENTIFIER,
             TargetValuePtr.as_mut_SQLPOINTER(),
             TargetValuePtr.len(),
-            StrLen_or_IndPtr.as_ptr().cast(),
+            StrLen_or_IndPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
         )
     }
 }
@@ -2173,6 +2170,7 @@ pub unsafe fn SQLPutData<TT: Ident, B: Buf<TT>>(
     DataPtr: &B,
 ) -> SQLRETURN
 where
+    B: ?Sized,
     for<'data> &'data B: IntoSQLPOINTER,
 {
     extern_api::SQLPutData(
