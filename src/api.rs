@@ -17,7 +17,7 @@ use crate::{
     AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AttrRead, AttrWrite, Buf,
     BulkOperation, CompletionType, DriverCompletion, FreeStmtOption, FunctionId, Ident,
     IdentifierType, IntoSQLPOINTER, LockType, NullAllowed, Operation, ParameterType, Reserved,
-    Scope, StrLenOrInd, TableType, UnicodeType, Unique, RETCODE, SQLCHAR, SQLHDBC, SQLHDESC,
+    Scope, StrLenOrInd, UnicodeType, Unique, RETCODE, SQLCHAR, SQLHDBC, SQLHDESC,
     SQLHENV, SQLHSTMT, SQLINTEGER, SQLLEN, SQLPOINTER, SQLRETURN, SQLSETPOSIROW, SQLSMALLINT,
     SQLULEN, SQLUSMALLINT, SQLWCHAR, SQL_DESC_DATETIME_INTERVAL_CODE, SQL_SUCCEEDED, SQL_SUCCESS,
 };
@@ -2750,17 +2750,14 @@ pub fn SQLTablesA(
     CatalogName: &[SQLCHAR],
     SchemaName: &[SQLCHAR],
     TableName: &[SQLCHAR],
-    TabType: &[TableType],
+    TableType: &[SQLCHAR],
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
     let TableName = TableName.as_raw_slice();
-    // TODO: Look into SQLTablesW
-    let TabType = TabType.iter().map(|v| v.0).collect::<Vec<&str>>().join(",");
+    let TableType = TableType.as_raw_slice();
 
     unsafe {
-        let TabType = TabType.as_raw_slice();
-
         extern_api::SQLTablesA(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
@@ -2769,8 +2766,8 @@ pub fn SQLTablesA(
             SchemaName.1,
             TableName.0,
             TableName.1,
-            TabType.0,
-            TabType.1,
+            TableType.0,
+            TableType.1,
         )
     }
 }
@@ -2788,19 +2785,12 @@ pub fn SQLTablesW(
     CatalogName: &[SQLWCHAR],
     SchemaName: &[SQLWCHAR],
     TableName: &[SQLWCHAR],
-    TabType: &[TableType],
+    TableType: &[SQLWCHAR],
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
     let TableName = TableName.as_raw_slice();
-    let TabType = TabType
-        .iter()
-        .map(|v| v.0)
-        .collect::<Vec<&str>>()
-        .join(",")
-        .encode_utf16()
-        // TODO: Not quite good
-        .collect::<Vec<SQLWCHAR>>();
+    let TableType = TableType.as_raw_slice();
 
     unsafe {
         extern_api::SQLTablesW(
@@ -2811,8 +2801,8 @@ pub fn SQLTablesW(
             SchemaName.1,
             TableName.0,
             TableName.1,
-            TabType.as_ptr(),
-            TabType.len() as i16,
+            TableType.0,
+            TableType.1,
         )
     }
 }

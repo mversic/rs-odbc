@@ -3,15 +3,11 @@ use crate::extern_api;
 use crate::stmt::{
     SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC, SQL_ATTR_IMP_ROW_DESC,
 };
-use crate::{
-    AsMutSQLPOINTER, AttrLen, Ident, IntoSQLPOINTER, OdbcDefined, SQLPOINTER, SQLSMALLINT,
-    SQL_SUCCESS,
-};
+use crate::{Ident, IntoSQLPOINTER, SQLPOINTER, SQLSMALLINT, SQL_SUCCESS};
 use std::any::type_name;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
-use std::rc::Rc;
 use std::thread::panicking;
 
 pub unsafe trait AsSQLHANDLE {
@@ -436,10 +432,6 @@ unsafe impl<T> AsSQLHANDLE for SQLHDESC<'_, T> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.handle
     }
-}
-impl<T> crate::Ident for Option<&SQLHDESC<'_, T>> {
-    type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = crate::SQL_IS_POINTER;
 }
 unsafe impl<'data, T: DescType<'data>> IntoSQLPOINTER for Option<&SQLHDESC<'_, T>> {
     fn into_SQLPOINTER(self) -> SQLPOINTER {
