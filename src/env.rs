@@ -1,7 +1,9 @@
 use crate::{
-    Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcDefined, True, SQLINTEGER, SQLUINTEGER,
+    Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcDefined, True, SQLCHAR, SQLINTEGER, SQLUINTEGER,
+    SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
+use std::mem::MaybeUninit;
 
 pub trait EnvAttr<A: Ident>:
     Attr<A, DefinedBy = OdbcDefined> + AttrLen<OdbcDefined, <Self as Attr<A>>::NonBinary, SQLINTEGER>
@@ -90,15 +92,25 @@ pub const SQL_CP_STRICT_MATCH: CpMatch = CpMatch(0);
 pub const SQL_CP_RELAXED_MATCH: CpMatch = CpMatch(1);
 pub use SQL_CP_STRICT_MATCH as SQL_CP_MATCH_DEFAULT;
 
-impl<A: Ident, T: Ident> EnvAttr<A> for std::mem::MaybeUninit<T>
+impl<A: Ident> EnvAttr<A> for [SQLWCHAR]
 where
-    T: EnvAttr<A>,
-    Self: Attr<A, DefinedBy = OdbcDefined> + AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
+    [SQLCHAR]: EnvAttr<A>,
+    Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
 {
 }
-impl<'a, A: Ident, T> EnvAttr<A> for &'a [std::mem::MaybeUninit<T>]
+impl<A: Ident> EnvAttr<A> for [MaybeUninit<SQLCHAR>]
 where
-    &'a [T]: EnvAttr<A>,
-    Self: Attr<A, DefinedBy = OdbcDefined> + AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
+    [SQLCHAR]: EnvAttr<A>,
+    Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
 {
 }
+impl<A: Ident> EnvAttr<A> for [MaybeUninit<SQLWCHAR>]
+where
+    [SQLWCHAR]: EnvAttr<A>,
+    Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
+{
+}
+impl<A: Ident, T: Ident> EnvAttr<A> for MaybeUninit<T> where T: EnvAttr<A> {}
+
+impl<A: Ident> EnvAttr<A> for &[SQLCHAR] where [SQLCHAR]: EnvAttr<A> {}
+impl<A: Ident> EnvAttr<A> for &[SQLWCHAR] where [SQLWCHAR]: EnvAttr<A> {}

@@ -1,7 +1,11 @@
-use crate::{handle::Handle, Attr, AttrLen, AttrRead, Ident, SQLLEN, SQLSMALLINT};
-use rs_odbc_derive::{DiagField, Ident};
+use crate::{handle::Handle, Attr, AttrLen, Ident, SQLCHAR, SQLSMALLINT, SQLWCHAR};
+use rs_odbc_derive::Ident;
+use std::mem::MaybeUninit;
 
-pub trait DiagField<H: Handle, D: Ident>: Attr<D> + AttrLen<<Self as Attr<D>>::DefinedBy, <Self as Attr<D>>::NonBinary, SQLSMALLINT> {}
+pub trait DiagField<H: Handle, D: Ident>:
+    Attr<D> + AttrLen<<Self as Attr<D>>::DefinedBy, <Self as Attr<D>>::NonBinary, SQLSMALLINT>
+{
+}
 
 // Header fields -----------------------------------------------------------------
 #[derive(Ident)]
@@ -91,15 +95,30 @@ pub struct SQL_DIAG_CURSOR_ROW_COUNT;
 //pub struct SQL_DIAG_SUBCLASS_ORIGIN;
 //impl<T: AsMutRawCharSlice> ReadAttr<T> for SQL_DIAG_SUBCLASS_ORIGIN {}
 
-impl<H: Handle, D: Ident, T: Ident> DiagField<H, D> for std::mem::MaybeUninit<T>
+//impl<H: Handle, D: Ident> DiagField<H, D> for [SQLWCHAR]
+//where
+//    [SQLCHAR]: DiagField<H, D>,
+//    [SQLWCHAR]: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+//{
+//}
+//impl<H: Handle, D: Ident> DiagField<H, D> for [MaybeUninit<SQLCHAR>]
+//where
+//    [SQLCHAR]: DiagField<H, D>,
+//    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+//{
+//}
+//impl<H: Handle, D: Ident> DiagField<H, D> for [MaybeUninit<SQLWCHAR>]
+//where
+//    [SQLWCHAR]: DiagField<H, D>,
+//    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+//{
+//}
+impl<H: Handle, D: Ident, T: Ident> DiagField<H, D> for MaybeUninit<T>
 where
     T: DiagField<H, D>,
-    Self: Attr<D> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<'a, H: Handle, D: Ident, T> DiagField<H, D> for &'a [std::mem::MaybeUninit<T>]
-where
-    &'a [T]: DiagField<H, D>,
-    Self: Attr<D> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-{
-}
+
+impl<H: Handle, D: Ident> DiagField<H, D> for &[SQLCHAR] where [SQLCHAR]: DiagField<H, D> {}
+impl<H: Handle, D: Ident> DiagField<H, D> for &[SQLWCHAR] where [SQLWCHAR]: DiagField<H, D> {}

@@ -1,7 +1,7 @@
 use crate::handle::{AppDesc, AsSQLHANDLE, ImplDesc, SQLHDESC};
 use crate::{
     extern_api, AsMutPtr, AsMutSQLPOINTER, Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcDefined,
-    True, SQLHSTMT, SQLINTEGER, SQLPOINTER, SQLRETURN, SQLULEN, SQL_SUCCESS,
+    True, SQLCHAR, SQLHSTMT, SQLINTEGER, SQLPOINTER, SQLRETURN, SQLULEN, SQLWCHAR, SQL_SUCCESS,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
@@ -22,12 +22,12 @@ pub trait StmtAttr<'stmt, 'data, A: Ident>:
     fn readA(
         &mut self,
         StatementHandle: &'stmt SQLHSTMT<'_, '_, 'data>,
-        StringLengthPtr: &mut MaybeUninit<Self::StrLen>,
+        StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN
     where
-        MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
         Self: AttrRead<A> + crate::AnsiType,
         A: Ident<Type = SQLINTEGER>,
+        MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
         let ValuePtrLen = self.len();
 
@@ -37,7 +37,7 @@ pub trait StmtAttr<'stmt, 'data, A: Ident>:
                 A::IDENTIFIER,
                 self.as_mut_SQLPOINTER(),
                 ValuePtrLen,
-                <MaybeUninit<_> as AsMutPtr<_>>::as_mut_ptr(StringLengthPtr),
+                StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
             )
         }
     }
@@ -45,12 +45,12 @@ pub trait StmtAttr<'stmt, 'data, A: Ident>:
     fn readW(
         &mut self,
         StatementHandle: &'stmt SQLHSTMT<'_, '_, 'data>,
-        StringLengthPtr: &mut MaybeUninit<Self::StrLen>,
+        StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN
     where
-        MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
         Self: AttrRead<A> + crate::UnicodeType,
         A: Ident<Type = SQLINTEGER>,
+        MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
         let ValuePtrLen = self.len();
 
@@ -60,7 +60,7 @@ pub trait StmtAttr<'stmt, 'data, A: Ident>:
                 A::IDENTIFIER,
                 self.as_mut_SQLPOINTER(),
                 ValuePtrLen,
-                <MaybeUninit<_> as AsMutPtr<_>>::as_mut_ptr(StringLengthPtr),
+                StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
             )
         }
     }
@@ -71,7 +71,9 @@ impl<'stmt, T> Ident for RefSQLHDESC<'stmt, T> {
     type Type = <Option<&'stmt SQLHDESC<'stmt, T>> as Ident>::Type;
     const IDENTIFIER: Self::Type = <Option<&SQLHDESC<T>>>::IDENTIFIER;
 }
-unsafe impl<'data, T: crate::handle::DescType<'data>> AsMutSQLPOINTER for MaybeUninit<RefSQLHDESC<'_, T>> {
+unsafe impl<'data, T: crate::handle::DescType<'data>> AsMutSQLPOINTER
+    for MaybeUninit<RefSQLHDESC<'_, T>>
+{
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
         unimplemented!()
     }
@@ -328,7 +330,9 @@ unsafe impl Attr<SQL_ATTR_APP_ROW_DESC> for Option<&SQLHDESC<'_, AppDesc<'_>>> {
     type NonBinary = True;
 }
 // TODO: I think this should be implemented only for MaybeUninit<RefSQLHDESC>
-unsafe impl<'stmt, 'data> Attr<SQL_ATTR_APP_ROW_DESC> for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>> {
+unsafe impl<'stmt, 'data> Attr<SQL_ATTR_APP_ROW_DESC>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>>
+{
     type DefinedBy =
         <Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>> as Attr<SQL_ATTR_APP_ROW_DESC>>::DefinedBy;
     type NonBinary =
@@ -341,7 +345,7 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_ROW_DESC>
     fn readA(
         &mut self,
         StatementHandle: &'stmt SQLHSTMT<'_, '_, 'data>,
-        StringLengthPtr: &mut MaybeUninit<Self::StrLen>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         if let Some(explicit_ard) = StatementHandle.explicit_ard.get() {
             *self = MaybeUninit::new(RefSQLHDESC(explicit_ard));
@@ -355,7 +359,7 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_ROW_DESC>
     fn readW(
         &mut self,
         StatementHandle: &'stmt SQLHSTMT<'_, '_, 'data>,
-        StringLengthPtr: &mut MaybeUninit<Self::StrLen>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         if let Some(explicit_ard) = StatementHandle.explicit_ard.get() {
             *self = MaybeUninit::new(RefSQLHDESC(explicit_ard));
@@ -385,11 +389,15 @@ unsafe impl Attr<SQL_ATTR_APP_PARAM_DESC> for Option<&SQLHDESC<'_, AppDesc<'_>>>
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl<'stmt, 'data> Attr<SQL_ATTR_APP_PARAM_DESC> for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>> {
-    type DefinedBy =
-        <Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>> as Attr<SQL_ATTR_APP_PARAM_DESC>>::DefinedBy;
-    type NonBinary =
-        <Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>> as Attr<SQL_ATTR_APP_PARAM_DESC>>::NonBinary;
+unsafe impl<'stmt, 'data> Attr<SQL_ATTR_APP_PARAM_DESC>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>>
+{
+    type DefinedBy = <Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>> as Attr<
+        SQL_ATTR_APP_PARAM_DESC,
+    >>::DefinedBy;
+    type NonBinary = <Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>> as Attr<
+        SQL_ATTR_APP_PARAM_DESC,
+    >>::NonBinary;
 }
 impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_PARAM_DESC>
     for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>>
@@ -398,7 +406,7 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_PARAM_DESC>
     fn readA(
         &mut self,
         StatementHandle: &'stmt SQLHSTMT<'_, '_, 'data>,
-        StringLengthPtr: &mut MaybeUninit<Self::StrLen>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         if let Some(explicit_apd) = StatementHandle.explicit_apd.get() {
             *self = MaybeUninit::new(RefSQLHDESC(explicit_apd));
@@ -411,7 +419,7 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_PARAM_DESC>
     fn readW(
         &mut self,
         StatementHandle: &'stmt SQLHSTMT<'_, '_, 'data>,
-        StringLengthPtr: &mut MaybeUninit<Self::StrLen>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         if let Some(explicit_apd) = StatementHandle.explicit_apd.get() {
             *self = MaybeUninit::new(RefSQLHDESC(explicit_apd));
@@ -441,12 +449,14 @@ unsafe impl Attr<SQL_ATTR_IMP_ROW_DESC> for MaybeUninit<RefSQLHDESC<'_, ImplDesc
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC> for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc>> {
+impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc>>
+{
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
         StatementHandle: &'stmt SQLHSTMT,
-        StringLengthPtr: &mut MaybeUninit<Self::StrLen>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ird));
         SQL_SUCCESS
@@ -455,7 +465,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC> for MaybeUninit<RefSQLHDE
     fn readW(
         &mut self,
         StatementHandle: &'stmt SQLHSTMT,
-        StringLengthPtr: &mut MaybeUninit<Self::StrLen>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ird));
         SQL_SUCCESS
@@ -472,12 +482,14 @@ unsafe impl Attr<SQL_ATTR_IMP_PARAM_DESC> for MaybeUninit<RefSQLHDESC<'_, ImplDe
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC> for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc>> {
+impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc>>
+{
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
         StatementHandle: &'stmt SQLHSTMT,
-        StringLengthPtr: &mut MaybeUninit<Self::StrLen>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ipd));
         SQL_SUCCESS
@@ -486,7 +498,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC> for MaybeUninit<RefSQLH
     fn readW(
         &mut self,
         StatementHandle: &'stmt SQLHSTMT,
-        StringLengthPtr: &mut MaybeUninit<Self::StrLen>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ipd));
         SQL_SUCCESS
@@ -562,15 +574,37 @@ pub const SQL_UB_OFF: UseBookmarks = UseBookmarks(0);
 pub const SQL_UB_ON: UseBookmarks = UseBookmarks(1);
 pub use SQL_UB_OFF as SQL_UB_DEFAULT;
 
+impl<'stmt, 'data, A: Ident> StmtAttr<'stmt, 'data, A> for [SQLWCHAR]
+where
+    [SQLCHAR]: StmtAttr<'stmt, 'data, A>,
+    Self: AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER>,
+{
+}
+
+impl<'stmt, 'data, A: Ident> StmtAttr<'stmt, 'data, A> for [MaybeUninit<SQLCHAR>]
+where
+    [SQLCHAR]: StmtAttr<'stmt, 'data, A>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+{
+}
+impl<'stmt, 'data, A: Ident> StmtAttr<'stmt, 'data, A> for [MaybeUninit<SQLWCHAR>]
+where
+    [SQLWCHAR]: StmtAttr<'stmt, 'data, A>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+{
+}
 impl<'stmt, 'data, A: Ident, T: Ident> StmtAttr<'stmt, 'data, A> for MaybeUninit<T>
 where
     T: StmtAttr<'stmt, 'data, A>,
-    Self: Attr<A> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }
-impl<'stmt, 'data, 'a, A: Ident, T> StmtAttr<'stmt, 'data, A> for &'a [MaybeUninit<T>]
-where
-    &'a [T]: StmtAttr<'stmt, 'data, A>,
-    Self: Attr<A> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+
+impl<'stmt, 'data, A: Ident> StmtAttr<'stmt, 'data, A> for &[SQLCHAR] where
+    [SQLCHAR]: StmtAttr<'stmt, 'data, A>
+{
+}
+impl<'stmt, 'data, A: Ident> StmtAttr<'stmt, 'data, A> for &[SQLWCHAR] where
+    [SQLWCHAR]: StmtAttr<'stmt, 'data, A>
 {
 }

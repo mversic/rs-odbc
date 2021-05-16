@@ -67,3 +67,24 @@ pub trait DescField<A: crate::Ident>: Attr<A> + AttrLen<<Self as Attr<A>>::Defin
 //        //SQL_PARAM_PROCEED = 0,
 //        //SQL_PARAM_IGNORE = 1,
 //    }
+
+//impl<'a, H: Handle, D: Ident> DescField<H, D> for &'a [SQLWCHAR]
+//where
+//    &'a [SQLCHAR]: DescField<H, D>,
+//    // TODO: This seems superflous
+//    &'a [SQLWCHAR]: AttrLen<<Self as Attr<D>>::DefinedBy, <Self as Attr<D>>::NonBinary, SQLSMALLINT>,
+//{
+//}
+//
+//impl<H: Handle, D: Ident, T: Ident> DescField<H, D> for std::mem::MaybeUninit<T>
+//where
+//    T: DescField<H, D>,
+//    Self: Attr<D> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+//{
+//}
+//impl<'a, H: Handle, D: Ident, T> DescField<H, D> for &'a [std::mem::MaybeUninit<T>]
+//where
+//    &'a [T]: DescField<H, D>,
+//    Self: Attr<D> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+//{
+//}

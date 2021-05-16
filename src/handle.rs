@@ -426,8 +426,6 @@ impl<T> crate::Ident for Option<&SQLHDESC<'_, T>> {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = crate::SQL_IS_POINTER;
 }
-impl<T> crate::AnsiType for Option<&SQLHDESC<'_, T>> {}
-impl<T> crate::UnicodeType for Option<&SQLHDESC<'_, T>> {}
 unsafe impl<'data, T: DescType<'data>> IntoSQLPOINTER for Option<&SQLHDESC<'_, T>> {
     fn into_SQLPOINTER(self) -> SQLPOINTER {
         self.map_or_else(std::ptr::null_mut, |handle| handle.as_SQLHANDLE().cast())

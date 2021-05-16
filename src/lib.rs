@@ -79,6 +79,11 @@ pub struct SqlStateW([SQLWCHAR; 6]);
 type UWORD = u16;
 type SQLPOINTER = *mut std::ffi::c_void;
 
+#[derive(Clone, Copy)]
+// TODO: https://github.com/rust-lang/rust/issues/35121
+// Use uninhabited type ! when it is available in std
+pub enum Void {}
+
 const SQL_IS_POINTER: SQLSMALLINT = -4;
 const SQL_IS_UINTEGER: SQLSMALLINT = -5;
 const SQL_IS_INTEGER: SQLSMALLINT = -6;
@@ -89,6 +94,8 @@ const SQL_IS_SMALLINT: SQLSMALLINT = -8;
 // WARNING: These are not mentioned in ODBC
 const SQL_IS_LEN: SQLSMALLINT = SQL_IS_INTEGER;
 const SQL_IS_ULEN: SQLSMALLINT = SQL_IS_UINTEGER;
+
+const SLICE_LEN_TOO_LARGE_MSG: &str = "Slice len too large";
 
 pub trait AsPtr<T> {
     fn as_ptr(&self) -> *mut T;
@@ -117,42 +124,32 @@ pub unsafe trait AsMutPtr<T> {
     fn as_mut_ptr(&mut self) -> *mut T;
 }
 
-unsafe impl<T> AsMutPtr<T> for T {
-    fn as_mut_ptr(&mut self) -> *mut T {
-        self
-    }
-}
-unsafe impl<T> AsMutPtr<T> for MaybeUninit<T>
-where
-    T: AsMutPtr<T>,
-{
+unsafe impl<T: Ident> AsMutPtr<T> for MaybeUninit<T> {
     fn as_mut_ptr(&mut self) -> *mut T {
         self.as_mut_ptr()
     }
 }
-unsafe impl<T> AsMutPtr<SQLPOINTER> for &mut T {
-    fn as_mut_ptr(&mut self) -> *mut SQLPOINTER {
-        (self as *mut Self).cast()
-    }
-}
-// TODO: This may become unnecessary
-unsafe impl AsMutPtr<SQLINTEGER> for MaybeUninit<()> {
-    fn as_mut_ptr(&mut self) -> *mut SQLINTEGER {
-        // TODO: If using dangling pointers is ok, this trait can be removed entirely and use MaybeUninit::as_mut_ptr instead as is
-        // However, it is SAFER to use null pointers because it is likely that implementation will null-check before dereferencing
+unsafe impl<T: Ident> AsMutPtr<T> for MaybeUninit<Void> {
+    fn as_mut_ptr(&mut self) -> *mut T {
+        // SAFETY:
+        // Acording to the ODBC specification returning `self.as_mut_ptr().cast()` here
+        // should be fine. However non-compliant implementations might try to write
+        // to non-null pointers obtained through this method which would cause UB
         std::ptr::null_mut()
     }
 }
-
+// TODO: Is this required and is this correct?
+//unsafe impl<T> AsMutPtr<SQLPOINTER> for &mut T {
+//    fn as_mut_ptr(&mut self) -> *mut SQLPOINTER {
+//        (self as *mut Self).cast()
+//    }
+//}
 pub unsafe trait AsSQLPOINTER {
     #[allow(non_snake_case)]
     fn as_SQLPOINTER(&self) -> SQLPOINTER;
 }
 /// Invariant: SQLPOINTER obtained through this trait is never written to
-pub unsafe trait IntoSQLPOINTER
-where
-    Self: Copy,
-{
+pub unsafe trait IntoSQLPOINTER: Copy {
     #[allow(non_snake_case)]
     fn into_SQLPOINTER(self) -> SQLPOINTER;
 }
@@ -167,89 +164,138 @@ pub unsafe trait Attr<A: Ident> {
     type DefinedBy: Def;
     type NonBinary: Bool;
 }
+unsafe impl<A: Ident> Attr<A> for [SQLWCHAR]
+where
+    [SQLCHAR]: Attr<A>,
+{
+    type DefinedBy = <[SQLCHAR] as Attr<A>>::DefinedBy;
+    type NonBinary = <[SQLCHAR] as Attr<A>>::NonBinary;
+}
 // TODO: https://github.com/rust-lang/rust/issues/20400
 // Once this problem is resolved, it would be possible to modify AttrLen<AD, NB, LEN>
 // into AttrLen<A, LEN> and do more precise blanket implementations like
 // impl<T: Attr<A>, LEN> AttrLen<A, LEN> for T {}
-pub unsafe trait AttrLen<AD: Def, NB: Bool, LEN> {
-    // TODO: Consider replacing StrLen with tuple
+pub unsafe trait AttrLen<AD: Def, NB: Bool, LEN: Copy> {
+    /// Invariant: StrLen can only be LEN(for slices) or uninhabited type(for scalar types)
+    /// It is assumed that ODBC driver will never write to StrLen pointer for scalar types
     type StrLen: Copy;
-    // TODO: consider returning MaybeUninit<LEN> here. This should be entirely valid
-    // It could be difficult to implement because of conflict with odbc_type macro
+
     fn len(&self) -> LEN;
 }
 // TODO: I should probably consider adding additional trait for scalar data types because
 // implementing for all T: Ident if implementing for all identifiers which isn't required
 // This should be considered if AttrLen won't be revised. Check comment on AttrLen definition
-unsafe impl<NB: Bool, LEN: Copy, T: Ident> AttrLen<OdbcDefined, NB, LEN> for T
+unsafe impl<AD: Def, NB: Bool, LEN: Copy, T: Ident> AttrLen<AD, NB, LEN> for T
 where
+    MaybeUninit<T>: AttrLen<AD, NB, LEN>,
     LEN: From<u8>,
 {
-    type StrLen = ();
+    type StrLen = Void;
+
     fn len(&self) -> LEN {
         LEN::from(0)
     }
 }
-unsafe impl<NB: Bool, LEN: Copy, T: Ident> AttrLen<DriverDefined, NB, LEN> for T
+unsafe impl<NB: Bool, LEN: Copy, T: Ident> AttrLen<OdbcDefined, NB, LEN> for MaybeUninit<T>
 where
-    LEN: From<T::Type>,
-{
-    type StrLen = ();
-    fn len(&self) -> LEN {
-        LEN::from(T::IDENTIFIER)
-    }
-}
-unsafe impl<NB: Bool, LEN: Copy, T: AttrLen<OdbcDefined, NB, LEN>> AttrLen<OdbcDefined, NB, LEN>
-    for MaybeUninit<T>
-where
-    T: Ident,
     LEN: From<u8>,
 {
-    type StrLen = ();
+    type StrLen = Void;
+
     fn len(&self) -> LEN {
         LEN::from(0)
     }
 }
-unsafe impl<NB: Bool, LEN: Copy, T: AttrLen<DriverDefined, NB, LEN>> AttrLen<DriverDefined, NB, LEN>
-    for MaybeUninit<T>
+unsafe impl<NB: Bool, LEN: Copy, T: Ident> AttrLen<DriverDefined, NB, LEN> for MaybeUninit<T>
 where
-    T: Ident,
+    T: AttrLen<OdbcDefined, NB, LEN>,
     LEN: From<T::Type>,
 {
-    type StrLen = ();
+    type StrLen = Void;
+
     fn len(&self) -> LEN {
         LEN::from(T::IDENTIFIER)
     }
 }
-unsafe impl<NB: Bool, LEN: Copy, T> AttrLen<OdbcDefined, NB, LEN> for &[T]
+unsafe impl<AD: Def, NB: Bool, LEN: Copy> AttrLen<AD, NB, LEN> for [SQLCHAR]
+where
+    LEN: TryFrom<usize>,
+    LEN::Error: Debug,
+    [MaybeUninit<SQLCHAR>]: AttrLen<AD, NB, LEN>,
+{
+    type StrLen = <[MaybeUninit<SQLCHAR>] as AttrLen<AD, NB, LEN>>::StrLen;
+
+    fn len(&self) -> LEN {
+        // This transmute is safe because MaybeUninit<T> has the same size and alignment as T
+        <[MaybeUninit<SQLCHAR>] as AttrLen<AD, NB, LEN>>::len(unsafe { std::mem::transmute(self) })
+    }
+}
+unsafe impl<AD: Def, NB: Bool, LEN: Copy> AttrLen<AD, NB, LEN> for [SQLWCHAR]
+where
+    LEN: TryFrom<usize>,
+    LEN::Error: Debug,
+    [MaybeUninit<SQLWCHAR>]: AttrLen<AD, NB, LEN>,
+{
+    type StrLen = <[MaybeUninit<SQLWCHAR>] as AttrLen<AD, NB, LEN>>::StrLen;
+
+    fn len(&self) -> LEN {
+        // This transmute is safe because MaybeUninit<T> has the same size and alignment as T
+        <[MaybeUninit<SQLWCHAR>] as AttrLen<AD, NB, LEN>>::len(unsafe { std::mem::transmute(self) })
+    }
+}
+unsafe impl<AD: Def, LEN: Copy> AttrLen<AD, True, LEN> for [MaybeUninit<SQLCHAR>]
 where
     LEN: TryFrom<usize>,
     LEN::Error: Debug,
 {
     type StrLen = LEN;
+
     fn len(&self) -> LEN {
         slice_len(self)
     }
 }
-unsafe impl<LEN: Copy, T> AttrLen<DriverDefined, True, LEN> for &[T]
+unsafe impl<LEN: Copy> AttrLen<OdbcDefined, False, LEN> for [MaybeUninit<SQLCHAR>]
 where
     LEN: TryFrom<usize>,
     LEN::Error: Debug,
 {
     type StrLen = LEN;
+
     fn len(&self) -> LEN {
         slice_len(self)
     }
 }
-unsafe impl<LEN: Copy, T> AttrLen<DriverDefined, False, LEN> for &[T]
+unsafe impl<LEN: Copy> AttrLen<DriverDefined, False, LEN> for [MaybeUninit<SQLCHAR>]
 where
     LEN: TryFrom<usize>,
+{
+    type StrLen = LEN;
+
+    fn len(&self) -> LEN {
+        unimplemented!();
+    }
+}
+unsafe impl<AD: Def, LEN: Copy> AttrLen<AD, True, LEN> for [MaybeUninit<SQLWCHAR>]
+where
+    LEN: TryFrom<usize> + std::ops::Mul<Output = LEN>,
     LEN::Error: Debug,
 {
     type StrLen = LEN;
+
     fn len(&self) -> LEN {
-        // TODO: Implement for binary
-        unimplemented!()
+        // TODO: Check for multiplication overflow
+        slice_len::<_, LEN>(self)
+            * LEN::try_from(std::mem::size_of::<SQLWCHAR>()).expect(SLICE_LEN_TOO_LARGE_MSG)
+    }
+}
+unsafe impl<AD: Def, NB: Bool, LEN: Copy, T> AttrLen<AD, NB, LEN> for &[T]
+where
+    [T]: AttrLen<AD, NB, LEN>,
+{
+    type StrLen = <[T] as AttrLen<AD, NB, LEN>>::StrLen;
+
+    fn len(&self) -> LEN {
+        AttrLen::len(*self)
     }
 }
 
@@ -333,12 +379,22 @@ pub trait Ident {
 pub unsafe trait AttrRead<A>: AsMutSQLPOINTER {}
 pub unsafe trait AttrWrite<A>: IntoSQLPOINTER {}
 
+unsafe impl<A> AttrRead<A> for [SQLWCHAR] where [SQLCHAR]: AttrRead<A> {}
+unsafe impl<'a, A> AttrWrite<A> for &'a [SQLWCHAR] where &'a [SQLCHAR]: AttrWrite<A> {}
+
 pub trait AnsiType {}
 pub trait UnicodeType {}
-impl<T: Ident> AnsiType for MaybeUninit<T> where T: AnsiType {}
-impl<T: Ident> UnicodeType for MaybeUninit<T> where T: UnicodeType {}
-impl<'a, T: Ident> AnsiType for &'a [MaybeUninit<T>] where &'a [T]: AnsiType {}
-impl<'a, T: Ident> UnicodeType for &'a [MaybeUninit<T>] where &'a [T]: UnicodeType {}
+impl<T: Ident> AnsiType for T {}
+impl<T: Ident> UnicodeType for T {}
+impl AnsiType for [SQLCHAR] {}
+impl UnicodeType for [SQLWCHAR] {}
+impl AnsiType for [MaybeUninit<SQLCHAR>] where [SQLCHAR]: AnsiType {}
+impl UnicodeType for [MaybeUninit<SQLWCHAR>] where [SQLWCHAR]: UnicodeType {}
+
+impl AnsiType for &[SQLCHAR] {}
+impl UnicodeType for &[SQLWCHAR] {}
+impl<'a> AnsiType for &'a [MaybeUninit<SQLCHAR>] where &'a [SQLCHAR]: AnsiType {}
+impl<'a> UnicodeType for &'a [MaybeUninit<SQLWCHAR>] where &'a [SQLWCHAR]: UnicodeType {}
 
 // TODO: Comapare attribute types: <attribute>(type, default)
 // SQL_ATTR_OUTPUT_NTS(u32, true), SQL_ATTR_AUTO_IPD(u32, _)
@@ -569,7 +625,6 @@ pub const TABLE: TableType = TableType("TABLE");
 pub const VIEW: TableType = TableType("VIEW");
 
 //unsafe impl AttrLen<OdbcDefined, SQL_C_SLONG, SQLSMALLINT> for std::cell::UnsafeCell<i32> {
-//    type StrLen = ();
 //    fn len(&self) -> SQLSMALLINT {
 //        0 as SQLSMALLINT
 //    }
@@ -619,7 +674,6 @@ fn slice_len<T, LEN: TryFrom<usize>>(slice: &[T]) -> LEN
 where
     LEN::Error: Debug,
 {
-    const SLICE_LEN_TOO_LARGE_MSG: &str = "Slice len too large";
     LEN::try_from(slice.len()).expect(SLICE_LEN_TOO_LARGE_MSG)
 }
 
@@ -630,12 +684,33 @@ where
     type DefinedBy = T::DefinedBy;
     type NonBinary = T::NonBinary;
 }
-unsafe impl<'a, A: Ident, T> Attr<A> for &'a [MaybeUninit<T>]
+unsafe impl<A: Ident> Attr<A> for [MaybeUninit<SQLCHAR>]
 where
-    &'a [T]: Attr<A>,
+    [SQLCHAR]: Attr<A>,
 {
-    type DefinedBy = <&'a [T] as Attr<A>>::DefinedBy;
-    type NonBinary = <&'a [T] as Attr<A>>::NonBinary;
+    type DefinedBy = <[SQLCHAR] as Attr<A>>::DefinedBy;
+    type NonBinary = <[SQLCHAR] as Attr<A>>::NonBinary;
+}
+unsafe impl<A: Ident> Attr<A> for [MaybeUninit<SQLWCHAR>]
+where
+    [SQLWCHAR]: Attr<A>,
+{
+    type DefinedBy = <[SQLWCHAR] as Attr<A>>::DefinedBy;
+    type NonBinary = <[SQLWCHAR] as Attr<A>>::NonBinary;
+}
+unsafe impl<A: Ident> Attr<A> for &[SQLCHAR]
+where
+    [SQLCHAR]: Attr<A>,
+{
+    type DefinedBy = <[SQLCHAR] as Attr<A>>::DefinedBy;
+    type NonBinary = <[SQLCHAR] as Attr<A>>::NonBinary;
+}
+unsafe impl<A: Ident> Attr<A> for &[SQLWCHAR]
+where
+    [SQLWCHAR]: Attr<A>,
+{
+    type DefinedBy = <[SQLWCHAR] as Attr<A>>::DefinedBy;
+    type NonBinary = <[SQLWCHAR] as Attr<A>>::NonBinary;
 }
 
 unsafe impl<A: Ident, T: Ident> AttrRead<A> for MaybeUninit<T>
@@ -644,7 +719,8 @@ where
     Self: AsMutSQLPOINTER,
 {
 }
-unsafe impl<'a, A: Ident, T> AttrRead<A> for &'a [MaybeUninit<T>] where &'a [T]: AttrRead<A> {}
+unsafe impl<A: Ident> AttrRead<A> for [MaybeUninit<SQLCHAR>] where [SQLCHAR]: AttrRead<A> {}
+unsafe impl<A: Ident> AttrRead<A> for [MaybeUninit<SQLWCHAR>] where [SQLWCHAR]: AttrRead<A> {}
 
 unsafe impl<A: Ident, T: Ident> AttrWrite<A> for MaybeUninit<T>
 where
@@ -652,13 +728,7 @@ where
     Self: IntoSQLPOINTER,
 {
 }
-unsafe impl<'a, A: Ident, T> AttrWrite<A> for &'a [MaybeUninit<T>] where &'a [T]: AttrWrite<A> {}
 
-unsafe impl<T> AsMutSQLPOINTER for &[T] {
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        self.as_mut_ptr().cast()
-    }
-}
 unsafe impl<T> AsMutSQLPOINTER for [T] {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
         self.as_mut_ptr().cast()

@@ -1,8 +1,9 @@
 use crate::{
-    Attr, AttrLen, AttrRead, AttrWrite, DriverDefined, False, Ident, OdbcBool, OdbcDefined, True,
-    SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR,
+    Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcBool, OdbcDefined, True, SQLCHAR, SQLINTEGER,
+    SQLUINTEGER, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
+use std::mem::MaybeUninit;
 
 pub trait ConnAttr<A: Ident>:
     Attr<A> + AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER>
@@ -47,16 +48,13 @@ impl ConnAttr<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {}
 #[identifier(SQLINTEGER, 109)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CURRENT_CATALOG;
-unsafe impl Attr<SQL_ATTR_CURRENT_CATALOG> for &[SQLCHAR] {
+unsafe impl Attr<SQL_ATTR_CURRENT_CATALOG> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl Attr<SQL_ATTR_CURRENT_CATALOG> for &[SQLWCHAR] {
-    type DefinedBy = OdbcDefined;
-    type NonBinary = True;
-}
-impl ConnAttr<SQL_ATTR_CURRENT_CATALOG> for &[SQLCHAR] {}
-impl ConnAttr<SQL_ATTR_CURRENT_CATALOG> for &[SQLWCHAR] {}
+impl ConnAttr<SQL_ATTR_CURRENT_CATALOG> for [SQLCHAR] {}
+unsafe impl AttrRead<SQL_ATTR_CURRENT_CATALOG> for [SQLCHAR] {}
+unsafe impl AttrWrite<SQL_ATTR_CURRENT_CATALOG> for &[SQLCHAR] {}
 
 // TODO: Not found in documentation, only in implementation
 //#[derive(Ident)]
@@ -143,32 +141,22 @@ pub struct SQL_ATTR_TRACEFILE;
 //pub const SQL_OPT_TRACE_FILE_DEFAULT = "\\SQL.LOG";
 
 // TODO: Has to be null-terminated
-unsafe impl Attr<SQL_ATTR_TRACEFILE> for &[SQLCHAR] {
+unsafe impl Attr<SQL_ATTR_TRACEFILE> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl Attr<SQL_ATTR_TRACEFILE> for &[SQLWCHAR] {
-    type DefinedBy = OdbcDefined;
-    type NonBinary = True;
-}
-impl ConnAttr<SQL_ATTR_TRACEFILE> for &[SQLCHAR] {}
-impl ConnAttr<SQL_ATTR_TRACEFILE> for &[SQLWCHAR] {}
+impl ConnAttr<SQL_ATTR_TRACEFILE> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 106)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_TRANSLATE_LIB;
 // TODO: Has to be null-terminated
-unsafe impl Attr<SQL_ATTR_TRANSLATE_LIB> for &[SQLCHAR] {
+unsafe impl Attr<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl Attr<SQL_ATTR_TRANSLATE_LIB> for &[SQLWCHAR] {
-    type DefinedBy = OdbcDefined;
-    type NonBinary = True;
-}
-impl ConnAttr<SQL_ATTR_TRANSLATE_LIB> for &[SQLCHAR] {}
-impl ConnAttr<SQL_ATTR_TRANSLATE_LIB> for &[SQLWCHAR] {}
+impl ConnAttr<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {}
 
 // TODO: Investigate this
 //#[derive(Ident, AttrIdent)]
@@ -331,15 +319,30 @@ pub const SQL_CD_FALSE: ConnectionDead = ConnectionDead(0);
 #[cfg(feature = "v3_5")]
 pub const SQL_CD_TRUE: ConnectionDead = ConnectionDead(1);
 
-impl<A: Ident, T: Ident> ConnAttr<A> for std::mem::MaybeUninit<T>
+impl<A: Ident> ConnAttr<A> for [SQLWCHAR]
+where
+    [SQLCHAR]: ConnAttr<A>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+{
+}
+impl<A: Ident> ConnAttr<A> for [MaybeUninit<SQLCHAR>]
+where
+    [SQLCHAR]: ConnAttr<A>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+{
+}
+impl<A: Ident> ConnAttr<A> for [MaybeUninit<SQLWCHAR>]
+where
+    [SQLWCHAR]: ConnAttr<A>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+{
+}
+impl<A: Ident, T: Ident> ConnAttr<A> for MaybeUninit<T>
 where
     T: ConnAttr<A>,
-    Self: Attr<A> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }
-impl<'a, A: Ident, T> ConnAttr<A> for &'a [std::mem::MaybeUninit<T>]
-where
-    &'a [T]: ConnAttr<A>,
-    Self: Attr<A> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
-{
-}
+
+impl<A: Ident> ConnAttr<A> for &[SQLCHAR] where [SQLCHAR]: ConnAttr<A> {}
+impl<A: Ident> ConnAttr<A> for &[SQLWCHAR] where [SQLWCHAR]: ConnAttr<A> {}

@@ -1,8 +1,8 @@
 use crate::{
-    AnsiType, AsMutRawSlice, Attr, AttrLen, Ident, OdbcDefined, True, UnicodeType, SQLCHAR,
-    SQLSMALLINT, SQLUSMALLINT, SQLWCHAR, SQL_C_USHORT,
+    Attr, AttrLen, Ident, OdbcDefined, True, SQLCHAR, SQLSMALLINT, SQLUSMALLINT, SQLWCHAR,
 };
-use rs_odbc_derive::{Ident, InfoType};
+use rs_odbc_derive::Ident;
+use std::mem::MaybeUninit;
 
 pub trait InfoType<I: Ident>:
     Attr<I> + AttrLen<<Self as Attr<I>>::DefinedBy, <Self as Attr<I>>::NonBinary, SQLSMALLINT>
@@ -286,15 +286,30 @@ pub struct SQL_MAX_IDENTIFIER_LEN;
 
 pub use SQL_MAX_IDENTIFIER_LEN as SQL_MAXIMUM_IDENTIFIER_LENGTH;
 
-impl<I: Ident, T: Ident> InfoType<I> for std::mem::MaybeUninit<T>
+impl<A: Ident> InfoType<A> for [SQLWCHAR]
+where
+    [SQLCHAR]: InfoType<A>,
+    [SQLWCHAR]: AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLSMALLINT>,
+{
+}
+
+impl<I: Ident> InfoType<I> for [MaybeUninit<SQLCHAR>]
+where
+    [SQLCHAR]: InfoType<I>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
+impl<I: Ident> InfoType<I> for [MaybeUninit<SQLWCHAR>]
+where
+    [SQLWCHAR]: InfoType<I>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
+impl<I: Ident, T: Ident> InfoType<I> for MaybeUninit<T>
 where
     T: InfoType<I>,
-    Self: Attr<I> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<'a, I: Ident, T> InfoType<I> for &'a [std::mem::MaybeUninit<T>]
-where
-    &'a [T]: InfoType<I>,
-    Self: Attr<I> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-{
-}
+impl<I: Ident> InfoType<I> for &[SQLCHAR] where [SQLCHAR]: InfoType<I> {}
+impl<I: Ident> InfoType<I> for &[SQLWCHAR] where [SQLWCHAR]: InfoType<I> {}

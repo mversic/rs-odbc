@@ -1,42 +1,7 @@
 use proc_macro::TokenStream;
-use proc_macro2::{Ident, Span};
+use proc_macro2::Ident;
 use quote::quote;
 use syn::{self, parse::Parse, parse::Parser};
-
-#[proc_macro_derive(ScalarCtype)]
-pub fn scalar_ctype_derive(input: TokenStream) -> TokenStream {
-    empty_trait_derive(input, Ident::new("ScalarCType", Span::call_site()))
-}
-
-#[proc_macro_derive(EnvAttr)]
-pub fn env_attr_derive(input: TokenStream) -> TokenStream {
-    empty_trait_derive(input, Ident::new("EnvAttr", Span::call_site()))
-}
-
-#[proc_macro_derive(ConnAttr)]
-pub fn conn_attr_derive(input: TokenStream) -> TokenStream {
-    attr_derive(input, Ident::new("ConnAttr", Span::call_site()))
-}
-
-#[proc_macro_derive(StmtAttr)]
-pub fn stmt_attr_derive(input: TokenStream) -> TokenStream {
-    attr_derive(input, Ident::new("StmtAttr", Span::call_site()))
-}
-
-#[proc_macro_derive(ColAttr)]
-pub fn col_attr_derive(input: TokenStream) -> TokenStream {
-    attr_derive(input, Ident::new("ColAttr", Span::call_site()))
-}
-
-#[proc_macro_derive(InfoType)]
-pub fn info_type_derive(input: TokenStream) -> TokenStream {
-    attr_derive(input, Ident::new("InfoType", Span::call_site()))
-}
-
-#[proc_macro_derive(DiagField)]
-pub fn diag_field_derive(input: TokenStream) -> TokenStream {
-    attr_derive(input, Ident::new("DiagField", Span::call_site()))
-}
 
 #[proc_macro_derive(Ident, attributes(identifier))]
 pub fn into_identifier(input: TokenStream) -> TokenStream {
@@ -71,32 +36,6 @@ pub fn into_identifier(input: TokenStream) -> TokenStream {
             type Type = crate::#identifier_type;
             const IDENTIFIER: Self::Type = #identifier;
         }
-    };
-
-    gen.into()
-}
-
-fn empty_trait_derive(input: TokenStream, attr_name: Ident) -> TokenStream {
-    let ast: syn::DeriveInput = syn::parse(input).unwrap();
-
-    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
-    let type_name = &ast.ident;
-
-    let gen = quote! {
-        impl #impl_generics #attr_name for #type_name #ty_generics #where_clause {}
-    };
-
-    gen.into()
-}
-
-fn attr_derive(input: TokenStream, attr_name: Ident) -> TokenStream {
-    let ast: syn::DeriveInput = syn::parse(input).unwrap();
-
-    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
-    let type_name = &ast.ident;
-
-    let gen = quote! {
-        impl #impl_generics #attr_name for #type_name #ty_generics #where_clause {}
     };
 
     gen.into()
@@ -221,9 +160,6 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
             type Type = <#inner_type as crate::Ident>::Type;
             const IDENTIFIER: Self::Type = <#inner_type as crate::Ident>::IDENTIFIER;
         }
-
-        impl crate::AnsiType for #type_name {}
-        impl crate::UnicodeType for #type_name {}
 
         impl PartialEq<#type_name> for #inner_type {
             fn eq(&self, other: &#type_name) -> bool {
