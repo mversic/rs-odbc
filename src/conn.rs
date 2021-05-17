@@ -1,15 +1,17 @@
 use crate::{
-    Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcBool, OdbcDefined, True, SQLCHAR, SQLINTEGER,
-    SQLUINTEGER, SQLULEN, SQLWCHAR,
+    Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcBool, OdbcDefined, True, SQLCHAR, SQLHDBC,
+    SQLINTEGER, SQLUINTEGER, SQLULEN, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
 
-// TODO: Implement runtime checks for when attributes can be set on a connection
-
 pub trait ConnAttr<A: Ident>:
     Attr<A> + AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER>
 {
+    #[inline]
+    // TODO: Not really sure whether attributes should be checked when getting them
+    // with SQLGetConnectAttr. Currently only SQLSetConnectAttr uses this
+    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {}
 }
 
 // Re-exported as connection attribute
@@ -76,7 +78,12 @@ unsafe impl Attr<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
+impl ConnAttr<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {
+    #[cfg(feature = "odbc_debug")]
+    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+        ConnectionHandle.assert_not_connected();
+    }
+}
 unsafe impl AttrRead<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
 unsafe impl AttrWrite<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
 
@@ -88,7 +95,12 @@ unsafe impl Attr<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
+impl ConnAttr<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {
+    #[cfg(feature = "odbc_debug")]
+    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+        ConnectionHandle.assert_not_connected();
+    }
+}
 unsafe impl AttrRead<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
 unsafe impl AttrWrite<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
 
@@ -124,7 +136,12 @@ unsafe impl Attr<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {}
+impl ConnAttr<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {
+    #[cfg(feature = "odbc_debug")]
+    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+        ConnectionHandle.assert_connected();
+    }
+}
 unsafe impl AttrRead<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {}
 unsafe impl AttrWrite<SQL_ATTR_TRANSLATE_LIB> for &[SQLCHAR] {}
 
@@ -171,7 +188,12 @@ unsafe impl Attr<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {
     type NonBinary = True;
 }
 #[cfg(feature = "v3_5")]
-impl ConnAttr<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {}
+impl ConnAttr<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {
+    #[cfg(feature = "odbc_debug")]
+    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+        ConnectionHandle.assert_connected();
+    }
+}
 #[cfg(feature = "v3_5")]
 unsafe impl AttrRead<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {}
 
@@ -183,7 +205,12 @@ unsafe impl Attr<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
+impl ConnAttr<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {
+    #[cfg(feature = "odbc_debug")]
+    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+        ConnectionHandle.assert_connected();
+    }
+}
 unsafe impl AttrRead<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
 unsafe impl AttrWrite<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
 
@@ -197,7 +224,12 @@ unsafe impl AttrWrite<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
 //#[identifier(SQLINTEGER, 118)]
 //// This is set-only attribute
 //pub struct SQL_ATTR_DBC_INFO_TOKEN;
-//impl ConnAttr<SQL_ATTR_DBC_INFO_TOKEN> for SQLPOINTER {}
+//impl ConnAttr<SQL_ATTR_DBC_INFO_TOKEN> for SQLPOINTER {
+//    #[cfg(feature = "odbc_debug")]
+//    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+//        assert_connected(ConnectionHandle);
+//    }
+//}
 //impl AttrWrite<SQL_ATTR_DBC_INFO_TOKEN> for SQLPOINTER {}
 
 //#[cfg(feature = "v3_8")]
@@ -235,7 +267,12 @@ unsafe impl AttrWrite<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
 //#[identifier(SQLINTEGER, 110)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_ODBC_CURSORS;
-//impl ConnAttr<SQL_ATTR_ODBC_CURSORS> for _ {}
+//impl ConnAttr<SQL_ATTR_ODBC_CURSORS> for _ {
+//    #[cfg(feature = "odbc_debug")]
+//    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+//        assert_not_connected(ConnectionHandle);
+//    }
+//}
 
 //#[allow(non_camel_case_types)]
 //#[derive(EqSQLULEN, Debug, PartialEq, Eq, Clone, Copy)]

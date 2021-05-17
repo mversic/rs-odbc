@@ -58,7 +58,7 @@ fn main() {
     let outstrr: &mut [MaybeUninit<SQLCHAR>] = &mut outstr;
     let mut outstrlen = MaybeUninit::uninit();
     let res = SQLDriverConnectA(
-        &conn,
+        &mut conn,
         None,
         conn_string.as_bytes(),
         outstrr,

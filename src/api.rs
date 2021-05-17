@@ -160,7 +160,7 @@ where
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLBrowseConnectA<C: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
-    ConnectionHandle: &SQLHDBC,
+    ConnectionHandle: &mut SQLHDBC,
     InConnectionString: &[SQLCHAR],
     OutConnectionString: Option<&mut C>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
@@ -172,7 +172,7 @@ where
     let OutConnectionString =
         OutConnectionString.map_or((std::ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
-    unsafe {
+    let sql_return = unsafe {
         extern_api::SQLBrowseConnectA(
             ConnectionHandle.as_SQLHANDLE(),
             InConnectionString.0,
@@ -181,7 +181,13 @@ where
             OutConnectionString.1,
             StringLength2Ptr.as_mut_ptr(),
         )
+    };
+
+    if SQL_SUCCEEDED(sql_return) {
+        ConnectionHandle.set_connected();
     }
+
+    sql_return
 }
 
 /// Supports an iterative method of discovering and enumerating the attributes and attribute values required to connect to a data source. Each call to **SQLBrowseConnect** returns successive levels of attributes and attribute values. When all levels have been enumerated, a connection to the data source is completed and a complete connection string is returned by **SQLBrowseConnect**. A return code of SQL_SUCCESS or SQL_SUCCESS_WITH_INFO indicates that all connection information has been specified and the application is now connected to the data source.
@@ -193,7 +199,7 @@ where
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLBrowseConnectW<C: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(
-    ConnectionHandle: &SQLHDBC,
+    ConnectionHandle: &mut SQLHDBC,
     InConnectionString: &[SQLWCHAR],
     OutConnectionString: Option<&mut C>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
@@ -205,7 +211,7 @@ where
     let OutConnectionString =
         OutConnectionString.map_or((std::ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
-    unsafe {
+    let sql_return = unsafe {
         extern_api::SQLBrowseConnectW(
             ConnectionHandle.as_SQLHANDLE(),
             InConnectionString.0,
@@ -214,7 +220,13 @@ where
             OutConnectionString.1,
             StringLength2Ptr.as_mut_ptr(),
         )
+    };
+
+    if SQL_SUCCEEDED(sql_return) {
+        ConnectionHandle.set_connected();
     }
+
+    sql_return
 }
 
 /// Performs bulk insertions and bulk bookmark operations, including update, delete, and fetch by bookmark.
@@ -527,7 +539,7 @@ where
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLConnectA(
-    ConnectionHandle: &SQLHDBC,
+    ConnectionHandle: &mut SQLHDBC,
     ServerName: &[SQLCHAR],
     UserName: &[SQLCHAR],
     Authentication: &[SQLCHAR],
@@ -536,7 +548,7 @@ pub fn SQLConnectA(
     let UserName = UserName.as_raw_slice();
     let Authentication = Authentication.as_raw_slice();
 
-    unsafe {
+    let sql_return = unsafe {
         extern_api::SQLConnectA(
             ConnectionHandle.as_SQLHANDLE(),
             ServerName.0,
@@ -546,7 +558,13 @@ pub fn SQLConnectA(
             Authentication.0,
             Authentication.1,
         )
+    };
+
+    if SQL_SUCCEEDED(sql_return) {
+        ConnectionHandle.set_connected();
     }
+
+    sql_return
 }
 
 /// Establishes connections to a driver and a data source. The connection handle references storage of all information about the connection to the data source, including status, transaction state, and error information.
@@ -558,7 +576,7 @@ pub fn SQLConnectA(
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLConnectW(
-    ConnectionHandle: &SQLHDBC,
+    ConnectionHandle: &mut SQLHDBC,
     ServerName: &[SQLWCHAR],
     UserName: &[SQLWCHAR],
     Authentication: &[SQLWCHAR],
@@ -567,7 +585,7 @@ pub fn SQLConnectW(
     let UserName = UserName.as_raw_slice();
     let Authentication = Authentication.as_raw_slice();
 
-    unsafe {
+    let sql_return = unsafe {
         extern_api::SQLConnectW(
             ConnectionHandle.as_SQLHANDLE(),
             ServerName.0,
@@ -577,7 +595,13 @@ pub fn SQLConnectW(
             Authentication.0,
             Authentication.1,
         )
+    };
+
+    if SQL_SUCCEEDED(sql_return) {
+        ConnectionHandle.set_connected();
     }
+
+    sql_return
 }
 
 /// Copies descriptor information from one descriptor handle to another.
@@ -790,7 +814,13 @@ pub fn SQLDescribeParam(
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLDisconnect(ConnectionHandle: &mut SQLHDBC) -> SQLRETURN {
-    unsafe { extern_api::SQLDisconnect(ConnectionHandle.as_SQLHANDLE()) }
+    let sql_return = unsafe { extern_api::SQLDisconnect(ConnectionHandle.as_SQLHANDLE()) };
+
+    if SQL_SUCCEEDED(sql_return) {
+        ConnectionHandle.set_disconnected();
+    }
+
+    sql_return
 }
 
 /// An alternative to **SQLConnect**. It supports data sources that require more connection information than the three arguments in **SQLConnect**, dialog boxes to prompt the user for all connection information, and data sources that are not defined in the system information. For more information, see Connecting with SQLDriverConnect.
@@ -802,7 +832,7 @@ pub fn SQLDisconnect(ConnectionHandle: &mut SQLHDBC) -> SQLRETURN {
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLDriverConnectA<C: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
-    ConnectionHandle: &SQLHDBC,
+    ConnectionHandle: &mut SQLHDBC,
     WindowHandle: Option<SQLHWND>,
     InConnectionString: &[SQLCHAR],
     OutConnectionString: &mut C,
@@ -815,7 +845,7 @@ where
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString = OutConnectionString.as_mut_raw_slice();
 
-    unsafe {
+    let sql_return = unsafe {
         extern_api::SQLDriverConnectA(
             ConnectionHandle.as_SQLHANDLE(),
             // TODO: Fix this
@@ -827,7 +857,13 @@ where
             StringLength2Ptr.as_mut_ptr(),
             DriverCompletion as SQLUSMALLINT,
         )
+    };
+
+    if SQL_SUCCEEDED(sql_return) {
+        ConnectionHandle.set_connected();
     }
+
+    sql_return
 }
 
 /// An alternative to **SQLConnect**. It supports data sources that require more connection information than the three arguments in **SQLConnect**, dialog boxes to prompt the user for all connection information, and data sources that are not defined in the system information. For more information, see Connecting with SQLDriverConnect.
@@ -839,7 +875,7 @@ where
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLDriverConnectW<C: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(
-    ConnectionHandle: &SQLHDBC,
+    ConnectionHandle: &mut SQLHDBC,
     WindowHandle: Option<SQLHWND>,
     InConnectionString: &[SQLWCHAR],
     OutConnectionString: &mut C,
@@ -852,7 +888,7 @@ where
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString = OutConnectionString.as_mut_raw_slice();
 
-    unsafe {
+    let sql_return = unsafe {
         extern_api::SQLDriverConnectW(
             ConnectionHandle.as_SQLHANDLE(),
             // TODO: Fix this
@@ -864,7 +900,13 @@ where
             StringLength2Ptr.as_mut_ptr(),
             DriverCompletion as SQLUSMALLINT,
         )
+    };
+
+    if SQL_SUCCEEDED(sql_return) {
+        ConnectionHandle.set_connected();
     }
+
+    sql_return
 }
 
 /// Lists driver descriptions and driver attribute keywords. This function is implemented only by the Driver Manager.
@@ -2208,6 +2250,7 @@ pub fn SQLSetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A>>(
 where
     T: AttrWrite<A> + AnsiType,
 {
+    ValuePtr.check_attr(ConnectionHandle);
     let ValuePtrLen = ValuePtr.len();
 
     unsafe {
@@ -2236,6 +2279,7 @@ pub fn SQLSetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A>>(
 where
     T: AttrWrite<A> + UnicodeType,
 {
+    ValuePtr.check_attr(ConnectionHandle);
     let ValuePtrLen = ValuePtr.len();
 
     unsafe {

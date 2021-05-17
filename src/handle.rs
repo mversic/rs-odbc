@@ -153,6 +153,44 @@ impl Drop for SQLHENV {
 pub struct SQLHDBC<'env> {
     parent: PhantomData<&'env ()>,
     pub(crate) handle: SQLHANDLE,
+
+    #[cfg(feature = "odbc_debug")]
+    connected: bool,
+}
+impl SQLHDBC<'_> {
+    #[inline]
+    #[cfg(feature = "odbc_debug")]
+    pub(crate) fn set_connected(&mut self) {
+        self.connected = true;
+    }
+
+    #[inline]
+    #[cfg(not(feature = "odbc_debug"))]
+    pub(crate) fn set_connected(&mut self) {}
+
+    #[inline]
+    #[cfg(feature = "odbc_debug")]
+    pub(crate) fn set_disconnected(&mut self) {
+        self.connected = false;
+    }
+
+    #[inline]
+    #[cfg(not(feature = "odbc_debug"))]
+    pub(crate) fn set_disconnected(&mut self) {}
+
+    #[inline]
+    #[cfg(feature = "odbc_debug")]
+    pub(crate) fn assert_connected(&self) {
+        // TODO: Add a message that attribute should be set only after connection was established
+        assert_eq!(true, self.connected);
+    }
+
+    #[inline]
+    #[cfg(feature = "odbc_debug")]
+    pub(crate) fn assert_not_connected(&self) {
+        // TODO: Add a message that attribute should be set only before connection was established
+        assert_eq!(false, self.connected);
+    }
 }
 impl Handle for SQLHDBC<'_> {
     type Ident = SQL_HANDLE_DBC;
@@ -160,6 +198,15 @@ impl Handle for SQLHDBC<'_> {
 unsafe impl<'env> Allocate<'env> for SQLHDBC<'env> {
     type SrcHandle = SQLHENV;
 
+    #[cfg(feature = "odbc_debug")]
+    fn from_raw(handle: SQLHANDLE) -> Self {
+        SQLHDBC {
+            handle,
+            parent: PhantomData,
+            connected: false,
+        }
+    }
+    #[cfg(not(feature = "odbc_debug"))]
     fn from_raw(handle: SQLHANDLE) -> Self {
         SQLHDBC {
             handle,
