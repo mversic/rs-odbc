@@ -51,15 +51,8 @@ impl EnvAttr<SQL_ATTR_CP_MATCH> for CpMatch {}
 unsafe impl AttrRead<SQL_ATTR_CP_MATCH> for CpMatch {}
 unsafe impl AttrWrite<SQL_ATTR_CP_MATCH> for CpMatch {}
 
-// TODO:
-//For private driver manager
-//#[derive(Ident, EnvAttr)]
-//#[ident(SQLINTEGER, 203)]
-//#[allow(non_camel_case_types)]
-//pub struct SQL_ATTR_APPLICATION_KEY;
-//unsafe impl<L> EnvAttr<SQL_ATTR_APPLICATION_KEY, L> for ApplicationKey {}
-
-// TODO: Is this used in V3.x?
+// TODO: Can this be used meaningfully?
+// Documentation says that SQLSetEnvAttr doesn't support setting this value to `false`
 //#[derive(Ident, EnvAttr)]
 //#[ident(SQLINTEGER, 1001)]
 //#[allow(non_camel_case_types)]
@@ -92,25 +85,13 @@ pub const SQL_CP_STRICT_MATCH: CpMatch = CpMatch(0);
 pub const SQL_CP_RELAXED_MATCH: CpMatch = CpMatch(1);
 pub use SQL_CP_STRICT_MATCH as SQL_CP_MATCH_DEFAULT;
 
-impl<A: Ident> EnvAttr<A> for [SQLWCHAR]
-where
-    [SQLCHAR]: EnvAttr<A, NonBinary = True>,
-    Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
-{
-}
-impl<A: Ident> EnvAttr<A> for [MaybeUninit<SQLCHAR>]
-where
-    [SQLCHAR]: EnvAttr<A>,
-    Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
-{
-}
-impl<A: Ident> EnvAttr<A> for [MaybeUninit<SQLWCHAR>]
-where
-    [SQLWCHAR]: EnvAttr<A>,
-    Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
-{
-}
 impl<A: Ident, T: Ident> EnvAttr<A> for MaybeUninit<T> where T: EnvAttr<A> {}
 
+impl<A: Ident> EnvAttr<A> for [MaybeUninit<SQLCHAR>]
+where
+    Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
+    [SQLCHAR]: EnvAttr<A>,
+{
+}
+
 impl<A: Ident> EnvAttr<A> for &[SQLCHAR] where [SQLCHAR]: EnvAttr<A> {}
-impl<A: Ident> EnvAttr<A> for &[SQLWCHAR] where [SQLWCHAR]: EnvAttr<A> {}

@@ -525,6 +525,7 @@ impl<'a> UnicodeType for &'a [MaybeUninit<SQLWCHAR>] where &'a [SQLWCHAR]: Unico
 
 // TODO: Comapare attribute types: <attribute>(type, default)
 // SQL_ATTR_OUTPUT_NTS(u32, true), SQL_ATTR_AUTO_IPD(u32, _)
+// WARN: SQL_ATTR_METADATA_ID is SQLULEN
 #[odbc_type(SQLUINTEGER)]
 #[allow(non_camel_case_types)]
 pub struct OdbcBool;

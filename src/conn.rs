@@ -1,38 +1,48 @@
 use crate::{
     Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcBool, OdbcDefined, True, SQLCHAR, SQLINTEGER,
-    SQLUINTEGER, SQLWCHAR,
+    SQLUINTEGER, SQLULEN, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
+
+// TODO: Implement runtime checks for when attributes can be set on a connection
 
 pub trait ConnAttr<A: Ident>:
     Attr<A> + AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER>
 {
 }
 
-// Re-exported as connection attributes
+// Re-exported as connection attribute
 pub use crate::stmt::SQL_ATTR_ASYNC_ENABLE;
+impl ConnAttr<SQL_ATTR_ASYNC_ENABLE> for SQLULEN {}
+
+// Re-exported as connection attribute
 pub use crate::stmt::SQL_ATTR_METADATA_ID;
+impl ConnAttr<SQL_ATTR_METADATA_ID> for OdbcBool {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 101)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_ACCESS_MODE;
-unsafe impl Attr<SQL_ATTR_ACCESS_MODE> for SQLUINTEGER {
+unsafe impl Attr<SQL_ATTR_ACCESS_MODE> for AccessMode {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_ACCESS_MODE> for SQLUINTEGER {}
+impl ConnAttr<SQL_ATTR_ACCESS_MODE> for AccessMode {}
+unsafe impl AttrRead<SQL_ATTR_ACCESS_MODE> for AccessMode {}
+unsafe impl AttrWrite<SQL_ATTR_ACCESS_MODE> for AccessMode {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 102)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_AUTOCOMMIT;
-unsafe impl Attr<SQL_ATTR_AUTOCOMMIT> for SQLUINTEGER {
+unsafe impl Attr<SQL_ATTR_AUTOCOMMIT> for AutoCommit {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_AUTOCOMMIT> for SQLUINTEGER {}
+impl ConnAttr<SQL_ATTR_AUTOCOMMIT> for AutoCommit {}
+unsafe impl AttrRead<SQL_ATTR_AUTOCOMMIT> for AutoCommit {}
+unsafe impl AttrWrite<SQL_ATTR_AUTOCOMMIT> for AutoCommit {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 113)]
@@ -43,6 +53,8 @@ unsafe impl Attr<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {
     type NonBinary = True;
 }
 impl ConnAttr<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {}
+unsafe impl AttrRead<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {}
+unsafe impl AttrWrite<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 109)]
@@ -56,32 +68,6 @@ impl ConnAttr<SQL_ATTR_CURRENT_CATALOG> for [SQLCHAR] {}
 unsafe impl AttrRead<SQL_ATTR_CURRENT_CATALOG> for [SQLCHAR] {}
 unsafe impl AttrWrite<SQL_ATTR_CURRENT_CATALOG> for &[SQLCHAR] {}
 
-// TODO: Not found in documentation, only in implementation
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, 114)]
-//#[allow(non_camel_case_types)]
-//pub struct SQL_ATTR_DISCONNECT_BEHAVIOR;
-
-//#[derive(Ident, AttrIdent)]
-//#[allow(non_camel_case_types)]
-//pub struct DisconnectBehavior;
-//pub const SQL_DB_RETURN_TO_POOL: DisconnectBehavior = DisconnectBehavior(0);
-//pub const SQL_DB_DISCONNECT: DisconnectBehavior = DisconnectBehavior(1);
-
-// TODO: Seems to be Microsoft related
-//#[derive(Ident, AttrIdent)]
-//#[identifier(SQLINTEGER, 1207)]
-//pub struct SQL_ATTR_ENLIST_IN_DTC;
-//impl ConnAttr<SQL_ATTR_ENLIST_IN_DTC> for SQLPOINTER {}
-
-//pub struct EnlistInDtc;
-//pub const SQL_DTC_DONE: = EnlistInDtc(0);
-
-// TODO: Unknown
-//#[derive(Ident, AttrIdent)]
-//#[identifier(SQLINTEGER, 1208)]
-//pub struct SQL_ATTR_ENLIST_IN_XA;
-
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 103)]
 #[allow(non_camel_case_types)]
@@ -91,6 +77,158 @@ unsafe impl Attr<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {
     type NonBinary = True;
 }
 impl ConnAttr<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
+unsafe impl AttrRead<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
+unsafe impl AttrWrite<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
+
+#[derive(Ident)]
+#[identifier(SQLINTEGER, 112)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ATTR_PACKET_SIZE;
+unsafe impl Attr<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+impl ConnAttr<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
+unsafe impl AttrRead<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
+unsafe impl AttrWrite<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
+
+#[derive(Ident)]
+#[identifier(SQLINTEGER, 104)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ATTR_TRACE;
+unsafe impl Attr<SQL_ATTR_TRACE> for Trace {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+impl ConnAttr<SQL_ATTR_TRACE> for Trace {}
+unsafe impl AttrRead<SQL_ATTR_TRACE> for Trace {}
+unsafe impl AttrWrite<SQL_ATTR_TRACE> for Trace {}
+
+#[derive(Ident)]
+#[identifier(SQLINTEGER, 105)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ATTR_TRACEFILE;
+unsafe impl Attr<SQL_ATTR_TRACEFILE> for [SQLCHAR] {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+impl ConnAttr<SQL_ATTR_TRACEFILE> for [SQLCHAR] {}
+unsafe impl AttrRead<SQL_ATTR_TRACEFILE> for [SQLCHAR] {}
+unsafe impl AttrWrite<SQL_ATTR_TRACEFILE> for &[SQLCHAR] {}
+
+#[derive(Ident)]
+#[identifier(SQLINTEGER, 106)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ATTR_TRANSLATE_LIB;
+unsafe impl Attr<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+impl ConnAttr<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {}
+unsafe impl AttrRead<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {}
+unsafe impl AttrWrite<SQL_ATTR_TRANSLATE_LIB> for &[SQLCHAR] {}
+
+#[derive(Ident)]
+#[identifier(SQLINTEGER, 10001)]
+#[allow(non_camel_case_types)]
+// This is read-only attribute
+pub struct SQL_ATTR_AUTO_IPD;
+unsafe impl Attr<SQL_ATTR_AUTO_IPD> for OdbcBool {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+impl ConnAttr<SQL_ATTR_AUTO_IPD> for OdbcBool {}
+unsafe impl AttrRead<SQL_ATTR_AUTO_IPD> for OdbcBool {}
+
+#[cfg(feature = "v3_8")]
+#[derive(Ident)]
+#[identifier(SQLINTEGER, 117)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE;
+#[cfg(feature = "v3_8")]
+unsafe impl Attr<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+#[cfg(feature = "v3_8")]
+impl ConnAttr<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {}
+#[cfg(feature = "v3_8")]
+unsafe impl AttrRead<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {}
+#[cfg(feature = "v3_8")]
+unsafe impl AttrWrite<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {}
+
+// TODO: It is not 3.5 in implementation ???
+// but it says that drivers conforming to earlier versions can support this field
+#[cfg(feature = "v3_5")]
+#[derive(Ident)]
+#[identifier(SQLINTEGER, 1209)]
+#[allow(non_camel_case_types)]
+// This is read-only attribute
+pub struct SQL_ATTR_CONNECTION_DEAD;
+#[cfg(feature = "v3_5")]
+unsafe impl Attr<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+#[cfg(feature = "v3_5")]
+impl ConnAttr<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {}
+#[cfg(feature = "v3_5")]
+unsafe impl AttrRead<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {}
+
+#[derive(Ident)]
+#[identifier(SQLINTEGER, 107)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ATTR_TRANSLATE_OPTION;
+unsafe impl Attr<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+impl ConnAttr<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
+unsafe impl AttrRead<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
+unsafe impl AttrWrite<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
+
+// TODO: Uncertain
+//#[derive(Ident, AttrIdent)]
+//#[identifier(SQLINTEGER, 108)]
+//pub struct SQL_ATTR_TXN_ISOLATION;
+
+//#[cfg(feature = "v3_8")]
+//#[derive(Ident)]
+//#[identifier(SQLINTEGER, 118)]
+//// This is set-only attribute
+//pub struct SQL_ATTR_DBC_INFO_TOKEN;
+//impl ConnAttr<SQL_ATTR_DBC_INFO_TOKEN> for SQLPOINTER {}
+//impl AttrWrite<SQL_ATTR_DBC_INFO_TOKEN> for SQLPOINTER {}
+
+//#[cfg(feature = "v3_8")]
+//#[derive(Ident)]
+//#[identifier(SQLINTEGER, 119)]
+//pub struct SQL_ATTR_ASYNC_DBC_EVENT;
+//// TODO: It's an Event handle. Should probably implement event handle
+//impl AttrRead<SQL_ATTR_ASYNC_DBC_EVENT> for SQLPOINTER {}
+
+//#[derive(Ident)]
+//#[identifier(SQLINTEGER, 111)]
+//#[allow(non_camel_case_types)]
+//pub struct SQL_ATTR_QUIET_MODE;
+//impl ConnAttr<SQL_ATTR_QUIET_MODE> for SQLHWND {}
+
+// TODO: Not found in documentation, only in implementation
+//#[derive(Ident)]
+//#[identifier(SQLINTEGER, 114)]
+//#[allow(non_camel_case_types)]
+//pub struct SQL_ATTR_DISCONNECT_BEHAVIOR;
+
+//#[derive(odbc_type)]
+//#[allow(non_camel_case_types)]
+//pub struct DisconnectBehavior;
+//pub const SQL_DB_RETURN_TO_POOL: DisconnectBehavior = DisconnectBehavior(0);
+//pub const SQL_DB_DISCONNECT: DisconnectBehavior = DisconnectBehavior(1);
+
+// TODO: Unknown
+//#[derive(Ident, AttrIdent)]
+//#[identifier(SQLINTEGER, 1208)]
+//pub struct SQL_ATTR_ENLIST_IN_XA;
 
 // TODO: Seems to be deprecated
 //#[derive(Ident, AttrIdent)]
@@ -106,123 +244,6 @@ impl ConnAttr<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
 //pub const SQL_CUR_USE_ODBC: SQLULEN = OdbcCursors(1);
 //pub const SQL_CUR_USE_DRIVER: SQLULEN = OdbcCursors(2);
 //pub use SQL_CUR_USE_DRIVER as SQL_CUR_DEFAULT;
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 112)]
-#[allow(non_camel_case_types)]
-pub struct SQL_ATTR_PACKET_SIZE;
-unsafe impl Attr<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {
-    type DefinedBy = OdbcDefined;
-    type NonBinary = True;
-}
-impl ConnAttr<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
-
-//#[derive(Ident, Read, Write)]
-//#[identifier(SQLINTEGER, 111)]
-//#[allow(non_camel_case_types)]
-//pub struct SQL_ATTR_QUIET_MODE;
-//impl ConnAttr<SQL_ATTR_QUIET_MODE> for SQLHWND {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 104)]
-#[allow(non_camel_case_types)]
-pub struct SQL_ATTR_TRACE;
-unsafe impl Attr<SQL_ATTR_TRACE> for Trace {
-    type DefinedBy = OdbcDefined;
-    type NonBinary = True;
-}
-impl ConnAttr<SQL_ATTR_TRACE> for Trace {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 105)]
-#[allow(non_camel_case_types)]
-pub struct SQL_ATTR_TRACEFILE;
-// TODO: Is this default really?
-//pub const SQL_OPT_TRACE_FILE_DEFAULT = "\\SQL.LOG";
-
-// TODO: Has to be null-terminated
-unsafe impl Attr<SQL_ATTR_TRACEFILE> for [SQLCHAR] {
-    type DefinedBy = OdbcDefined;
-    type NonBinary = True;
-}
-impl ConnAttr<SQL_ATTR_TRACEFILE> for [SQLCHAR] {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 106)]
-#[allow(non_camel_case_types)]
-pub struct SQL_ATTR_TRANSLATE_LIB;
-// TODO: Has to be null-terminated
-unsafe impl Attr<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {
-    type DefinedBy = OdbcDefined;
-    type NonBinary = True;
-}
-impl ConnAttr<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {}
-
-// TODO: Investigate this
-//#[derive(Ident, AttrIdent)]
-//#[identifier(SQLINTEGER, 107)]
-//pub struct SQL_ATTR_TRANSLATE_OPTION;
-//impl ConnAttr<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
-
-// TODO: Uncertain
-//#[derive(Ident, AttrIdent)]
-//#[identifier(SQLINTEGER, 108)]
-//pub struct SQL_ATTR_TXN_ISOLATION;
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 10001)]
-#[allow(non_camel_case_types)]
-// This is read-only attribute
-pub struct SQL_ATTR_AUTO_IPD;
-unsafe impl Attr<SQL_ATTR_AUTO_IPD> for OdbcBool {
-    type DefinedBy = OdbcDefined;
-    type NonBinary = True;
-}
-impl ConnAttr<SQL_ATTR_AUTO_IPD> for OdbcBool {}
-
-#[cfg(feature = "v3_8")]
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 117)]
-#[allow(non_camel_case_types)]
-pub struct SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE;
-#[cfg(feature = "v3_8")]
-unsafe impl Attr<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {
-    type DefinedBy = OdbcDefined;
-    type NonBinary = True;
-}
-#[cfg(feature = "v3_8")]
-impl ConnAttr<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {}
-
-//#[cfg(feature = "v3_8")]
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, 118)]
-//// This is set-only attribute
-//pub struct SQL_ATTR_DBC_INFO_TOKEN;
-//impl ConnAttr<SQL_ATTR_DBC_INFO_TOKEN> for SQLPOINTER {}
-//impl AttrWrite<SQLPOINTER, C> for SQL_ATTR_DBC_INFO_TOKEN {}
-
-//#[cfg(feature = "v3_8")]
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, 119)]
-//pub struct SQL_ATTR_ASYNC_DBC_EVENT;
-//// TODO: It's an Event handle. Should probably implement event handle
-//impl AttrRead<SQLPOINTER, C> for SQL_ATTR_ASYNC_DBC_EVENT {}
-
-// TODO: It is not 3.5 in implementation ???
-// but it says that drivers conforming to earlier versions can support this field. HMMMMMMMMMMM
-#[cfg(feature = "v3_5")]
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 1209)]
-#[allow(non_camel_case_types)]
-// This is read-only attribute
-pub struct SQL_ATTR_CONNECTION_DEAD;
-#[cfg(feature = "v3_5")]
-unsafe impl Attr<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {
-    type DefinedBy = OdbcDefined;
-    type NonBinary = True;
-}
-#[cfg(feature = "v3_5")]
-impl ConnAttr<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {}
 
 //*  ODBC Driver Manager sets this connection attribute to a unicode driver
 //    (which supports SQLConnectW) when the application is an ANSI application
@@ -278,11 +299,6 @@ impl ConnAttr<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {}
 //    SQL_REFRESH_MANUAL = 1,
 //}
 
-// TODO: Reexport these in conn module
-// TODO: Or derive them, but still export?
-//impl ConnAttr for crate::stmt::SQL_ATTR_METADATA_ID {}
-//impl ConnAttr for crate::stmt::SQL_ATTR_ASYNC_ENABLE {}
-
 #[odbc_type(SQLUINTEGER)]
 pub struct AccessMode;
 pub const SQL_MODE_READ_WRITE: AccessMode = AccessMode(0);
@@ -321,28 +337,32 @@ pub const SQL_CD_TRUE: ConnectionDead = ConnectionDead(1);
 
 impl<A: Ident> ConnAttr<A> for [SQLWCHAR]
 where
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
     [SQLCHAR]: ConnAttr<A, NonBinary = True>,
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }
-impl<A: Ident> ConnAttr<A> for [MaybeUninit<SQLCHAR>]
-where
-    [SQLCHAR]: ConnAttr<A>,
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
-{
-}
-impl<A: Ident> ConnAttr<A> for [MaybeUninit<SQLWCHAR>]
-where
-    [SQLWCHAR]: ConnAttr<A>,
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
-{
-}
+
 impl<A: Ident, T: Ident> ConnAttr<A> for MaybeUninit<T>
 where
-    T: ConnAttr<A>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+    T: ConnAttr<A>,
+{
+}
+
+impl<A: Ident> ConnAttr<A> for [MaybeUninit<SQLCHAR>]
+where
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+    [SQLCHAR]: ConnAttr<A>,
+{
+}
+
+impl<A: Ident> ConnAttr<A> for [MaybeUninit<SQLWCHAR>]
+where
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+    [SQLWCHAR]: ConnAttr<A>,
 {
 }
 
 impl<A: Ident> ConnAttr<A> for &[SQLCHAR] where [SQLCHAR]: ConnAttr<A> {}
+
 impl<A: Ident> ConnAttr<A> for &[SQLWCHAR] where [SQLWCHAR]: ConnAttr<A> {}

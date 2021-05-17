@@ -1,7 +1,8 @@
 use crate::handle::{AppDesc, AsSQLHANDLE, ImplDesc, SQLHDESC};
 use crate::{
-    extern_api, AsMutPtr, AsMutSQLPOINTER, Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcDefined,
-    True, SQLCHAR, SQLHSTMT, SQLINTEGER, SQLPOINTER, SQLRETURN, SQLULEN, SQLWCHAR, SQL_SUCCESS,
+    extern_api, AsMutPtr, AsMutSQLPOINTER, Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcBool,
+    OdbcDefined, True, SQLCHAR, SQLHSTMT, SQLINTEGER, SQLPOINTER, SQLRETURN, SQLULEN, SQLWCHAR,
+    SQL_SUCCESS,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
@@ -526,13 +527,25 @@ unsafe impl AttrRead<SQL_ATTR_IMP_PARAM_DESC> for MaybeUninit<RefSQLHDESC<'_, Im
 #[identifier(SQLINTEGER, 10014)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_METADATA_ID;
-//impl AttrRead<MaybeUninit<SQLUINTEGER>> for SQL_ATTR_METADATA_ID {}
-//
+unsafe impl Attr<SQL_ATTR_METADATA_ID> for OdbcBool {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+//impl StmtAttr<SQL_ATTR_METADATA_ID> for OdbcBool {}
+//unsafe impl AttrRead<SQL_ATTR_METADATA_ID> for OdbcBool {}
+//unsafe impl AttrWrite<SQL_ATTR_METADATA_ID> for OdbcBool {}
+
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 4)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_ASYNC_ENABLE;
-//impl AttrRead<MaybeUninit<SQLULEN>> for SQL_ATTR_ASYNC_ENABLE {}
+unsafe impl Attr<SQL_ATTR_ASYNC_ENABLE> for SQLULEN {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+//impl StmtAttr<SQL_ATTR_ASYNC_ENABLE> for SQLULEN {}
+//unsafe impl AttrRead<SQL_ATTR_ASYNC_ENABLE> for SQLULEN {}
+//unsafe impl AttrWrite<SQL_ATTR_ASYNC_ENABLE> for SQLULEN {}
 
 #[odbc_type(SQLULEN)]
 pub struct Noscan;

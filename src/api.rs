@@ -17,9 +17,9 @@ use crate::{
     AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AttrRead, AttrWrite, Buf,
     BulkOperation, CompletionType, DriverCompletion, FreeStmtOption, FunctionId, Ident,
     IdentifierType, IntoSQLPOINTER, LockType, NullAllowed, Operation, ParameterType, Reserved,
-    Scope, StrLenOrInd, UnicodeType, Unique, RETCODE, SQLCHAR, SQLHDBC, SQLHDESC,
-    SQLHENV, SQLHSTMT, SQLINTEGER, SQLLEN, SQLPOINTER, SQLRETURN, SQLSETPOSIROW, SQLSMALLINT,
-    SQLULEN, SQLUSMALLINT, SQLWCHAR, SQL_DESC_DATETIME_INTERVAL_CODE, SQL_SUCCEEDED, SQL_SUCCESS,
+    Scope, StrLenOrInd, UnicodeType, Unique, RETCODE, SQLCHAR, SQLHDBC, SQLHDESC, SQLHENV,
+    SQLHSTMT, SQLINTEGER, SQLLEN, SQLPOINTER, SQLRETURN, SQLSETPOSIROW, SQLSMALLINT, SQLULEN,
+    SQLUSMALLINT, SQLWCHAR, SQL_DESC_DATETIME_INTERVAL_CODE, SQL_SUCCEEDED, SQL_SUCCESS,
 };
 
 /// Allocates an environment, connection, statement, or descriptor handle.
@@ -2416,7 +2416,9 @@ where
 #[inline]
 #[allow(non_snake_case, unused_variables)]
 pub fn SQLSetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A>>(
-    EnvironmentHandle: &SQLHENV,
+    // Reference to SQLHENV is mutable to make it impossible to have a connection
+    // handle allocated on the environment handle when calling this function
+    EnvironmentHandle: &mut SQLHENV,
     Attribute: A,
     ValuePtr: T,
 ) -> SQLRETURN

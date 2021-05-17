@@ -106,6 +106,7 @@ impl Handle for SQLHENV {
 }
 unsafe impl Allocate<'_> for SQLHENV {
     type SrcHandle = SQL_NULL_HANDLE;
+
     fn from_raw(handle: SQLHANDLE) -> Self {
         SQLHENV { handle }
     }
@@ -158,6 +159,7 @@ impl Handle for SQLHDBC<'_> {
 }
 unsafe impl<'env> Allocate<'env> for SQLHDBC<'env> {
     type SrcHandle = SQLHENV;
+
     fn from_raw(handle: SQLHANDLE) -> Self {
         SQLHDBC {
             handle,
