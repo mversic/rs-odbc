@@ -49,6 +49,8 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
     let inner_type: Ident = syn::parse(args.next().unwrap().into()).expect("KAR");
 
     match inner_type.to_string().as_str() {
+        // REQUIREMENT1: supported types must have a valid zero-byte representation because of AttrZeroFill
+        // REQUIREMENT2: supported types must have the same representation as SQLPOINTER because of Ident
         "SQLINTEGER" | "SQLUINTEGER" | "SQLSMALLINT" | "SQLUSMALLINT" | "SQLLEN" | "SQLULEN" => {}
         unsupported => panic!("{}: unsupported ODBC type", unsupported),
     }
@@ -159,6 +161,14 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
         impl crate::Ident for #type_name {
             type Type = <#inner_type as crate::Ident>::Type;
             const IDENTIFIER: Self::Type = <#inner_type as crate::Ident>::IDENTIFIER;
+        }
+
+        impl crate::AttrZeroAssert for #type_name {
+            #[inline]
+            fn assert_zeroed(&self) {
+                // TODO: Check implementation on types in lib.rs
+                assert_eq!(0, *self);
+            }
         }
 
         impl PartialEq<#type_name> for #inner_type {

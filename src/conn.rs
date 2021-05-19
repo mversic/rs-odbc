@@ -8,10 +8,13 @@ use std::mem::MaybeUninit;
 pub trait ConnAttr<A: Ident>:
     Attr<A> + AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER>
 {
+    // TODO: Track active statements in debug mode because SQL_ATTR_ASYNC_ENABLE
+    // can only be set when there are no active statements
+
     #[inline]
     // TODO: Not really sure whether attributes should be checked when getting them
     // with SQLGetConnectAttr. Currently only SQLSetConnectAttr uses this
-    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {}
+    fn check_attr(&self, ConnectionHandle: &SQLHDBC) { }
 }
 
 // Re-exported as connection attribute

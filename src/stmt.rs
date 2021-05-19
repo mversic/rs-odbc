@@ -26,8 +26,8 @@ pub trait StmtAttr<'stmt, 'data, A: Ident>:
         StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN
     where
-        Self: AttrRead<A> + crate::AnsiType,
         A: Ident<Type = SQLINTEGER>,
+        Self: AttrRead<A> + crate::AnsiType,
         MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
         let ValuePtrLen = self.len();
@@ -49,14 +49,14 @@ pub trait StmtAttr<'stmt, 'data, A: Ident>:
         StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN
     where
-        Self: AttrRead<A> + crate::UnicodeType,
         A: Ident<Type = SQLINTEGER>,
+        Self: AttrRead<A> + crate::UnicodeType,
         MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
         let ValuePtrLen = self.len();
 
         unsafe {
-            extern_api::SQLGetStmtAttrA(
+            extern_api::SQLGetStmtAttrW(
                 StatementHandle.as_SQLHANDLE(),
                 A::IDENTIFIER,
                 self.as_mut_SQLPOINTER(),
@@ -76,11 +76,9 @@ unsafe impl<'data, T: crate::handle::DescType<'data>> AsMutSQLPOINTER
     for MaybeUninit<RefSQLHDESC<'_, T>>
 {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        unimplemented!()
+        unimplemented!("This method should never be called")
     }
 }
-impl<T> crate::AnsiType for MaybeUninit<RefSQLHDESC<'_, T>> {}
-impl<T> crate::UnicodeType for MaybeUninit<RefSQLHDESC<'_, T>> {}
 impl<'stmt, T> Deref for RefSQLHDESC<'stmt, T> {
     type Target = SQLHDESC<'stmt, T>;
 
@@ -330,7 +328,6 @@ unsafe impl Attr<SQL_ATTR_APP_ROW_DESC> for Option<&SQLHDESC<'_, AppDesc<'_>>> {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-// TODO: I think this should be implemented only for MaybeUninit<RefSQLHDESC>
 unsafe impl<'stmt, 'data> Attr<SQL_ATTR_APP_ROW_DESC>
     for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>>
 {

@@ -304,6 +304,11 @@ where
     T: AttrRead<A> + AnsiType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
+    // TODO: With MaybeUnint it's not possible to check that value is zeroed
+    //if cfg!(feature = "odbc_debug") {
+    //    NumericAttributePtr.assert_zeroed();
+    //}
+
     let CharacterAttributePtrLen = CharacterAttributePtr
         .as_ref()
         .map_or(0, |CharacterAttributePtr| CharacterAttributePtr.len());
@@ -1231,7 +1236,13 @@ where
     T: AttrRead<A> + AnsiType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
-    let ValuePtrLen = ValuePtr.as_ref().map_or(0, |ValuePtr| ValuePtr.len());
+    let ValuePtrLen = ValuePtr.as_ref().map_or(0, |ValuePtr| {
+        if cfg!(feature = "odbc_debug") {
+            ValuePtr.assert_zeroed();
+        }
+
+        ValuePtr.len()
+    });
 
     unsafe {
         extern_api::SQLGetConnectAttrA(
@@ -1262,7 +1273,13 @@ where
     T: AttrRead<A> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
-    let ValuePtrLen = ValuePtr.as_ref().map_or(0, |ValuePtr| ValuePtr.len());
+    let ValuePtrLen = ValuePtr.as_ref().map_or(0, |ValuePtr| {
+        if cfg!(feature = "odbc_debug") {
+            ValuePtr.assert_zeroed();
+        }
+
+        ValuePtr.len()
+    });
 
     unsafe {
         extern_api::SQLGetConnectAttrW(
@@ -1382,7 +1399,13 @@ where
     T: AttrRead<A> + AnsiType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
-    let ValuePtrLen = ValuePtr.as_ref().map_or(0, |ValuePtr| ValuePtr.len());
+    let ValuePtrLen = ValuePtr.as_ref().map_or(0, |ValuePtr| {
+        if cfg!(feature = "odbc_debug") {
+            ValuePtr.assert_zeroed();
+        }
+
+        ValuePtr.len()
+    });
 
     unsafe {
         extern_api::SQLGetDescFieldA(
@@ -1415,7 +1438,13 @@ where
     T: AttrRead<A> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
-    let ValuePtrLen = ValuePtr.as_ref().map_or(0, |ValuePtr| ValuePtr.len());
+    let ValuePtrLen = ValuePtr.as_ref().map_or(0, |ValuePtr| {
+        if cfg!(feature = "odbc_debug") {
+            ValuePtr.assert_zeroed();
+        }
+
+        ValuePtr.len()
+    });
 
     unsafe {
         extern_api::SQLGetDescFieldW(
@@ -1536,9 +1565,13 @@ where
     T: AttrRead<D> + AnsiType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
-    let DiagInfoPtrLen = DiagInfoPtr
-        .as_ref()
-        .map_or(0, |DiagInfoPtr| DiagInfoPtr.len());
+    let DiagInfoPtrLen = DiagInfoPtr.as_ref().map_or(0, |DiagInfoPtr| {
+        if cfg!(feature = "odbc_debug") {
+            DiagInfoPtr.assert_zeroed();
+        }
+
+        DiagInfoPtr.len()
+    });
 
     unsafe {
         extern_api::SQLGetDiagFieldA(
@@ -1574,9 +1607,13 @@ where
     T: AttrRead<D> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
-    let DiagInfoPtrLen = DiagInfoPtr
-        .as_ref()
-        .map_or(0, |DiagInfoPtr| DiagInfoPtr.len());
+    let DiagInfoPtrLen = DiagInfoPtr.as_ref().map_or(0, |DiagInfoPtr| {
+        if cfg!(feature = "odbc_debug") {
+            DiagInfoPtr.assert_zeroed();
+        }
+
+        DiagInfoPtr.len()
+    });
 
     unsafe {
         extern_api::SQLGetDiagFieldW(
@@ -1591,7 +1628,7 @@ where
     }
 }
 
-// TODO: Finish this functgion
+// TODO: Finish this functtion
 ///// Returns the current values of multiple fields of a diagnostic record that contains error, warning, and status information. Unlike **SQLGetDiagField**, which returns one diagnostic field per call, **SQLGetDiagRec** returns several commonly used fields of a diagnostic record, including the SQLSTATE, the native error code, and the diagnostic message text.
 /////
 ///// For complete documentation on SQLGetDiagRecA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdiagrec-function).
@@ -1749,7 +1786,6 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-// TODO: Is both 'stmt and 'data required to be declared when taking out values
 pub fn SQLGetStmtAttrA<'stmt, 'data, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'stmt, 'data, A>>(
     StatementHandle: &'stmt SQLHSTMT<'_, '_, 'data>,
     Attribute: A,
@@ -1757,20 +1793,22 @@ pub fn SQLGetStmtAttrA<'stmt, 'data, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'s
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrRead<A> + AnsiType + ?Sized,
+    T: AttrRead<A> + AnsiType,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     if let Some(ValuePtr) = ValuePtr {
+        if cfg!(feature = "odbc_debug") {
+            ValuePtr.assert_zeroed();
+        }
+
         ValuePtr.readA(StatementHandle, StringLengthPtr)
     } else {
-        let ValuePtrLen = ValuePtr.map_or(0, |ValuePtr| ValuePtr.len());
-
         unsafe {
             extern_api::SQLGetStmtAttrA(
                 StatementHandle.as_SQLHANDLE(),
                 A::IDENTIFIER,
                 std::ptr::null_mut(),
-                ValuePtrLen,
+                0,
                 StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
             )
         }
@@ -1796,16 +1834,18 @@ where
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     if let Some(ValuePtr) = ValuePtr {
+        if cfg!(feature = "odbc_debug") {
+            ValuePtr.assert_zeroed();
+        }
+
         ValuePtr.readW(StatementHandle, StringLengthPtr)
     } else {
-        let ValuePtrLen = ValuePtr.map_or(0, |ValuePtr| ValuePtr.len());
-
         unsafe {
             extern_api::SQLGetStmtAttrW(
                 StatementHandle.as_SQLHANDLE(),
                 A::IDENTIFIER,
                 std::ptr::null_mut(),
-                ValuePtrLen,
+                0,
                 StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
             )
         }
@@ -2469,14 +2509,12 @@ pub fn SQLSetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A>>(
 where
     T: AttrWrite<A>,
 {
-    let ValuePtrLen = ValuePtr.len();
-
     unsafe {
         extern_api::SQLSetEnvAttr(
             EnvironmentHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
             ValuePtr.into_SQLPOINTER(),
-            ValuePtrLen,
+            ValuePtr.len(),
         )
     }
 }
@@ -2521,14 +2559,12 @@ pub fn SQLSetStmtAttrA<'stmt, 'data, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'s
 where
     T: AttrWrite<A> + AnsiType,
 {
-    let ValuePtrLen = ValuePtr.len();
-
     let sql_return = unsafe {
         extern_api::SQLSetStmtAttrA(
             StatementHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
             ValuePtr.into_SQLPOINTER(),
-            ValuePtrLen,
+            ValuePtr.len(),
         )
     };
 

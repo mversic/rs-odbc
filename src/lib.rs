@@ -185,6 +185,49 @@ unsafe impl<T> IntoSQLPOINTER for &[T] {
     }
 }
 
+pub trait AttrZeroAssert {
+    fn assert_zeroed(&self) {}
+}
+
+impl AttrZeroAssert for SQLSMALLINT {
+    fn assert_zeroed(&self) {
+        // TODO: Add custom message
+        assert_eq!(0, *self);
+    }
+}
+impl AttrZeroAssert for SQLUSMALLINT {
+    fn assert_zeroed(&self) {
+        // TODO: Add custom message
+        assert_eq!(0, *self);
+    }
+}
+impl AttrZeroAssert for SQLINTEGER {
+    fn assert_zeroed(&self) {
+        // TODO: Add custom message
+        assert_eq!(0, *self);
+    }
+}
+impl AttrZeroAssert for SQLUINTEGER {
+    fn assert_zeroed(&self) {
+        // TODO: Add custom message
+        assert_eq!(0, *self);
+    }
+}
+impl AttrZeroAssert for SQLLEN {
+    fn assert_zeroed(&self) {
+        // TODO: Add custom message
+        assert_eq!(0, *self);
+    }
+}
+impl AttrZeroAssert for SQLULEN {
+    fn assert_zeroed(&self) {
+        // TODO: Add custom message
+        assert_eq!(0, *self);
+    }
+}
+impl<T> AttrZeroAssert for MaybeUninit<T> {}
+impl<T> AttrZeroAssert for [T] {}
+
 /// If type implementing this trait is a reference allocated inside Driver Manager, then
 /// it must be constrained by the given lifetime parameter 'a. Such references are never
 /// owned (and therefore never dropped) by the Rust code
@@ -216,52 +259,52 @@ pub trait Ident {
 impl Ident for SQLSMALLINT {
     type Type = SQLSMALLINT;
 
-    const IDENTIFIER: SQLSMALLINT = SQL_IS_SMALLINT;
+    const IDENTIFIER: Self::Type = SQL_IS_SMALLINT;
 }
 impl Ident for SQLUSMALLINT {
     type Type = SQLSMALLINT;
 
-    const IDENTIFIER: SQLSMALLINT = SQL_IS_USMALLINT;
+    const IDENTIFIER: Self::Type = SQL_IS_USMALLINT;
 }
 impl Ident for SQLINTEGER {
     type Type = SQLSMALLINT;
 
-    const IDENTIFIER: SQLSMALLINT = SQL_IS_INTEGER;
+    const IDENTIFIER: Self::Type = SQL_IS_INTEGER;
 }
 impl Ident for SQLUINTEGER {
     type Type = SQLSMALLINT;
 
-    const IDENTIFIER: SQLSMALLINT = SQL_IS_UINTEGER;
+    const IDENTIFIER: Self::Type = SQL_IS_UINTEGER;
 }
 impl Ident for SQLLEN {
     type Type = SQLSMALLINT;
 
-    const IDENTIFIER: SQLSMALLINT = SQL_IS_LEN;
+    const IDENTIFIER: Self::Type = SQL_IS_LEN;
 }
 impl Ident for SQLULEN {
     type Type = SQLSMALLINT;
 
-    const IDENTIFIER: SQLSMALLINT = SQL_IS_ULEN;
+    const IDENTIFIER: Self::Type = SQL_IS_ULEN;
 }
 impl<T> Ident for &T {
     type Type = SQLSMALLINT;
 
-    const IDENTIFIER: SQLSMALLINT = SQL_IS_POINTER;
+    const IDENTIFIER: Self::Type = SQL_IS_POINTER;
 }
 impl<T> Ident for &mut T {
     type Type = SQLSMALLINT;
 
-    const IDENTIFIER: SQLSMALLINT = SQL_IS_POINTER;
+    const IDENTIFIER: Self::Type = SQL_IS_POINTER;
 }
 impl<T> Ident for Option<&T> {
     type Type = SQLSMALLINT;
 
-    const IDENTIFIER: SQLSMALLINT = SQL_IS_POINTER;
+    const IDENTIFIER: Self::Type = SQL_IS_POINTER;
 }
 impl<T> Ident for Option<&mut T> {
     type Type = SQLSMALLINT;
 
-    const IDENTIFIER: SQLSMALLINT = SQL_IS_POINTER;
+    const IDENTIFIER: Self::Type = SQL_IS_POINTER;
 }
 
 pub unsafe trait Attr<A: Ident> {
@@ -275,7 +318,7 @@ pub unsafe trait Attr<A: Ident> {
 }
 unsafe impl<A: Ident> Attr<A> for [SQLWCHAR]
 where
-    [SQLCHAR]: Attr<A, NonBinary=True>,
+    [SQLCHAR]: Attr<A, NonBinary = True>,
 {
     type DefinedBy = <[SQLCHAR] as Attr<A>>::DefinedBy;
     type NonBinary = <[SQLCHAR] as Attr<A>>::NonBinary;
@@ -383,7 +426,9 @@ where
 
     fn len(&self) -> LEN {
         // Transmute is safe because MaybeUninit<T> has the same size and alignment as T
-        <[MaybeUninit<SQLWCHAR>] as AttrLen<AD, True, LEN>>::len(unsafe { std::mem::transmute(self) })
+        <[MaybeUninit<SQLWCHAR>] as AttrLen<AD, True, LEN>>::len(unsafe {
+            std::mem::transmute(self)
+        })
     }
 }
 unsafe impl<AD: Def, LEN: Copy> AttrLen<AD, True, LEN> for [MaybeUninit<SQLCHAR>]
@@ -489,7 +534,7 @@ impl Def for OdbcDefined {}
 pub enum DriverDefined {}
 impl Def for DriverDefined {}
 
-pub unsafe trait AttrRead<A>: AsMutSQLPOINTER {}
+pub unsafe trait AttrRead<A>: AsMutSQLPOINTER + AttrZeroAssert {}
 pub unsafe trait AttrWrite<A>: IntoSQLPOINTER {}
 
 unsafe impl<A> AttrRead<A> for [SQLWCHAR] where [SQLCHAR]: AttrRead<A> {}
@@ -511,15 +556,22 @@ unsafe impl<A: Ident> AttrRead<A> for [MaybeUninit<SQLWCHAR>] where [SQLWCHAR]: 
 
 pub trait AnsiType {}
 pub trait UnicodeType {}
+
 impl<T: Ident> AnsiType for T {}
 impl<T: Ident> UnicodeType for T {}
+
 impl AnsiType for [SQLCHAR] {}
+impl AnsiType for &[SQLCHAR] {}
+
 impl UnicodeType for [SQLWCHAR] {}
+impl UnicodeType for &[SQLWCHAR] {}
+
+impl<T: Ident> AnsiType for MaybeUninit<T> {}
+impl<T: Ident> UnicodeType for MaybeUninit<T> {}
+
 impl AnsiType for [MaybeUninit<SQLCHAR>] where [SQLCHAR]: AnsiType {}
 impl UnicodeType for [MaybeUninit<SQLWCHAR>] where [SQLWCHAR]: UnicodeType {}
 
-impl AnsiType for &[SQLCHAR] {}
-impl UnicodeType for &[SQLWCHAR] {}
 impl<'a> AnsiType for &'a [MaybeUninit<SQLCHAR>] where &'a [SQLCHAR]: AnsiType {}
 impl<'a> UnicodeType for &'a [MaybeUninit<SQLWCHAR>] where &'a [SQLWCHAR]: UnicodeType {}
 
