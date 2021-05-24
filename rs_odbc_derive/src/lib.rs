@@ -79,7 +79,7 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
             if struct_data.fields.is_empty() {
                 struct_data.fields = syn::Fields::Unnamed(
                     syn::FieldsUnnamed::parse
-                        .parse2(quote! { (#inner_type) })
+                        .parse2(quote! { (crate::#inner_type) })
                         .expect(&format!("{}: unknown ODBC type", inner_type)),
                 );
             } else {
@@ -105,15 +105,15 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
                     }
                 }
 
-                impl PartialEq<#inner_type> for #type_name {
-                    fn eq(&self, other: &#inner_type) -> bool {
+                impl PartialEq<crate::#inner_type> for #type_name {
+                    fn eq(&self, other: &crate::#inner_type) -> bool {
                         self.0 == *other
                     }
                 }
 
                 impl #type_name {
                     #[inline]
-                    pub(crate) const fn identifier(&self) -> #inner_type {
+                    pub(crate) const fn identifier(&self) -> crate::#inner_type {
                         self.0
                     }
                 }
@@ -127,29 +127,29 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
 
                 unsafe impl crate::IntoSQLPOINTER for #type_name {
                     fn into_SQLPOINTER(self) -> crate::SQLPOINTER {
-                        self as #inner_type as _
+                        self as crate::#inner_type as _
                     }
                 }
-                impl PartialEq<#inner_type> for #type_name {
-                    fn eq(&self, other: &#inner_type) -> bool {
-                        *self as #inner_type == *other
+                impl PartialEq<crate::#inner_type> for #type_name {
+                    fn eq(&self, other: &crate::#inner_type) -> bool {
+                        *self as crate::#inner_type == *other
                     }
                 }
 
-                impl std::convert::TryFrom<#inner_type> for #type_name {
-                    type Error = #inner_type;
+                impl std::convert::TryFrom<crate::#inner_type> for #type_name {
+                    type Error = crate::#inner_type;
 
-                    fn try_from(source: #inner_type) -> Result<Self, Self::Error> {
+                    fn try_from(source: crate::#inner_type) -> Result<Self, Self::Error> {
                         match source {
-                            #(x if x == #type_name::#variants as #inner_type => Ok(#type_name::#variants)),*,
+                            #(x if x == #type_name::#variants as crate::#inner_type => Ok(#type_name::#variants)),*,
                             unknown => Err(unknown),
                         }
                     }
                 }
 
                 impl #type_name {
-                    pub(crate) const fn identifier(&self) -> #inner_type {
-                        *self as #inner_type
+                    pub(crate) const fn identifier(&self) -> crate::#inner_type {
+                        *self as crate::#inner_type
                     }
                 }
             }
@@ -159,8 +159,8 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
 
     ret.extend(quote! {
         impl crate::Ident for #type_name {
-            type Type = <#inner_type as crate::Ident>::Type;
-            const IDENTIFIER: Self::Type = <#inner_type as crate::Ident>::IDENTIFIER;
+            type Type = <crate::#inner_type as crate::Ident>::Type;
+            const IDENTIFIER: Self::Type = <crate::#inner_type as crate::Ident>::IDENTIFIER;
         }
 
         impl crate::AttrZeroAssert for #type_name {
@@ -171,7 +171,7 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl PartialEq<#type_name> for #inner_type {
+        impl PartialEq<#type_name> for crate::#inner_type {
             fn eq(&self, other: &#type_name) -> bool {
                 other == self
             }

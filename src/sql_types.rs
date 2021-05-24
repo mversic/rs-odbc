@@ -232,31 +232,24 @@ pub const SQL_INTERVAL: SqlType = SqlType(10);
 
 #[odbc_type(SQLSMALLINT)]
 #[allow(non_camel_case_types)]
-pub struct SQL_DESC_DATETIME_INTERVAL_CODE;
+pub struct DatetimeIntervalCode;
 
 // Subcodes for the specific verbose datetime data type
-pub const SQL_CODE_DATE: SQL_DESC_DATETIME_INTERVAL_CODE = SQL_DESC_DATETIME_INTERVAL_CODE(1);
-pub const SQL_CODE_TIME: SQL_DESC_DATETIME_INTERVAL_CODE = SQL_DESC_DATETIME_INTERVAL_CODE(2);
-pub const SQL_CODE_TIMESTAMP: SQL_DESC_DATETIME_INTERVAL_CODE = SQL_DESC_DATETIME_INTERVAL_CODE(3);
+pub const SQL_CODE_DATE: DatetimeIntervalCode = DatetimeIntervalCode(1);
+pub const SQL_CODE_TIME: DatetimeIntervalCode = DatetimeIntervalCode(2);
+pub const SQL_CODE_TIMESTAMP: DatetimeIntervalCode = DatetimeIntervalCode(3);
 
 // Subcode for the specific verbose interval data type
-pub const SQL_CODE_YEAR: SQL_DESC_DATETIME_INTERVAL_CODE = SQL_DESC_DATETIME_INTERVAL_CODE(1);
-pub const SQL_CODE_MONTH: SQL_DESC_DATETIME_INTERVAL_CODE = SQL_DESC_DATETIME_INTERVAL_CODE(2);
-pub const SQL_CODE_DAY: SQL_DESC_DATETIME_INTERVAL_CODE = SQL_DESC_DATETIME_INTERVAL_CODE(3);
-pub const SQL_CODE_HOUR: SQL_DESC_DATETIME_INTERVAL_CODE = SQL_DESC_DATETIME_INTERVAL_CODE(4);
-pub const SQL_CODE_MINUTE: SQL_DESC_DATETIME_INTERVAL_CODE = SQL_DESC_DATETIME_INTERVAL_CODE(5);
-pub const SQL_CODE_SECOND: SQL_DESC_DATETIME_INTERVAL_CODE = SQL_DESC_DATETIME_INTERVAL_CODE(6);
-pub const SQL_CODE_YEAR_TO_MONTH: SQL_DESC_DATETIME_INTERVAL_CODE =
-    SQL_DESC_DATETIME_INTERVAL_CODE(7);
-pub const SQL_CODE_DAY_TO_HOUR: SQL_DESC_DATETIME_INTERVAL_CODE =
-    SQL_DESC_DATETIME_INTERVAL_CODE(8);
-pub const SQL_CODE_DAY_TO_MINUTE: SQL_DESC_DATETIME_INTERVAL_CODE =
-    SQL_DESC_DATETIME_INTERVAL_CODE(9);
-pub const SQL_CODE_DAY_TO_SECOND: SQL_DESC_DATETIME_INTERVAL_CODE =
-    SQL_DESC_DATETIME_INTERVAL_CODE(10);
-pub const SQL_CODE_HOUR_TO_MINUTE: SQL_DESC_DATETIME_INTERVAL_CODE =
-    SQL_DESC_DATETIME_INTERVAL_CODE(11);
-pub const SQL_CODE_HOUR_TO_SECOND: SQL_DESC_DATETIME_INTERVAL_CODE =
-    SQL_DESC_DATETIME_INTERVAL_CODE(12);
-pub const SQL_CODE_MINUTE_TO_SECOND: SQL_DESC_DATETIME_INTERVAL_CODE =
-    SQL_DESC_DATETIME_INTERVAL_CODE(13);
+pub const SQL_CODE_YEAR: DatetimeIntervalCode = DatetimeIntervalCode(1);
+pub const SQL_CODE_MONTH: DatetimeIntervalCode = DatetimeIntervalCode(2);
+pub const SQL_CODE_DAY: DatetimeIntervalCode = DatetimeIntervalCode(3);
+pub const SQL_CODE_HOUR: DatetimeIntervalCode = DatetimeIntervalCode(4);
+pub const SQL_CODE_MINUTE: DatetimeIntervalCode = DatetimeIntervalCode(5);
+pub const SQL_CODE_SECOND: DatetimeIntervalCode = DatetimeIntervalCode(6);
+pub const SQL_CODE_YEAR_TO_MONTH: DatetimeIntervalCode = DatetimeIntervalCode(7);
+pub const SQL_CODE_DAY_TO_HOUR: DatetimeIntervalCode = DatetimeIntervalCode(8);
+pub const SQL_CODE_DAY_TO_MINUTE: DatetimeIntervalCode = DatetimeIntervalCode(9);
+pub const SQL_CODE_DAY_TO_SECOND: DatetimeIntervalCode = DatetimeIntervalCode(10);
+pub const SQL_CODE_HOUR_TO_MINUTE: DatetimeIntervalCode = DatetimeIntervalCode(11);
+pub const SQL_CODE_HOUR_TO_SECOND: DatetimeIntervalCode = DatetimeIntervalCode(12);
+pub const SQL_CODE_MINUTE_TO_SECOND: DatetimeIntervalCode = DatetimeIntervalCode(13);

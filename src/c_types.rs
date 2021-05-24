@@ -3,10 +3,14 @@ use crate::Ident;
 use crate::{
     AsMutSQLPOINTER, AsSQLPOINTER, SQLBIGINT, SQLCHAR, SQLDOUBLE, SQLINTEGER, SQLLEN, SQLPOINTER,
     SQLREAL, SQLSCHAR, SQLSMALLINT, SQLUBIGINT, SQLUINTEGER, SQLUSMALLINT, SQLWCHAR,
+    SQL_PARAM_INPUT, SQL_PARAM_INPUT_OUTPUT, SQL_PARAM_OUTPUT,
 };
+
 use std::cell::UnsafeCell;
 use std::convert::TryInto;
+use std::ffi::c_void;
 use std::mem::MaybeUninit;
+use std::ptr::NonNull;
 
 pub trait Buf<TT: Ident>: BufLen {}
 // TODO: If mutable reference is coerced to shared and then to SQLPOINTER this is WRONG!
@@ -15,13 +19,12 @@ pub trait OutBuf<TT: Ident>: BufLen + AsMutSQLPOINTER {}
 
 /// Care must be taken because references to DeferredBuf might be written to. This usually
 /// means that DeferredBuf should only be implemented on UnsafeCell<T> or [UnsafeCell<T>].
-pub unsafe trait DeferredBuf<TT: Ident>: BufLen + AsSQLPOINTER {}
+pub unsafe trait DeferredBuf<'buf, TT: Ident>: BufLen + AsSQLPOINTER {}
 
 /// ScalarCType must have SQLPOINTER representation
 pub unsafe trait ScalarCType {}
 
 pub trait BufLen {
-    // TODO: Return MaybeUninit? len is not used for scalar types
     fn len(&self) -> SQLLEN;
 }
 
@@ -533,6 +536,11 @@ impl<T> BufLen for [T] {
             .expect("Buffer length greater than SQLLEN max")
     }
 }
+impl<T> BufLen for &[T] {
+    fn len(&self) -> SQLLEN {
+        <[T] as BufLen>::len(*self)
+    }
+}
 impl<T: ScalarCType> BufLen for T {
     fn len(&self) -> SQLLEN {
         0
@@ -543,7 +551,22 @@ impl<T: ScalarCType> BufLen for MaybeUninit<T> {
         0
     }
 }
+impl<T: ScalarCType> BufLen for &MaybeUninit<T> {
+    fn len(&self) -> SQLLEN {
+        (*self).len()
+    }
+}
 impl<T: ScalarCType> BufLen for UnsafeCell<T> {
+    fn len(&self) -> SQLLEN {
+        0
+    }
+}
+impl<T: ScalarCType> BufLen for &UnsafeCell<T> {
+    fn len(&self) -> SQLLEN {
+        (*self).len()
+    }
+}
+impl BufLen for NonNull<c_void> {
     fn len(&self) -> SQLLEN {
         0
     }
@@ -555,6 +578,17 @@ unsafe impl<T: ScalarCType> AsSQLPOINTER for UnsafeCell<T> {
         // that the underlaying type T has the same representation as SQLPOINTER
         // which should hold true for any type implementing ScalarCType trait
         self.get().cast()
+    }
+}
+
+unsafe impl<T: ScalarCType> AsSQLPOINTER for &UnsafeCell<T> {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+        (*self).as_SQLPOINTER()
+    }
+}
+unsafe impl<T> AsSQLPOINTER for &[UnsafeCell<T>] {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+        (*self).as_SQLPOINTER()
     }
 }
 
@@ -571,14 +605,23 @@ unsafe impl<T: ScalarCType> AsMutSQLPOINTER for MaybeUninit<T> {
     }
 }
 
-impl<TT: Ident, T> Buf<TT> for [MaybeUninit<T>] {}
-impl<TT: Ident, T: ScalarCType> Buf<TT> for MaybeUninit<T> {}
+impl<TT: Ident, T> Buf<TT> for &[MaybeUninit<T>] where T: Buf<TT> {}
+impl<TT: Ident, T: ScalarCType> Buf<TT> for &MaybeUninit<T> where T: Buf<TT> {}
 
-impl<TT: Ident, T> OutBuf<TT> for [T] where [T]: Buf<TT> {}
-impl<TT: Ident, T: ScalarCType> OutBuf<TT> for T where T: Buf<TT> {}
+impl<TT: Ident, T> OutBuf<TT> for [T] {}
+impl<TT: Ident, T: ScalarCType> OutBuf<TT> for T {}
 
-unsafe impl<TT: Ident, T> DeferredBuf<TT> for [UnsafeCell<T>] where [T]: Buf<TT> {}
-unsafe impl<TT: Ident, T: ScalarCType> DeferredBuf<TT> for UnsafeCell<T> where T: Buf<TT> {}
+unsafe impl<'buf, TT: Ident> DeferredBuf<'buf, TT> for NonNull<c_void> {}
+
+unsafe impl<'buf, TT: Ident, T> DeferredBuf<'buf, TT> for &'buf [UnsafeCell<T>] where [T]: Buf<TT> {}
+unsafe impl<'buf, TT: Ident, T: ScalarCType> DeferredBuf<'buf, TT> for &'buf UnsafeCell<T> where T: Buf<TT> {}
+
+//impl<T> ParameterDir<SQL_PARAM_INPUT> for [T] where [T]: DeferredBuf {}
+//impl<T> ParameterDir<SQL_PARAM_OUTPUT> for [MaybeUninit<T>] where [T]: DeferredBuf {}
+//impl<T> ParameterDir<SQL_PARAM_INPUT_OUTPUT> for [MaybeUninit<T>] where
+//    [T]: ParameterDir<SQL_PARAM_INPUT>
+//{
+//}
 
 // TODO: Also, should these be implemented for SQLBindCol?
 //unsafe impl AsSQLPOINTER for SQLINTEGER {

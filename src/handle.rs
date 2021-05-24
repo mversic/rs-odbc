@@ -1,11 +1,11 @@
-use crate::c_types::DeferredBuf;
-use crate::extern_api;
 use crate::stmt::{
     SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC, SQL_ATTR_IMP_ROW_DESC,
 };
-use crate::{Ident, IntoSQLPOINTER, SQLPOINTER, SQLSMALLINT, SQL_SUCCESS};
+use crate::c_types::DeferredBuf;
+use crate::extern_api;
+use crate::{Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER, SQLSMALLINT, SQL_SUCCESS};
 use std::any::type_name;
-use std::cell::Cell;
+use std::cell::{Cell, UnsafeCell};
 use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::thread::panicking;
@@ -24,6 +24,7 @@ pub trait Handle {
 pub unsafe trait Allocate<'src>: Handle + Drop {
     type SrcHandle: AsSQLHANDLE;
     fn from_raw(handle: SQLHANDLE) -> Self;
+    // TODO: What is the point of this function? Is it because compiler cannot infer type?
     fn uninit() -> MaybeUninit<Self>
     where
         Self: Sized,
@@ -36,14 +37,21 @@ pub trait SQLCancelHandle: Handle {}
 pub trait SQLCompleteAsyncHandle: Handle {}
 pub trait SQLEndTranHandle: Handle {}
 
-pub trait DescType<'data> {}
-pub struct ImplDesc {}
-impl DescType<'_> for ImplDesc {}
+pub enum RowDesc {}
+pub enum ParamDesc {}
 
-pub struct AppDesc<'data> {
-    pub(crate) data_ptrs: PhantomData<&'data ()>,
+pub trait DescType<'buf> {}
+
+pub struct ImplDesc<T> {
+    desc_type: PhantomData<T>,
 }
-impl<'data> DescType<'data> for AppDesc<'data> {}
+impl<T> DescType<'_> for ImplDesc<T> {}
+
+#[derive(Debug)]
+pub struct AppDesc<'buf> {
+    pub(crate) data_ptrs: PhantomData<&'buf ()>,
+}
+impl<'buf> DescType<'buf> for AppDesc<'buf> {}
 
 #[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 1)]
@@ -98,6 +106,7 @@ pub type HDESC = SQLHANDLE;
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/environment-handles
+#[repr(transparent)]
 pub struct SQLHENV {
     pub(crate) handle: SQLHANDLE,
 }
@@ -150,6 +159,7 @@ impl Drop for SQLHENV {
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/connection-handles
+#[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
 pub struct SQLHDBC<'env> {
     parent: PhantomData<&'env ()>,
     pub(crate) handle: SQLHANDLE,
@@ -259,41 +269,42 @@ impl Drop for SQLHDBC<'_> {
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/statement-handles
-pub struct SQLHSTMT<'conn, 'stmt, 'data> {
+#[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
+pub struct SQLHSTMT<'conn, 'stmt, 'buf> {
     parent: PhantomData<&'conn ()>,
     pub(crate) handle: SQLHANDLE,
 
     #[cfg(feature = "odbc_debug")]
-    pub(crate) explicit_ard: Cell<Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>>>,
+    pub(crate) explicit_ard: Cell<Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>>>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) explicit_apd: Cell<Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>>>,
+    pub(crate) explicit_apd: Cell<Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>>>>,
 
     #[cfg(feature = "odbc_debug")]
-    pub(crate) ard: ManuallyDrop<SQLHDESC<'stmt, AppDesc<'data>>>,
+    pub(crate) ard: ManuallyDrop<SQLHDESC<'stmt, AppDesc<'buf>>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) apd: ManuallyDrop<SQLHDESC<'stmt, AppDesc<'data>>>,
+    pub(crate) apd: ManuallyDrop<SQLHDESC<'stmt, AppDesc<'buf>>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) ird: ManuallyDrop<SQLHDESC<'stmt, ImplDesc>>,
+    pub(crate) ird: ManuallyDrop<SQLHDESC<'stmt, ImplDesc<RowDesc>>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) ipd: ManuallyDrop<SQLHDESC<'stmt, ImplDesc>>,
+    pub(crate) ipd: ManuallyDrop<SQLHDESC<'stmt, ImplDesc<ParamDesc>>>,
 
     #[allow(dead_code)]
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) explicit_ard: Cell<PhantomData<&'stmt SQLHDESC<'stmt, AppDesc<'data>>>>,
+    pub(crate) explicit_ard: Cell<PhantomData<&'stmt SQLHDESC<'stmt, AppDesc<'buf>>>>,
     #[allow(dead_code)]
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) explicit_apd: Cell<PhantomData<&'stmt SQLHDESC<'stmt, AppDesc<'data>>>>,
+    pub(crate) explicit_apd: Cell<PhantomData<&'stmt SQLHDESC<'stmt, AppDesc<'buf>>>>,
 
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) ard: PhantomData<SQLHDESC<'stmt, AppDesc<'data>>>,
+    pub(crate) ard: PhantomData<SQLHDESC<'stmt, AppDesc<'buf>>>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) apd: PhantomData<SQLHDESC<'stmt, AppDesc<'data>>>,
+    pub(crate) apd: PhantomData<SQLHDESC<'stmt, AppDesc<'buf>>>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) ird: PhantomData<SQLHDESC<'stmt, ImplDesc>>,
+    pub(crate) ird: PhantomData<SQLHDESC<'stmt, ImplDesc<RowDesc>>>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) ipd: PhantomData<SQLHDESC<'stmt, ImplDesc>>,
+    pub(crate) ipd: PhantomData<SQLHDESC<'stmt, ImplDesc<ParamDesc>>>,
 }
-impl SQLHSTMT<'_, '_, '_> {
+impl<'buf> SQLHSTMT<'_, '_, 'buf> {
     #[cfg(feature = "odbc_debug")]
     unsafe fn get_descriptor_handle<A: Ident<Type = crate::SQLINTEGER>>(
         handle: SQLHANDLE,
@@ -319,31 +330,36 @@ impl SQLHSTMT<'_, '_, '_> {
     }
 
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>)
-    where
-        B: ?Sized,
-    {
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<'buf, TT>>(&self, TargetValuePtr: Option<B>) {}
+    #[cfg(not(feature = "odbc_debug"))]
+    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<'buf, TT>>(
+        &self,
+        TargetValuePtr: Option<B>,
+    ) {
     }
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>)
-    where
-        B: ?Sized,
-    {
+    pub(crate) fn bind_strlen_or_ind(
+        &self,
+        StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
+    ) {
     }
 
     #[cfg(feature = "odbc_debug")]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>)
-    where
-        B: ?Sized,
-    {
-        // TODO:
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<'buf, TT>>(&self, TargetValuePtr: Option<B>) {
         unimplemented!();
     }
     #[cfg(feature = "odbc_debug")]
-    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT>>(&self, TargetValuePtr: Option<&B>)
-    where
-        B: ?Sized,
-    {
+    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<'buf, TT>>(
+        &self,
+        TargetValuePtr: Option<B>,
+    ) {
+        unimplemented!();
+    }
+    #[cfg(feature = "odbc_debug")]
+    pub(crate) fn bind_strlen_or_ind(
+        &self,
+        StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
+    ) {
         unimplemented!();
     }
 }
@@ -369,8 +385,8 @@ unsafe impl<'conn> Allocate<'conn> for SQLHSTMT<'conn, '_, '_> {
 
                 ard: ManuallyDrop::new(SQLHDESC::<AppDesc>::from_raw(ard)),
                 apd: ManuallyDrop::new(SQLHDESC::<AppDesc>::from_raw(apd)),
-                ird: ManuallyDrop::new(SQLHDESC::<ImplDesc>::from_raw(ird)),
-                ipd: ManuallyDrop::new(SQLHDESC::<ImplDesc>::from_raw(ipd)),
+                ird: ManuallyDrop::new(SQLHDESC::<ImplDesc<_>>::from_raw(ird)),
+                ipd: ManuallyDrop::new(SQLHDESC::<ImplDesc<_>>::from_raw(ipd)),
 
                 explicit_ard: Cell::new(None),
                 explicit_apd: Cell::new(None),
@@ -438,6 +454,8 @@ impl Drop for SQLHSTMT<'_, '_, '_> {
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/descriptor-handles
+#[derive(Debug)]
+#[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
 pub struct SQLHDESC<'conn, T> {
     parent: PhantomData<&'conn ()>,
     pub(crate) handle: SQLHANDLE,
@@ -448,7 +466,7 @@ pub struct SQLHDESC<'conn, T> {
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) data: PhantomData<T>,
 }
-impl<'data, T: DescType<'data>> SQLHDESC<'_, T> {
+impl<'buf, T: DescType<'buf>> SQLHDESC<'_, T> {
     #[cfg(not(feature = "odbc_debug"))]
     fn from_raw(handle: SQLHANDLE) -> Self {
         SQLHDESC {
@@ -466,10 +484,10 @@ impl<'data, T: DescType<'data>> SQLHDESC<'_, T> {
         }
     }
 }
-impl<'data, T: DescType<'data>> Handle for SQLHDESC<'_, T> {
+impl<'buf, T: DescType<'buf>> Handle for SQLHDESC<'_, T> {
     type Ident = SQL_HANDLE_DESC;
 }
-unsafe impl<'conn, 'data> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'data>> {
+unsafe impl<'conn, 'buf> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'buf>> {
     // Valid because SQLHDBC is covariant
     type SrcHandle = SQLHDBC<'conn>;
 
@@ -482,7 +500,7 @@ unsafe impl<T> AsSQLHANDLE for SQLHDESC<'_, T> {
         self.handle
     }
 }
-unsafe impl<'data, T: DescType<'data>> IntoSQLPOINTER for Option<&SQLHDESC<'_, T>> {
+unsafe impl<'buf, T: DescType<'buf>> IntoSQLPOINTER for Option<&SQLHDESC<'_, T>> {
     fn into_SQLPOINTER(self) -> SQLPOINTER {
         self.map_or_else(std::ptr::null_mut, |handle| handle.as_SQLHANDLE().cast())
     }

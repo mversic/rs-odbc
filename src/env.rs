@@ -1,6 +1,5 @@
 use crate::{
     Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcDefined, True, SQLCHAR, SQLINTEGER, SQLUINTEGER,
-    SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;

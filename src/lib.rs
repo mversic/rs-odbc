@@ -12,9 +12,11 @@ pub mod sql_types;
 pub mod sqlreturn;
 pub mod stmt;
 
+use std::ffi::c_void;
 use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::mem::MaybeUninit;
+use std::cell::UnsafeCell;
 
 pub use conn::{
     SQL_ASYNC_DBC_ENABLE_DEFAULT, SQL_ATTR_ACCESS_MODE, SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE,
@@ -77,7 +79,7 @@ pub struct SqlStateA([SQLCHAR; 6]);
 pub struct SqlStateW([SQLWCHAR; 6]);
 
 type UWORD = u16;
-type SQLPOINTER = *mut std::ffi::c_void;
+pub type SQLPOINTER = *mut c_void;
 
 #[derive(Clone, Copy)]
 // TODO: https://github.com/rust-lang/rust/issues/35121
@@ -123,7 +125,7 @@ unsafe impl AsMutPtr<SQLLEN> for MaybeUninit<StrLenOrInd> {
         self.as_mut_ptr().cast()
     }
 }
-unsafe impl AsMutPtr<SQLLEN> for std::cell::UnsafeCell<StrLenOrInd> {
+unsafe impl AsMutPtr<SQLLEN> for UnsafeCell<StrLenOrInd> {
     fn as_mut_ptr(&mut self) -> *mut SQLLEN {
         self.get().cast()
     }
@@ -139,6 +141,11 @@ unsafe impl<T> AsSQLPOINTER for [T] {
         // Casting from const to mutable raw pointer is ok because of the invariant
         // that SQLPOINTER obtained through AsSQLPOINTER will never be written to
         (self.as_ptr() as *mut T).cast()
+    }
+}
+unsafe impl AsSQLPOINTER for std::ptr::NonNull<c_void> {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+        self.as_ptr() as SQLPOINTER
     }
 }
 
@@ -679,18 +686,17 @@ pub enum Scope {
 #[odbc_type(SQLSMALLINT)]
 #[allow(non_camel_case_types)]
 // TODO: Think about splitting for IO
-pub enum ParameterType {
-    SQL_PARAM_INPUT = 1,
-    SQL_PARAM_INPUT_OUTPUT = 2,
-    SQL_PARAM_OUTPUT = 4,
+pub struct IOType;
+pub const SQL_PARAM_INPUT: IOType = IOType(1);
+pub const SQL_PARAM_INPUT_OUTPUT: IOType = IOType(2);
+pub const SQL_PARAM_OUTPUT: IOType = IOType(4);
 
-    SQL_PARAM_INPUT_OUTPUT_STREAM = 8,
-    SQL_PARAM_OUTPUT_STREAM = 16,
+pub const SQL_PARAM_INPUT_OUTPUT_STREAM: IOType = IOType(8);
+pub const SQL_PARAM_OUTPUT_STREAM: IOType = IOType(16);
 
-    SQL_PARAM_TYPE_UNKNOWN = 0,
-    SQL_RESULT_COL = 3,
-    SQL_RETURN_VALUE = 5,
-}
+pub const SQL_PARAM_TYPE_UNKNOWN: IOType = IOType(0);
+pub const SQL_RESULT_COL: IOType = IOType(3);
+pub const SQL_RETURN_VALUE: IOType = IOType(5);
 
 //pub const fn SQL_LEN_BINARY_ATTR<LEN>(length: LEN) {
 //    const SQL_LEN_BINARY_ATTR_OFFSET: LEN = -100;

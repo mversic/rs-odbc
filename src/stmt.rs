@@ -1,20 +1,20 @@
-use crate::handle::{AppDesc, AsSQLHANDLE, ImplDesc, SQLHDESC};
+use crate::handle::{AppDesc, AsSQLHANDLE, ImplDesc, ParamDesc, RowDesc, SQLHANDLE, SQLHDESC};
 use crate::{
     extern_api, AsMutPtr, AsMutSQLPOINTER, Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcBool,
     OdbcDefined, True, SQLCHAR, SQLHSTMT, SQLINTEGER, SQLPOINTER, SQLRETURN, SQLULEN, SQLWCHAR,
-    SQL_SUCCESS,
+    SQL_SUCCEEDED, SQL_SUCCESS,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 
-pub trait StmtAttr<'stmt, 'data, A: Ident>:
+pub trait StmtAttr<'stmt, 'buf, A: Ident>:
     Attr<A> + AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER>
 {
     // TODO: Can I use here descriptor and statement defined on different connections??? This
     // should not be allowed If this is true, then I need to use unelided lifetime 'conn to
     // tie the lifetimes. Will that solve the problem?
-    fn update_handle(&self, _: &SQLHSTMT<'_, 'stmt, 'data>)
+    fn update_handle(&self, _: &SQLHSTMT<'_, 'stmt, 'buf>)
     where
         Self: AttrWrite<A>,
     {
@@ -22,7 +22,7 @@ pub trait StmtAttr<'stmt, 'data, A: Ident>:
 
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'data>,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf>,
         StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN
     where
@@ -45,7 +45,7 @@ pub trait StmtAttr<'stmt, 'data, A: Ident>:
 
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'data>,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf>,
         StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN
     where
@@ -67,16 +67,24 @@ pub trait StmtAttr<'stmt, 'data, A: Ident>:
     }
 }
 
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy)]
 pub struct RefSQLHDESC<'stmt, T>(&'stmt SQLHDESC<'stmt, T>);
 impl<'stmt, T> Ident for RefSQLHDESC<'stmt, T> {
     type Type = <Option<&'stmt SQLHDESC<'stmt, T>> as Ident>::Type;
     const IDENTIFIER: Self::Type = <Option<&SQLHDESC<T>>>::IDENTIFIER;
 }
-unsafe impl<'data, T: crate::handle::DescType<'data>> AsMutSQLPOINTER
+unsafe impl<'buf, T: crate::handle::DescType<'buf>> AsMutSQLPOINTER
     for MaybeUninit<RefSQLHDESC<'_, T>>
 {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        unimplemented!("This method should never be called")
+        if cfg!(feature = "odbc_debug") {
+            // SQLHDESC is not transparent
+            unimplemented!("This method should never be called")
+        } else {
+            // SQLHDESC is transparent
+            self.as_mut_ptr().cast()
+        }
     }
 }
 impl<'stmt, T> Deref for RefSQLHDESC<'stmt, T> {
@@ -216,6 +224,7 @@ impl StmtAttr<'_, '_, SQL_ATTR_USE_BOOKMARKS> for UseBookmarks {}
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_ROW_BIND_TYPE;
 //
+// TODO: This cannot be supported until SQL_DESC_BIND_OFFSET_PTR is supported in descriptors
 //// Corresponds to APD SQL_DESC_BIND_OFFSET_PTR
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 17)]
@@ -252,6 +261,8 @@ impl StmtAttr<'_, '_, SQL_ATTR_USE_BOOKMARKS> for UseBookmarks {}
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_PARAMSET_SIZE;
 //
+
+// TODO: This cannot be supported until SQL_DESC_BIND_OFFSET_PTR is supported in descriptors
 //// Corresponds to ARD SQL_DESC_BIND_OFFSET_PTR
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 23)]
@@ -328,21 +339,21 @@ unsafe impl Attr<SQL_ATTR_APP_ROW_DESC> for Option<&SQLHDESC<'_, AppDesc<'_>>> {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl<'stmt, 'data> Attr<SQL_ATTR_APP_ROW_DESC>
-    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>>
+unsafe impl<'stmt, 'buf> Attr<SQL_ATTR_APP_ROW_DESC>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>>>
 {
     type DefinedBy =
-        <Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>> as Attr<SQL_ATTR_APP_ROW_DESC>>::DefinedBy;
+        <Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>>> as Attr<SQL_ATTR_APP_ROW_DESC>>::DefinedBy;
     type NonBinary =
-        <Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>> as Attr<SQL_ATTR_APP_ROW_DESC>>::NonBinary;
+        <Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>>> as Attr<SQL_ATTR_APP_ROW_DESC>>::NonBinary;
 }
-impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_ROW_DESC>
-    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>>
+impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'data>,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         if let Some(explicit_ard) = StatementHandle.explicit_ard.get() {
@@ -353,10 +364,11 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_ROW_DESC>
 
         SQL_SUCCESS
     }
+
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'data>,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         if let Some(explicit_ard) = StatementHandle.explicit_ard.get() {
@@ -368,11 +380,11 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_ROW_DESC>
         SQL_SUCCESS
     }
 }
-impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_ROW_DESC>
-    for Option<&'stmt SQLHDESC<'_, AppDesc<'data>>>
+impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC>
+    for Option<&'stmt SQLHDESC<'_, AppDesc<'buf>>>
 {
     #[cfg(feature = "odbc_debug")]
-    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'data>) {
+    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf>) {
         StatementHandle.explicit_ard.set(*self);
     }
 }
@@ -387,23 +399,21 @@ unsafe impl Attr<SQL_ATTR_APP_PARAM_DESC> for Option<&SQLHDESC<'_, AppDesc<'_>>>
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl<'stmt, 'data> Attr<SQL_ATTR_APP_PARAM_DESC>
-    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>>
+unsafe impl<'stmt, 'buf> Attr<SQL_ATTR_APP_PARAM_DESC>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>>>
 {
-    type DefinedBy = <Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>> as Attr<
-        SQL_ATTR_APP_PARAM_DESC,
-    >>::DefinedBy;
-    type NonBinary = <Option<&'stmt SQLHDESC<'stmt, AppDesc<'data>>> as Attr<
-        SQL_ATTR_APP_PARAM_DESC,
-    >>::NonBinary;
+    type DefinedBy =
+        <Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>>> as Attr<SQL_ATTR_APP_PARAM_DESC>>::DefinedBy;
+    type NonBinary =
+        <Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>>> as Attr<SQL_ATTR_APP_PARAM_DESC>>::NonBinary;
 }
-impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_PARAM_DESC>
-    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'data>>>
+impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'data>,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         if let Some(explicit_apd) = StatementHandle.explicit_apd.get() {
@@ -413,10 +423,11 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_PARAM_DESC>
         }
         SQL_SUCCESS
     }
+
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'data>,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         if let Some(explicit_apd) = StatementHandle.explicit_apd.get() {
@@ -427,11 +438,11 @@ impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_PARAM_DESC>
         SQL_SUCCESS
     }
 }
-impl<'stmt, 'data> StmtAttr<'stmt, 'data, SQL_ATTR_APP_PARAM_DESC>
-    for Option<&'stmt SQLHDESC<'_, AppDesc<'data>>>
+impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC>
+    for Option<&'stmt SQLHDESC<'_, AppDesc<'buf>>>
 {
     #[cfg(feature = "odbc_debug")]
-    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'data>) {
+    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf>) {
         StatementHandle.explicit_apd.set(*self);
     }
 }
@@ -443,12 +454,12 @@ unsafe impl AttrWrite<SQL_ATTR_APP_PARAM_DESC> for Option<&SQLHDESC<'_, AppDesc<
 #[allow(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_ATTR_IMP_ROW_DESC;
-unsafe impl Attr<SQL_ATTR_IMP_ROW_DESC> for MaybeUninit<RefSQLHDESC<'_, ImplDesc>> {
+unsafe impl Attr<SQL_ATTR_IMP_ROW_DESC> for MaybeUninit<RefSQLHDESC<'_, ImplDesc<RowDesc>>> {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
 impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC>
-    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc>>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<RowDesc>>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
@@ -459,6 +470,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC>
         *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ird));
         SQL_SUCCESS
     }
+
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
@@ -469,19 +481,19 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC>
         SQL_SUCCESS
     }
 }
-unsafe impl AttrRead<SQL_ATTR_IMP_ROW_DESC> for MaybeUninit<RefSQLHDESC<'_, ImplDesc>> {}
+unsafe impl AttrRead<SQL_ATTR_IMP_ROW_DESC> for MaybeUninit<RefSQLHDESC<'_, ImplDesc<RowDesc>>> {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 10013)]
 #[allow(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_ATTR_IMP_PARAM_DESC;
-unsafe impl Attr<SQL_ATTR_IMP_PARAM_DESC> for MaybeUninit<RefSQLHDESC<'_, ImplDesc>> {
+unsafe impl Attr<SQL_ATTR_IMP_PARAM_DESC> for MaybeUninit<RefSQLHDESC<'_, ImplDesc<ParamDesc>>> {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
 impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC>
-    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc>>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<ParamDesc>>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
@@ -492,6 +504,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC>
         *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ipd));
         SQL_SUCCESS
     }
+
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
@@ -502,7 +515,10 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC>
         SQL_SUCCESS
     }
 }
-unsafe impl AttrRead<SQL_ATTR_IMP_PARAM_DESC> for MaybeUninit<RefSQLHDESC<'_, ImplDesc>> {}
+unsafe impl AttrRead<SQL_ATTR_IMP_PARAM_DESC>
+    for MaybeUninit<RefSQLHDESC<'_, ImplDesc<ParamDesc>>>
+{
+}
 
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, -1)]
@@ -584,37 +600,37 @@ pub const SQL_UB_OFF: UseBookmarks = UseBookmarks(0);
 pub const SQL_UB_ON: UseBookmarks = UseBookmarks(1);
 pub use SQL_UB_OFF as SQL_UB_DEFAULT;
 
-impl<'stmt, 'data, A: Ident> StmtAttr<'stmt, 'data, A> for [SQLWCHAR]
+impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for [SQLWCHAR]
 where
-    [SQLCHAR]: StmtAttr<'stmt, 'data, A, NonBinary = True>,
+    [SQLCHAR]: StmtAttr<'stmt, 'buf, A, NonBinary = True>,
     Self: AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER>,
 {
 }
 
-impl<'stmt, 'data, A: Ident> StmtAttr<'stmt, 'data, A> for [MaybeUninit<SQLCHAR>]
+impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for [MaybeUninit<SQLCHAR>]
 where
-    [SQLCHAR]: StmtAttr<'stmt, 'data, A>,
+    [SQLCHAR]: StmtAttr<'stmt, 'buf, A>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }
-impl<'stmt, 'data, A: Ident> StmtAttr<'stmt, 'data, A> for [MaybeUninit<SQLWCHAR>]
+impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for [MaybeUninit<SQLWCHAR>]
 where
-    [SQLWCHAR]: StmtAttr<'stmt, 'data, A>,
+    [SQLWCHAR]: StmtAttr<'stmt, 'buf, A>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }
-impl<'stmt, 'data, A: Ident, T: Ident> StmtAttr<'stmt, 'data, A> for MaybeUninit<T>
+impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A> for MaybeUninit<T>
 where
-    T: StmtAttr<'stmt, 'data, A>,
+    T: StmtAttr<'stmt, 'buf, A>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }
 
-impl<'stmt, 'data, A: Ident> StmtAttr<'stmt, 'data, A> for &[SQLCHAR] where
-    [SQLCHAR]: StmtAttr<'stmt, 'data, A>
+impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for &[SQLCHAR] where
+    [SQLCHAR]: StmtAttr<'stmt, 'buf, A>
 {
 }
-impl<'stmt, 'data, A: Ident> StmtAttr<'stmt, 'data, A> for &[SQLWCHAR] where
-    [SQLWCHAR]: StmtAttr<'stmt, 'data, A>
+impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for &[SQLWCHAR] where
+    [SQLWCHAR]: StmtAttr<'stmt, 'buf, A>
 {
 }

@@ -93,12 +93,12 @@ fn main() {
     let Statement = "SELECT a from test.T";
     let k = rs_odbc::SQLPrepareA(&stmt, Statement.as_bytes());
     println!("PREPARE: {:?}", k);
-    //let mut kita = MaybeUninit::uninit();
-    //let k = rs_odbc::SQLBindCol(&stmt, 1, rs_odbc::c_types::SQL_C_SLONG, Some(ref_val), &mut kita);
+    //let mut kita = std::cell::UnsafeCell::new(StrLenOrInd::from);
+    let k = rs_odbc::SQLBindCol(&stmt, 1, rs_odbc::c_types::SQL_C_SLONG, Some(ref_val), None);
     //let col_cnt = unsafe { col_cnt.assume_init() };
     //println!("col_cnt: {}", col_cnt);
     let mut row = 0;
-    let x = SQLFetch(&stmt);
+    let x = unsafe { SQLFetch(&stmt)};
     println!("{:?}", x);
     while SQL_SUCCEEDED(x) {
         println!("Row {}, val: {:?}\n", row, val);
@@ -142,9 +142,10 @@ fn main() {
         None,
     );
     let read_desc: rs_odbc::stmt::RefSQLHDESC<_> = unsafe { read_desc.assume_init() };
-    SQLFetch(&stmt);
+    unsafe {SQLFetch(&stmt); }
     println!("KARA: {:?}", res);
 
+    println!("{:?}", read_desc);
     std::mem::drop(read_desc);
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     SQLFreeHandle(SQL_HANDLE_DESC, desc);
