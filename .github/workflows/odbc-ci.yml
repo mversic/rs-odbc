@@ -15,6 +15,11 @@ jobs:
       with:
         toolchain: stable
 
+    - name: Install ODBC Drivers
+      run: |
+        sudo apt update && sudo apt install odbcinst odbc-mariadb
+        /usr/lib/x86_64-linux-gnu/odbc/libmaodbc.so
+
     - name: Build rs-odbc
       run: cargo build --release
 

@@ -421,6 +421,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC>
         } else {
             *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.apd));
         }
+
         SQL_SUCCESS
     }
 
@@ -435,6 +436,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC>
         } else {
             *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.apd));
         }
+
         SQL_SUCCESS
     }
 }
