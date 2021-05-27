@@ -1,6 +1,10 @@
 name: odbc-ci
-# TODO: Only on PR on master?
-on: [push, pull_request]
+
+on:
+  push:
+    branches: master
+  pull_request:
+    branches: master
 
 jobs:
   build:
@@ -10,18 +14,14 @@ jobs:
     - name: Checkout master branch
       uses: actions/checkout@v2
 
-    - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
+    - name: Build rs-odbc docker image
+      run: docker-compose build
 
-    - name: Install ODBC Drivers
-      run: |
-        sudo apt update && sudo apt install odbcinst odbc-mariadb
-        /usr/lib/x86_64-linux-gnu/odbc/libmaodbc.so
+    - name: Start rs-odbc docker container
+      run: docker-compose up -d
 
     - name: Build rs-odbc
-      run: cargo build --release
+      run: docker exec -t rs-odbc cargo build --release
 
     - name: Run tests for rs-odbc
-      run: cargo test --release
+      run: docker exec -t rs-odbc cargo test --release

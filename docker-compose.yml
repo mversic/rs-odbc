@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  mariadb:
+    container_name: rs-odbc
+    build: docker/mariadb
+    ports:
+      - "3307:3306"
+    environment:
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'true'
+      MARIADB_ALLOW_EMPTY_PASSWORD: 'true'
+    volumes:
+      - './:/root/rs-odbc'
