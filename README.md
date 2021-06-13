@@ -10,4 +10,4 @@ ODBC implementation that looks and feels like ODBC
 Integration tests use dockerized environment which has database and ODBC driver already set up.
 
 Testing environment can be set up with `docker-compose up -d`<br/>
-Tests can be executed with `docker exec -t rs-odbc cargo test`
+Tests are executed with `docker exec -t rs-odbc sh -lc 'cargo test'`

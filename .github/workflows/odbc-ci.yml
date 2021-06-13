@@ -21,7 +21,7 @@ jobs:
       run: docker-compose up -d
 
     - name: Build rs-odbc
-      run: docker exec -t rs-odbc cargo build --release
+      run: docker exec -t rs-odbc sh -lc 'cargo build --release'
 
     - name: Run tests for rs-odbc
-      run: docker exec -t rs-odbc cargo test --release
+      run: docker exec -t rs-odbc sh -lc 'cargo test --release'
