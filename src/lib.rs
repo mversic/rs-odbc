@@ -12,36 +12,17 @@ pub mod sql_types;
 pub mod sqlreturn;
 pub mod stmt;
 
-use std::ffi::c_void;
+use rs_odbc_derive::odbc_type;
+use std::cell::UnsafeCell;
 use std::convert::TryFrom;
+use std::ffi::c_void;
 use std::fmt::Debug;
 use std::mem::MaybeUninit;
-use std::cell::UnsafeCell;
-
-pub use conn::{
-    SQL_ASYNC_DBC_ENABLE_DEFAULT, SQL_ATTR_ACCESS_MODE, SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE,
-    SQL_ATTR_AUTOCOMMIT, SQL_ATTR_AUTO_IPD, SQL_ATTR_CONNECTION_DEAD, SQL_ATTR_CONNECTION_TIMEOUT,
-    SQL_ATTR_CURRENT_CATALOG, SQL_ATTR_LOGIN_TIMEOUT, SQL_ATTR_PACKET_SIZE, SQL_ATTR_TRACE,
-    SQL_ATTR_TRACEFILE, SQL_ATTR_TRANSLATE_LIB, SQL_AUTOCOMMIT_DEFAULT, SQL_MODE_DEFAULT,
-    SQL_OPT_TRACE_DEFAULT,
-};
-pub use env::{
-    SQL_ATTR_CONNECTION_POOLING, SQL_ATTR_CP_MATCH, SQL_ATTR_ODBC_VERSION, SQL_CP_DEFAULT,
-    SQL_CP_DRIVER_AWARE, SQL_CP_MATCH_DEFAULT, SQL_CP_OFF, SQL_CP_ONE_PER_DRIVER,
-    SQL_CP_ONE_PER_HENV, SQL_CP_RELAXED_MATCH, SQL_CP_STRICT_MATCH, SQL_OV_ODBC3, SQL_OV_ODBC3_80,
-};
-pub use handle::{
-    SQLHANDLE, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT, SQLHWND, SQL_HANDLE_DBC, SQL_HANDLE_DESC,
-    SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE,
-}; // TODO: SQLHWND
-pub use rs_odbc_derive::odbc_type;
-pub use sql_types::*;
-pub use sqlreturn::{
-    SQLRETURN, SQL_ERROR, SQL_INVALID_HANDLE, SQL_NEED_DATA, SQL_NO_DATA, SQL_PARAM_DATA_AVAILABLE,
-    SQL_STILL_EXECUTING, SQL_SUCCEEDED, SQL_SUCCESS, SQL_SUCCESS_WITH_INFO,
-};
-pub use DriverCompletion::*;
 pub use {api::*, c_types::*, sql_types::*};
+pub use {
+    BulkOperation::*, CompletionType::*, DriverCompletion::*, FreeStmtOption::*, FunctionId::*,
+    IdentifierType::*, LockType::*, Operation::*, Reserved::*, Scope::*, Unique::*,
+};
 
 // TODO: Add support for mingw-x64 on x86 platform
 
@@ -132,24 +113,6 @@ unsafe impl AsMutPtr<SQLLEN> for UnsafeCell<StrLenOrInd> {
 }
 
 /// Invariant: SQLPOINTER obtained through this trait is never written to
-pub unsafe trait AsSQLPOINTER {
-    #[allow(non_snake_case)]
-    fn as_SQLPOINTER(&self) -> SQLPOINTER;
-}
-unsafe impl<T> AsSQLPOINTER for [T] {
-    fn as_SQLPOINTER(&self) -> SQLPOINTER {
-        // Casting from const to mutable raw pointer is ok because of the invariant
-        // that SQLPOINTER obtained through AsSQLPOINTER will never be written to
-        (self.as_ptr() as *mut T).cast()
-    }
-}
-unsafe impl AsSQLPOINTER for std::ptr::NonNull<c_void> {
-    fn as_SQLPOINTER(&self) -> SQLPOINTER {
-        self.as_ptr() as SQLPOINTER
-    }
-}
-
-/// Invariant: SQLPOINTER obtained through this trait is never written to
 pub unsafe trait IntoSQLPOINTER: Copy {
     #[allow(non_snake_case)]
     fn into_SQLPOINTER(self) -> SQLPOINTER;
@@ -189,6 +152,46 @@ unsafe impl<T> IntoSQLPOINTER for &[T] {
         // Casting from const to mutable raw pointer is safe because of the invariant
         // that SQLPOINTER obtained through IntoSQLPOINTER will never be written to
         (self.as_ptr() as *mut T).cast()
+    }
+}
+unsafe impl IntoSQLPOINTER for std::ptr::NonNull<c_void> {
+    fn into_SQLPOINTER(self) -> SQLPOINTER {
+        self.as_ptr().cast()
+    }
+}
+
+/// Invariant: SQLPOINTER obtained through this trait is never written to
+pub unsafe trait AsSQLPOINTER {
+    #[allow(non_snake_case)]
+    fn as_SQLPOINTER(&self) -> SQLPOINTER;
+}
+unsafe impl<T> AsSQLPOINTER for [T] {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
+        // Casting from const to mutable raw pointer is ok because of the invariant
+        // that SQLPOINTER obtained through AsSQLPOINTER will never be written to
+        (self.as_ptr() as *mut T).cast()
+    }
+}
+
+pub unsafe trait AsMutSQLPOINTER {
+    #[allow(non_snake_case)]
+    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER;
+}
+// TODO: Why special implementation?
+unsafe impl AsMutSQLPOINTER for SQLLEN {
+    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
+        (self as *mut Self).cast()
+    }
+}
+// TODO: Why special implementation?
+unsafe impl AsMutSQLPOINTER for SQLULEN {
+    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
+        (self as *mut Self).cast()
+    }
+}
+unsafe impl<T> AsMutSQLPOINTER for [T] {
+    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
+        self.as_mut_ptr().cast()
     }
 }
 
@@ -234,29 +237,6 @@ impl AttrZeroAssert for SQLULEN {
 }
 impl<T> AttrZeroAssert for MaybeUninit<T> {}
 impl<T> AttrZeroAssert for [T] {}
-
-/// If type implementing this trait is a reference allocated inside Driver Manager, then
-/// it must be constrained by the given lifetime parameter 'a. Such references are never
-/// owned (and therefore never dropped) by the Rust code
-pub unsafe trait AsMutSQLPOINTER {
-    #[allow(non_snake_case)]
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER;
-}
-unsafe impl AsMutSQLPOINTER for SQLLEN {
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        (self as *mut Self).cast()
-    }
-}
-unsafe impl AsMutSQLPOINTER for SQLULEN {
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        (self as *mut Self).cast()
-    }
-}
-unsafe impl<T> AsMutSQLPOINTER for [T] {
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        self.as_mut_ptr().cast()
-    }
-}
 
 /// Implementing type must have the same representation as SQLPOINTER
 pub trait Ident {
@@ -386,7 +366,7 @@ where
 
     fn len(&self) -> LEN {
         // Transmute is safe because MaybeUninit<T> has the same size and alignment as T
-        <MaybeUninit<T> as AttrLen<AD, NB, LEN>>::len(unsafe { std::mem::transmute(self) })
+        <MaybeUninit<_> as AttrLen<AD, NB, LEN>>::len(unsafe { std::mem::transmute(self) })
     }
 }
 unsafe impl<NB: Bool, LEN: Copy, T: Ident> AttrLen<OdbcDefined, NB, LEN> for MaybeUninit<T>
@@ -494,7 +474,7 @@ where
     }
 }
 
-pub unsafe trait AsRawSlice<T, LEN: Copy> {
+unsafe trait AsRawSlice<T, LEN: Copy> {
     fn as_raw_slice(&self) -> (*const T, LEN);
 }
 unsafe impl<C, LEN: TryFrom<usize>> AsRawSlice<C, LEN> for [C]
@@ -507,7 +487,7 @@ where
     }
 }
 
-pub unsafe trait AsMutRawSlice<T, LEN: Copy> {
+unsafe trait AsMutRawSlice<T, LEN: Copy> {
     fn as_mut_raw_slice(&mut self) -> (*mut T, LEN);
 }
 unsafe impl<C, LEN: TryFrom<usize>> AsMutRawSlice<C, LEN> for [C]
@@ -702,18 +682,6 @@ pub const SQL_RETURN_VALUE: IOType = IOType(5);
 //    const SQL_LEN_BINARY_ATTR_OFFSET: LEN = -100;
 //    -length + SQL_LEN_BINARY_ATTR_OFFSET
 //}
-
-//#[derive(Ident)]
-//#[ident(SQLSMALLINT, -99)]
-//#[allow(non_camel_case_types)]
-//pub struct SQL_ARD_TYPE;
-//impl<T> GetData<T> for SQL_ARD_TYPE {}
-//
-//#[derive(Ident)]
-//#[ident(SQLSMALLINT, -100)]
-//#[allow(non_camel_case_types)]
-//pub struct SQL_APD_TYPE;
-//impl<T> GetData<T> for SQL_APD_TYPE {}
 
 // /// Specifies how many active connections a particular driver supports.
 //#define SQL_MAX_DRIVER_CONNECTIONS          0

@@ -1,15 +1,18 @@
-use crate::handle::{AppDesc, AsSQLHANDLE, ImplDesc, ParamDesc, RowDesc, SQLHANDLE, SQLHDESC};
+use crate::handle::{AppDesc, AsSQLHANDLE, ImplDesc, ParamDesc, RowDesc, SQLHDESC};
 use crate::{
-    extern_api, AsMutPtr, AsMutSQLPOINTER, Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcBool,
-    OdbcDefined, True, SQLCHAR, SQLHSTMT, SQLINTEGER, SQLPOINTER, SQLRETURN, SQLULEN, SQLWCHAR,
-    SQL_SUCCEEDED, SQL_SUCCESS,
+    extern_api, handle::SQLHSTMT, sqlreturn::SQLRETURN, AsMutPtr, AsMutSQLPOINTER, Attr, AttrLen,
+    AttrRead, AttrWrite, Ident, OdbcBool, OdbcDefined, True, SQLCHAR, SQLINTEGER, SQLPOINTER,
+    SQLULEN, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 
+#[cfg(feature = "odbc_debug")]
+use crate::sqlreturn::SQL_SUCCESS;
+
 pub trait StmtAttr<'stmt, 'buf, A: Ident>:
-    Attr<A> + AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER>
+    Attr<A> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>
 {
     // TODO: Can I use here descriptor and statement defined on different connections??? This
     // should not be allowed If this is true, then I need to use unelided lifetime 'conn to
@@ -95,13 +98,43 @@ impl<'stmt, T> Deref for RefSQLHDESC<'stmt, T> {
     }
 }
 
-// TODO: These seem to be from v2.0
-#[deprecated]
-#[allow(non_camel_case_types)]
-enum StmtOption {
-    SQL_ROWSET_SIZE = 9,
-    SQL_GET_BOOKMARK = 13,
+impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for &[SQLCHAR] where
+    [SQLCHAR]: StmtAttr<'stmt, 'buf, A>
+{
 }
+impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for &[SQLWCHAR] where
+    [SQLWCHAR]: StmtAttr<'stmt, 'buf, A>
+{
+}
+
+impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for [SQLWCHAR]
+where
+    [SQLCHAR]: StmtAttr<'stmt, 'buf, A, NonBinary = True>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+{
+}
+
+impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for [MaybeUninit<SQLCHAR>]
+where
+    [SQLCHAR]: StmtAttr<'stmt, 'buf, A>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+{
+}
+impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for [MaybeUninit<SQLWCHAR>]
+where
+    [SQLWCHAR]: StmtAttr<'stmt, 'buf, A>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+{
+}
+impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A> for MaybeUninit<T>
+where
+    T: StmtAttr<'stmt, 'buf, A>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+{
+}
+
+//=====================================================================================//
+//-------------------------------------Attributes--------------------------------------//
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 0)]
@@ -562,6 +595,8 @@ unsafe impl Attr<SQL_ATTR_ASYNC_ENABLE> for SQLULEN {
 //unsafe impl AttrRead<SQL_ATTR_ASYNC_ENABLE> for SQLULEN {}
 //unsafe impl AttrWrite<SQL_ATTR_ASYNC_ENABLE> for SQLULEN {}
 
+//=====================================================================================//
+
 #[odbc_type(SQLULEN)]
 pub struct Noscan;
 pub const SQL_NOSCAN_OFF: Noscan = Noscan(0);
@@ -602,37 +637,10 @@ pub const SQL_UB_OFF: UseBookmarks = UseBookmarks(0);
 pub const SQL_UB_ON: UseBookmarks = UseBookmarks(1);
 pub use SQL_UB_OFF as SQL_UB_DEFAULT;
 
-impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for [SQLWCHAR]
-where
-    [SQLCHAR]: StmtAttr<'stmt, 'buf, A, NonBinary = True>,
-    Self: AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER>,
-{
-}
-
-impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for [MaybeUninit<SQLCHAR>]
-where
-    [SQLCHAR]: StmtAttr<'stmt, 'buf, A>,
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
-{
-}
-impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for [MaybeUninit<SQLWCHAR>]
-where
-    [SQLWCHAR]: StmtAttr<'stmt, 'buf, A>,
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
-{
-}
-impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A> for MaybeUninit<T>
-where
-    T: StmtAttr<'stmt, 'buf, A>,
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
-{
-}
-
-impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for &[SQLCHAR] where
-    [SQLCHAR]: StmtAttr<'stmt, 'buf, A>
-{
-}
-impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A> for &[SQLWCHAR] where
-    [SQLWCHAR]: StmtAttr<'stmt, 'buf, A>
-{
+// TODO: These seem to be from v2.0
+#[deprecated]
+#[allow(non_camel_case_types)]
+enum StmtOption {
+    SQL_ROWSET_SIZE = 9,
+    SQL_GET_BOOKMARK = 13,
 }

@@ -2,24 +2,26 @@ use crate::extern_api;
 use crate::handle::*;
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
+use std::ptr;
 
 use crate::{
+    c_types::CData,
     c_types::DeferredBuf,
-    c_types::OutBuf,
     col::ColAttr,
     conn::ConnAttr,
     desc::{DescField, WriteDescField},
     diag::DiagField,
     env::EnvAttr,
+    handle::{SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
     info::InfoType,
     sql_types::SqlType,
+    sqlreturn::{SQLRETURN, SQL_SUCCEEDED, SQL_SUCCESS},
     stmt::StmtAttr,
-    AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AttrRead, AttrWrite, Buf,
-    BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion, FreeStmtOption,
-    FunctionId, IOType, Ident, IdentifierType, IntoSQLPOINTER, LockType, NullAllowed, Operation,
-    Reserved, Scope, StrLenOrInd, UnicodeType, Unique, RETCODE, SQLCHAR, SQLHDBC, SQLHDESC,
-    SQLHENV, SQLHSTMT, SQLINTEGER, SQLLEN, SQLPOINTER, SQLRETURN, SQLSETPOSIROW, SQLSMALLINT,
-    SQLULEN, SQLUSMALLINT, SQLWCHAR, SQL_SUCCEEDED, SQL_SUCCESS,
+    AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLPOINTER, AttrRead,
+    AttrWrite, BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion,
+    FreeStmtOption, FunctionId, IOType, Ident, IdentifierType, IntoSQLPOINTER, LockType,
+    NullAllowed, Operation, Reserved, Scope, StrLenOrInd, UnicodeType, Unique, RETCODE, SQLCHAR,
+    SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
 
 /// Allocates an environment, connection, statement, or descriptor handle.
@@ -38,7 +40,7 @@ pub fn SQLAllocHandle<'src, OH: Allocate<'src>>(
 where
     OH::SrcHandle: AsSQLHANDLE,
 {
-    let mut output_handle: SQLHANDLE = std::ptr::null_mut();
+    let mut output_handle: SQLHANDLE = ptr::null_mut();
 
     unsafe {
         let sql_return = extern_api::SQLAllocHandle(
@@ -73,11 +75,9 @@ pub fn SQLBindCol<'buf, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'buf, TT>>
     StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
 ) -> SQLRETURN {
     let sql_return = unsafe {
-        let TargetValuePtr = TargetValuePtr
-            .as_ref()
-            .map_or((std::ptr::null_mut(), 0), |TargetValuePtr| {
-                (TargetValuePtr.as_SQLPOINTER(), TargetValuePtr.len())
-            });
+        let TargetValuePtr = TargetValuePtr.map_or((ptr::null_mut(), 0), |TargetValuePtr| {
+            (TargetValuePtr.into_SQLPOINTER(), TargetValuePtr.len())
+        });
 
         extern_api::SQLBindCol(
             StatementHandle.as_SQLHANDLE(),
@@ -85,7 +85,7 @@ pub fn SQLBindCol<'buf, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'buf, TT>>
             TT::IDENTIFIER,
             TargetValuePtr.0,
             TargetValuePtr.1,
-            StrLen_or_IndPtr.map_or_else(std::ptr::null_mut, |StrLen_or_IndPtr| {
+            StrLen_or_IndPtr.map_or_else(ptr::null_mut, |StrLen_or_IndPtr| {
                 StrLen_or_IndPtr.get().cast()
             }),
         )
@@ -121,9 +121,8 @@ pub fn SQLBindParameter<'buf, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'buf
 ) -> SQLRETURN {
     let sql_return = unsafe {
         let ParameterValuePtr = ParameterValuePtr
-            .as_ref()
-            .map_or((std::ptr::null_mut(), 0), |ParameterValuePtr| {
-                (ParameterValuePtr.as_SQLPOINTER(), ParameterValuePtr.len())
+            .map_or((ptr::null_mut(), 0), |ParameterValuePtr| {
+                (ParameterValuePtr.into_SQLPOINTER(), ParameterValuePtr.len())
             });
 
         extern_api::SQLBindParameter(
@@ -136,7 +135,7 @@ pub fn SQLBindParameter<'buf, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'buf
             DecimalDigits,
             ParameterValuePtr.0,
             ParameterValuePtr.1,
-            StrLen_or_IndPtr.map_or_else(std::ptr::null_mut, |StrLen_or_IndPtr| {
+            StrLen_or_IndPtr.map_or_else(ptr::null_mut, |StrLen_or_IndPtr| {
                 StrLen_or_IndPtr.get().cast()
             }),
         )
@@ -157,18 +156,15 @@ pub fn SQLBindParameter<'buf, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'buf
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLBrowseConnectA<C: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
+pub fn SQLBrowseConnectA(
     ConnectionHandle: &mut SQLHDBC,
     InConnectionString: &[SQLCHAR],
-    OutConnectionString: Option<&mut C>,
+    OutConnectionString: Option<&mut [MaybeUninit<SQLCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
-        OutConnectionString.map_or((std::ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
+        OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     let sql_return = unsafe {
         extern_api::SQLBrowseConnectA(
@@ -196,18 +192,15 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLBrowseConnectW<C: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(
+pub fn SQLBrowseConnectW(
     ConnectionHandle: &mut SQLHDBC,
     InConnectionString: &[SQLWCHAR],
-    OutConnectionString: Option<&mut C>,
+    OutConnectionString: Option<&mut [MaybeUninit<SQLWCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
-        OutConnectionString.map_or((std::ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
+        OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     let sql_return = unsafe {
         extern_api::SQLBrowseConnectW(
@@ -307,19 +300,22 @@ where
     //    NumericAttributePtr.assert_zeroed();
     //}
 
-    let CharacterAttributePtrLen = CharacterAttributePtr
-        .as_ref()
-        .map_or(0, |CharacterAttributePtr| CharacterAttributePtr.len());
+    let CharacterAttributePtr =
+        CharacterAttributePtr.map_or((ptr::null_mut(), 0), |CharacterAttributePtr| {
+            (
+                CharacterAttributePtr.as_mut_SQLPOINTER(),
+                CharacterAttributePtr.len(),
+            )
+        });
 
     unsafe {
         extern_api::SQLColAttributeA(
             StatementHandle.as_SQLHANDLE(),
             ColumnNumber,
             A::IDENTIFIER,
-            CharacterAttributePtr
-                .map_or_else(std::ptr::null_mut, AsMutSQLPOINTER::as_mut_SQLPOINTER),
-            CharacterAttributePtrLen,
-            StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+            CharacterAttributePtr.0,
+            CharacterAttributePtr.1,
+            StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
             NumericAttributePtr.as_mut_ptr(),
         )
     }
@@ -345,19 +341,27 @@ where
     T: AttrRead<A> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
-    let CharacterAttributePtrLen = CharacterAttributePtr
-        .as_ref()
-        .map_or(0, |CharacterAttributePtr| CharacterAttributePtr.len());
+    // TODO: With MaybeUnint it's not possible to check that value is zeroed
+    //if cfg!(feature = "odbc_debug") {
+    //    NumericAttributePtr.assert_zeroed();
+    //}
+
+    let CharacterAttributePtr =
+        CharacterAttributePtr.map_or((ptr::null_mut(), 0), |CharacterAttributePtr| {
+            (
+                CharacterAttributePtr.as_mut_SQLPOINTER(),
+                CharacterAttributePtr.len(),
+            )
+        });
 
     unsafe {
         extern_api::SQLColAttributeW(
             StatementHandle.as_SQLHANDLE(),
             ColumnNumber,
             A::IDENTIFIER,
-            CharacterAttributePtr
-                .map_or_else(std::ptr::null_mut, AsMutSQLPOINTER::as_mut_SQLPOINTER),
-            CharacterAttributePtrLen,
-            StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+            CharacterAttributePtr.0,
+            CharacterAttributePtr.1,
+            StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
             NumericAttributePtr.as_mut_ptr(),
         )
     }
@@ -640,17 +644,14 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDataSourcesA<C: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
+pub fn SQLDataSourcesA(
     EnvironmentHandle: &SQLHENV,
     Direction: SQLUSMALLINT,
-    ServerName: &mut C,
+    ServerName: &mut [MaybeUninit<SQLCHAR>],
     NameLength1Ptr: &mut MaybeUninit<SQLSMALLINT>,
-    Description: &mut C,
+    Description: &mut [MaybeUninit<SQLCHAR>],
     NameLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let ServerName = ServerName.as_mut_raw_slice();
     let Description = Description.as_mut_raw_slice();
 
@@ -676,17 +677,14 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDataSourcesW<C: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(
+pub fn SQLDataSourcesW(
     EnvironmentHandle: &SQLHENV,
     Direction: SQLUSMALLINT,
-    ServerName: &mut C,
+    ServerName: &mut [MaybeUninit<SQLWCHAR>],
     NameLength1Ptr: &mut MaybeUninit<SQLSMALLINT>,
-    Description: &mut C,
+    Description: &mut [MaybeUninit<SQLWCHAR>],
     NameLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let ServerName = ServerName.as_mut_raw_slice();
     let Description = Description.as_mut_raw_slice();
 
@@ -712,19 +710,16 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDescribeColA<C: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
+pub fn SQLDescribeColA(
     StatementHandle: &SQLHSTMT,
     ColumnNumber: SQLUSMALLINT,
-    ColumnName: &mut C,
+    ColumnName: &mut [MaybeUninit<SQLCHAR>],
     NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
     DataTypePtr: &mut MaybeUninit<SQLSMALLINT>,
     ColumnSizePtr: &mut MaybeUninit<SQLULEN>,
     DecimalDigitsPtr: &mut MaybeUninit<SQLSMALLINT>,
     NullablePtr: &mut MaybeUninit<NullAllowed>,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let ColumnName = ColumnName.as_mut_raw_slice();
 
     unsafe {
@@ -750,19 +745,16 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDescribeColW<C: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(
+pub fn SQLDescribeColW(
     StatementHandle: &SQLHSTMT,
     ColumnNumber: SQLUSMALLINT,
-    ColumnName: &mut C,
+    ColumnName: &mut [MaybeUninit<SQLWCHAR>],
     NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
     DataTypePtr: &mut MaybeUninit<SQLSMALLINT>,
     ColumnSizePtr: &mut MaybeUninit<SQLULEN>,
     DecimalDigitsPtr: &mut MaybeUninit<SQLSMALLINT>,
     NullablePtr: &mut MaybeUninit<NullAllowed>,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let ColumnName = ColumnName.as_mut_raw_slice();
 
     unsafe {
@@ -834,25 +826,23 @@ pub fn SQLDisconnect(ConnectionHandle: &mut SQLHDBC) -> SQLRETURN {
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDriverConnectA<C: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
+pub fn SQLDriverConnectA(
     ConnectionHandle: &mut SQLHDBC,
     WindowHandle: Option<SQLHWND>,
     InConnectionString: &[SQLCHAR],
-    OutConnectionString: &mut C,
+    OutConnectionString: Option<&mut [MaybeUninit<SQLCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
     DriverCompletion: DriverCompletion,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let InConnectionString = InConnectionString.as_raw_slice();
-    let OutConnectionString = OutConnectionString.as_mut_raw_slice();
+    let OutConnectionString =
+        OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     let sql_return = unsafe {
         extern_api::SQLDriverConnectA(
             ConnectionHandle.as_SQLHANDLE(),
             // TODO: Fix this
-            std::ptr::null_mut(),
+            ptr::null_mut(),
             InConnectionString.0,
             InConnectionString.1,
             OutConnectionString.0,
@@ -877,25 +867,23 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDriverConnectW<C: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(
+pub fn SQLDriverConnectW(
     ConnectionHandle: &mut SQLHDBC,
     WindowHandle: Option<SQLHWND>,
     InConnectionString: &[SQLWCHAR],
-    OutConnectionString: &mut C,
+    OutConnectionString: Option<&mut [MaybeUninit<SQLWCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
     DriverCompletion: DriverCompletion,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let InConnectionString = InConnectionString.as_raw_slice();
-    let OutConnectionString = OutConnectionString.as_mut_raw_slice();
+    let OutConnectionString =
+        OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     let sql_return = unsafe {
         extern_api::SQLDriverConnectW(
             ConnectionHandle.as_SQLHANDLE(),
             // TODO: Fix this
-            std::ptr::null_mut(),
+            ptr::null_mut(),
             InConnectionString.0,
             InConnectionString.1,
             OutConnectionString.0,
@@ -920,17 +908,14 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDriversA<C: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
+pub fn SQLDriversA(
     EnvironmentHandle: &SQLHENV,
     Direction: SQLUSMALLINT,
-    DriverDescription: &mut C,
+    DriverDescription: &mut [MaybeUninit<SQLCHAR>],
     DescriptionLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-    DriverAttributes: &mut C,
+    DriverAttributes: &mut [MaybeUninit<SQLCHAR>],
     AttributesLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let DriverDescription = DriverDescription.as_mut_raw_slice();
     let DriverAttributes = DriverAttributes.as_mut_raw_slice();
 
@@ -956,17 +941,14 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDriversW<C: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(
+pub fn SQLDriversW(
     EnvironmentHandle: &SQLHENV,
     Direction: SQLUSMALLINT,
-    DriverDescription: &mut C,
+    DriverDescription: &mut [MaybeUninit<SQLWCHAR>],
     DescriptionLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-    DriverAttributes: &mut C,
+    DriverAttributes: &mut [MaybeUninit<SQLWCHAR>],
     AttributesLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let DriverDescription = DriverDescription.as_mut_raw_slice();
     let DriverAttributes = DriverAttributes.as_mut_raw_slice();
 
@@ -1228,21 +1210,21 @@ where
     T: AttrRead<A> + AnsiType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
-    let ValuePtrLen = ValuePtr.as_ref().map_or(0, |ValuePtr| {
+    let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
         if cfg!(feature = "odbc_debug") {
             ValuePtr.assert_zeroed();
         }
 
-        ValuePtr.len()
+        (ValuePtr.as_mut_SQLPOINTER(), ValuePtr.len())
     });
 
     unsafe {
         extern_api::SQLGetConnectAttrA(
             ConnectionHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
-            ValuePtr.map_or_else(std::ptr::null_mut, AsMutSQLPOINTER::as_mut_SQLPOINTER),
-            ValuePtrLen,
-            StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+            ValuePtr.0,
+            ValuePtr.1,
+            StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
         )
     }
 }
@@ -1265,21 +1247,21 @@ where
     T: AttrRead<A> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
-    let ValuePtrLen = ValuePtr.as_ref().map_or(0, |ValuePtr| {
+    let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
         if cfg!(feature = "odbc_debug") {
             ValuePtr.assert_zeroed();
         }
 
-        ValuePtr.len()
+        (ValuePtr.as_mut_SQLPOINTER(), ValuePtr.len())
     });
 
     unsafe {
         extern_api::SQLGetConnectAttrW(
             ConnectionHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
-            ValuePtr.map_or_else(std::ptr::null_mut, AsMutSQLPOINTER::as_mut_SQLPOINTER),
-            ValuePtrLen,
-            StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+            ValuePtr.0,
+            ValuePtr.1,
+            StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
         )
     }
 }
@@ -1292,14 +1274,11 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetCursorNameA<C: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
+pub fn SQLGetCursorNameA(
     StatementHandle: &SQLHSTMT,
-    CursorName: &mut C,
+    CursorName: &mut [MaybeUninit<SQLCHAR>],
     NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let CursorName = CursorName.as_mut_raw_slice();
 
     unsafe {
@@ -1320,14 +1299,11 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetCursorNameW<C: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(
+pub fn SQLGetCursorNameW(
     StatementHandle: &SQLHSTMT,
-    CursorName: &mut C,
+    CursorName: &mut [MaybeUninit<SQLWCHAR>],
     NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let CursorName = CursorName.as_mut_raw_slice();
 
     unsafe {
@@ -1348,8 +1324,8 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetData<TT: Ident<Type = SQLSMALLINT>, B: OutBuf<TT>>(
-    // Function doesn't bind the buffer
+// TODO: This function must be unsafe if SQL_ARD_TYPE and SQL_APD_TYPE are allowed to be used
+pub fn SQLGetData<TT: Ident<Type = SQLSMALLINT>, B: CData<TT>>(
     StatementHandle: &SQLHSTMT,
     Col_or_Param_Num: SQLUSMALLINT,
     TargetType: TT,
@@ -1357,7 +1333,7 @@ pub fn SQLGetData<TT: Ident<Type = SQLSMALLINT>, B: OutBuf<TT>>(
     StrLen_or_IndPtr: Option<&mut MaybeUninit<StrLenOrInd>>,
 ) -> SQLRETURN
 where
-    B: ?Sized,
+    B: AsMutSQLPOINTER + ?Sized,
     MaybeUninit<StrLenOrInd>: AsMutPtr<SQLLEN>,
 {
     unsafe {
@@ -1367,7 +1343,7 @@ where
             TT::IDENTIFIER,
             TargetValuePtr.as_mut_SQLPOINTER(),
             TargetValuePtr.len(),
-            StrLen_or_IndPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+            StrLen_or_IndPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
         )
     }
 }
@@ -1391,12 +1367,12 @@ where
     T: AttrRead<A> + AnsiType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
-    let ValuePtrLen = ValuePtr.as_ref().map_or(0, |ValuePtr| {
+    let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
         if cfg!(feature = "odbc_debug") {
             ValuePtr.assert_zeroed();
         }
 
-        ValuePtr.len()
+        (ValuePtr.as_mut_SQLPOINTER(), ValuePtr.len())
     });
 
     unsafe {
@@ -1404,9 +1380,9 @@ where
             DescriptorHandle.as_SQLHANDLE(),
             RecNumber,
             A::IDENTIFIER,
-            ValuePtr.map_or_else(std::ptr::null_mut, AsMutSQLPOINTER::as_mut_SQLPOINTER),
-            ValuePtrLen,
-            StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+            ValuePtr.0,
+            ValuePtr.1,
+            StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
         )
     }
 }
@@ -1430,12 +1406,12 @@ where
     T: AttrRead<A> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
-    let ValuePtrLen = ValuePtr.as_ref().map_or(0, |ValuePtr| {
+    let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
         if cfg!(feature = "odbc_debug") {
             ValuePtr.assert_zeroed();
         }
 
-        ValuePtr.len()
+        (ValuePtr.as_mut_SQLPOINTER(), ValuePtr.len())
     });
 
     unsafe {
@@ -1443,9 +1419,9 @@ where
             DescriptorHandle.as_SQLHANDLE(),
             RecNumber,
             A::IDENTIFIER,
-            ValuePtr.map_or_else(std::ptr::null_mut, AsMutSQLPOINTER::as_mut_SQLPOINTER),
-            ValuePtrLen,
-            StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+            ValuePtr.0,
+            ValuePtr.1,
+            StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
         )
     }
 }
@@ -1458,10 +1434,10 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetDescRecA<DT, C: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
+pub fn SQLGetDescRecA<DT>(
     DescriptorHandle: &SQLHDESC<DT>,
     RecNumber: SQLSMALLINT,
-    Name: Option<&mut C>,
+    Name: Option<&mut [MaybeUninit<SQLCHAR>]>,
     StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
     TypePtr: &mut MaybeUninit<SqlType>,
     SubTypePtr: &mut MaybeUninit<DatetimeIntervalCode>,
@@ -1472,9 +1448,8 @@ pub fn SQLGetDescRecA<DT, C: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(
 ) -> SQLRETURN
 where
     DT: for<'buf> DescType<'buf>,
-    C: ?Sized,
 {
-    let Name = Name.map_or((std::ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
+    let Name = Name.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     unsafe {
         extern_api::SQLGetDescRecA(
@@ -1501,10 +1476,10 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetDescRecW<DT, C: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(
+pub fn SQLGetDescRecW<DT>(
     DescriptorHandle: &SQLHDESC<DT>,
     RecNumber: SQLSMALLINT,
-    Name: Option<&mut C>,
+    Name: Option<&mut [MaybeUninit<SQLWCHAR>]>,
     StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
     TypePtr: &mut MaybeUninit<SqlType>,
     SubTypePtr: &mut MaybeUninit<DatetimeIntervalCode>,
@@ -1515,9 +1490,8 @@ pub fn SQLGetDescRecW<DT, C: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(
 ) -> SQLRETURN
 where
     DT: for<'buf> DescType<'buf>,
-    C: ?Sized,
 {
-    let Name = Name.map_or((std::ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
+    let Name = Name.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     unsafe {
         extern_api::SQLGetDescRecW(
@@ -1557,12 +1531,12 @@ where
     T: AttrRead<D> + AnsiType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
-    let DiagInfoPtrLen = DiagInfoPtr.as_ref().map_or(0, |DiagInfoPtr| {
+    let DiagInfoPtr = DiagInfoPtr.map_or((ptr::null_mut(), 0), |DiagInfoPtr| {
         if cfg!(feature = "odbc_debug") {
             DiagInfoPtr.assert_zeroed();
         }
 
-        DiagInfoPtr.len()
+        (DiagInfoPtr.as_mut_SQLPOINTER(), DiagInfoPtr.len())
     });
 
     unsafe {
@@ -1571,9 +1545,9 @@ where
             Handle.as_SQLHANDLE(),
             RecNumber,
             D::IDENTIFIER,
-            DiagInfoPtr.map_or_else(std::ptr::null_mut, AsMutSQLPOINTER::as_mut_SQLPOINTER),
-            DiagInfoPtrLen,
-            StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+            DiagInfoPtr.0,
+            DiagInfoPtr.1,
+            StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
         )
     }
 }
@@ -1599,12 +1573,12 @@ where
     T: AttrRead<D> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
-    let DiagInfoPtrLen = DiagInfoPtr.as_ref().map_or(0, |DiagInfoPtr| {
+    let DiagInfoPtr = DiagInfoPtr.map_or((ptr::null_mut(), 0), |DiagInfoPtr| {
         if cfg!(feature = "odbc_debug") {
             DiagInfoPtr.assert_zeroed();
         }
 
-        DiagInfoPtr.len()
+        (DiagInfoPtr.as_mut_SQLPOINTER(), DiagInfoPtr.len())
     });
 
     unsafe {
@@ -1613,9 +1587,9 @@ where
             Handle.as_SQLHANDLE(),
             RecNumber,
             D::IDENTIFIER,
-            DiagInfoPtr.map_or_else(std::ptr::null_mut, AsMutSQLPOINTER::as_mut_SQLPOINTER),
-            DiagInfoPtrLen,
-            StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+            DiagInfoPtr.0,
+            DiagInfoPtr.1,
+            StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
         )
     }
 }
@@ -1629,7 +1603,7 @@ where
 ///// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 //#[inline]
 //#[allow(non_snake_case, unused_variables)]
-//pub fn SQLGetDiagRecA<H: Handle, MC: AsMutRawSlice<SQLCHAR, SQLSMALLINT>>(HandleType: H::Identifier, Handle: &H, SQLState: SqlStateA, NativeErrorPtr: &mut I32, MessageText: &mut MC, TextLengthPtr: &mut I16) -> SQLRETURN
+//pub fn SQLGetDiagRecA<H: Handle>(HandleType: H::Identifier, Handle: &H, SQLState: SqlStateA, NativeErrorPtr: &mut I32, MessageText: &mut MC, TextLengthPtr: &mut I16) -> SQLRETURN
 //where H: AsSQLHANDLE {
 //    let MessageText = MessageText.as_mut_raw_slice();
 //
@@ -1644,7 +1618,7 @@ where
 ///// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 //#[inline]
 //#[allow(non_snake_case, unused_variables)]
-//pub fn SQLGetDiagRecW<H: Handle, MC: AsMutRawSlice<SQLWCHAR, SQLSMALLINT>>(HandleType: H::Identifier, Handle: &H, SQLState: SqlStateW, NativeErrorPtr: &mut I32, MessageText: &mut MC, TextLengthPtr: &mut I16) -> SQLRETURN
+//pub fn SQLGetDiagRecW<H: Handle>(HandleType: H::Identifier, Handle: &H, SQLState: SqlStateW, NativeErrorPtr: &mut I32, MessageText: &mut MC, TextLengthPtr: &mut I16) -> SQLRETURN
 //where H: AsSQLHANDLE {
 //    let MessageText = MessageText.as_mut_raw_slice();
 //
@@ -1669,15 +1643,17 @@ where
     T: AttrRead<A> + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
-    let ValuePtrLen = ValuePtr.as_ref().map_or(0, |ValuePtr| ValuePtr.len());
+    let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
+        (ValuePtr.as_mut_SQLPOINTER(), ValuePtr.len())
+    });
 
     unsafe {
         extern_api::SQLGetEnvAttr(
             EnvironmentHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
-            ValuePtr.map_or_else(std::ptr::null_mut, AsMutSQLPOINTER::as_mut_SQLPOINTER),
-            ValuePtrLen,
-            StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+            ValuePtr.0,
+            ValuePtr.1,
+            StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
         )
     }
 }
@@ -1722,17 +1698,17 @@ where
     T: AttrRead<I> + AnsiType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
-    let InfoValuePtrLen = InfoValuePtr
-        .as_ref()
-        .map_or(0, |InfoValuePtr| InfoValuePtr.len());
+    let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
+        (InfoValuePtr.as_mut_SQLPOINTER(), InfoValuePtr.len())
+    });
 
     unsafe {
         extern_api::SQLGetInfoA(
             ConnectionHandle.as_SQLHANDLE(),
             I::IDENTIFIER,
-            InfoValuePtr.map_or_else(std::ptr::null_mut, AsMutSQLPOINTER::as_mut_SQLPOINTER),
-            InfoValuePtrLen,
-            StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+            InfoValuePtr.0,
+            InfoValuePtr.1,
+            StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
         )
     }
 }
@@ -1755,17 +1731,17 @@ where
     T: AttrRead<I> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
-    let InfoValuePtrLen = InfoValuePtr
-        .as_ref()
-        .map_or(0, |InfoValuePtr| InfoValuePtr.len());
+    let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
+        (InfoValuePtr.as_mut_SQLPOINTER(), InfoValuePtr.len())
+    });
 
     unsafe {
         extern_api::SQLGetInfoW(
             ConnectionHandle.as_SQLHANDLE(),
             I::IDENTIFIER,
-            InfoValuePtr.map_or_else(std::ptr::null_mut, AsMutSQLPOINTER::as_mut_SQLPOINTER),
-            InfoValuePtrLen,
-            StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+            InfoValuePtr.0,
+            InfoValuePtr.1,
+            StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
         )
     }
 }
@@ -1799,9 +1775,9 @@ where
             extern_api::SQLGetStmtAttrA(
                 StatementHandle.as_SQLHANDLE(),
                 A::IDENTIFIER,
-                std::ptr::null_mut(),
+                ptr::null_mut(),
                 0,
-                StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
             )
         }
     }
@@ -1836,9 +1812,9 @@ where
             extern_api::SQLGetStmtAttrW(
                 StatementHandle.as_SQLHANDLE(),
                 A::IDENTIFIER,
-                std::ptr::null_mut(),
+                ptr::null_mut(),
                 0,
-                StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
             )
         }
     }
@@ -1888,15 +1864,12 @@ pub fn SQLMoreResults(StatementHandle: &SQLHSTMT) -> SQLRETURN {
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLNativeSqlA<C: AsMutRawSlice<SQLCHAR, SQLINTEGER>>(
+pub fn SQLNativeSqlA(
     ConnectionHandle: &SQLHDBC,
     InStatementText: &[SQLCHAR],
-    OutStatementText: &mut C,
+    OutStatementText: &mut [MaybeUninit<SQLCHAR>],
     TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let InStatementText = InStatementText.as_raw_slice();
     let OutStatementText = OutStatementText.as_mut_raw_slice();
 
@@ -1920,15 +1893,12 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLNativeSqlW<C: AsMutRawSlice<SQLWCHAR, SQLINTEGER>>(
+pub fn SQLNativeSqlW(
     ConnectionHandle: &SQLHDBC,
     InStatementText: &[SQLWCHAR],
-    OutStatementText: &mut C,
+    OutStatementText: &mut [MaybeUninit<SQLWCHAR>],
     TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
-) -> SQLRETURN
-where
-    C: ?Sized,
-{
+) -> SQLRETURN {
     let InStatementText = InStatementText.as_raw_slice();
     let OutStatementText = OutStatementText.as_mut_raw_slice();
 
@@ -2238,20 +2208,19 @@ pub fn SQLProceduresW(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-// TODO: This function is incredibly unsafe. How to know which type to provide and panic at runtime if incorrect?
-pub unsafe fn SQLPutData<TT: Ident, B: Buf<TT>>(
+pub unsafe fn SQLPutData<TT: Ident, B: CData<TT>>(
     StatementHandle: &SQLHSTMT,
-    DataPtr: &B,
+    DataPtr: Option<&B>,
 ) -> SQLRETURN
 where
-    B: ?Sized,
-    for<'buf> &'buf B: IntoSQLPOINTER,
+    B: AsSQLPOINTER + ?Sized,
 {
-    extern_api::SQLPutData(
-        StatementHandle.as_SQLHANDLE(),
-        DataPtr.into_SQLPOINTER(),
-        DataPtr.len(),
-    )
+    let DataPtr = DataPtr.map_or((ptr::null_mut(), 0), |DataPtr| {
+        (DataPtr.as_SQLPOINTER(), DataPtr.len())
+    });
+
+    // TODO: This function is incredibly unsafe. How to know which type to provide and panic at runtime if incorrect?
+    extern_api::SQLPutData(StatementHandle.as_SQLHANDLE(), DataPtr.0, DataPtr.1)
 }
 
 /// Returns the number of rows affected by an **UPDATE**, **INSERT**, or **DELETE** statement; an SQL_ADD, SQL_UPDATE_BY_BOOKMARK, or SQL_DELETE_BY_BOOKMARK operation in **SQLBulkOperations**; or an SQL_UPDATE or SQL_DELETE operation in **SQLSetPos**.
@@ -2283,14 +2252,13 @@ where
     T: AttrWrite<A> + AnsiType,
 {
     ValuePtr.check_attr(ConnectionHandle);
-    let ValuePtrLen = ValuePtr.len();
 
     unsafe {
         extern_api::SQLSetConnectAttrA(
             ConnectionHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
             ValuePtr.into_SQLPOINTER(),
-            ValuePtrLen,
+            ValuePtr.len(),
         )
     }
 }
@@ -2312,14 +2280,13 @@ where
     T: AttrWrite<A> + UnicodeType,
 {
     ValuePtr.check_attr(ConnectionHandle);
-    let ValuePtrLen = ValuePtr.len();
 
     unsafe {
         extern_api::SQLSetConnectAttrW(
             ConnectionHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
             ValuePtr.into_SQLPOINTER(),
-            ValuePtrLen,
+            ValuePtr.len(),
         )
     }
 }
@@ -2374,8 +2341,8 @@ where
     T: AnsiType,
 {
     let sql_return = unsafe {
-        let ValuePtr = ValuePtr.as_ref().map_or((std::ptr::null_mut(), 0), |&v| {
-            (v.into_SQLPOINTER(), v.len())
+        let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
+            (ValuePtr.into_SQLPOINTER(), ValuePtr.len())
         });
 
         extern_api::SQLSetDescFieldA(
@@ -2412,8 +2379,8 @@ where
     T: UnicodeType,
 {
     let sql_return = unsafe {
-        let ValuePtr = ValuePtr.as_ref().map_or((std::ptr::null_mut(), 0), |&v| {
-            (v.into_SQLPOINTER(), v.len())
+        let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
+            (ValuePtr.into_SQLPOINTER(), ValuePtr.len())
         });
 
         extern_api::SQLSetDescFieldW(
@@ -2468,9 +2435,7 @@ where
             Length,
             Precision,
             Scale,
-            DataPtr
-                .as_ref()
-                .map_or_else(std::ptr::null_mut, |&v| v.into_SQLPOINTER()),
+            DataPtr.map_or_else(ptr::null_mut, IntoSQLPOINTER::into_SQLPOINTER),
             StringLengthPtr.as_mut_ptr(),
             IndicatorPtr.as_mut_ptr(),
         )

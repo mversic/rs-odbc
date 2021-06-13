@@ -3,9 +3,40 @@ use rs_odbc_derive::Ident;
 use std::mem::MaybeUninit;
 
 pub trait DiagField<H: Handle, D: Ident>:
-    Attr<D> + AttrLen<<Self as Attr<D>>::DefinedBy, <Self as Attr<D>>::NonBinary, SQLSMALLINT>
+    Attr<D> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>
 {
 }
+
+impl<H: Handle, D: Ident> DiagField<H, D> for &[SQLCHAR] where [SQLCHAR]: DiagField<H, D> {}
+impl<H: Handle, D: Ident> DiagField<H, D> for &[SQLWCHAR] where [SQLWCHAR]: DiagField<H, D> {}
+
+impl<H: Handle, D: Ident> DiagField<H, D> for [SQLWCHAR]
+where
+    [SQLCHAR]: DiagField<H, D, NonBinary = True>,
+    [SQLWCHAR]: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
+impl<H: Handle, D: Ident> DiagField<H, D> for [MaybeUninit<SQLCHAR>]
+where
+    [SQLCHAR]: DiagField<H, D>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
+impl<H: Handle, D: Ident> DiagField<H, D> for [MaybeUninit<SQLWCHAR>]
+where
+    [SQLWCHAR]: DiagField<H, D>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
+impl<H: Handle, D: Ident, T: Ident> DiagField<H, D> for MaybeUninit<T>
+where
+    T: DiagField<H, D>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
+
+//=====================================================================================//
+//-------------------------------------Attributes--------------------------------------//
 
 // Header fields -----------------------------------------------------------------
 #[derive(Ident)]
@@ -94,31 +125,3 @@ pub struct SQL_DIAG_CURSOR_ROW_COUNT;
 //#[derive(DiagField)]
 //pub struct SQL_DIAG_SUBCLASS_ORIGIN;
 //impl<T: AsMutRawCharSlice> ReadAttr<T> for SQL_DIAG_SUBCLASS_ORIGIN {}
-
-impl<H: Handle, D: Ident> DiagField<H, D> for [SQLWCHAR]
-where
-    [SQLCHAR]: DiagField<H, D, NonBinary = True>,
-    [SQLWCHAR]: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-{
-}
-impl<H: Handle, D: Ident> DiagField<H, D> for [MaybeUninit<SQLCHAR>]
-where
-    [SQLCHAR]: DiagField<H, D>,
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-{
-}
-impl<H: Handle, D: Ident> DiagField<H, D> for [MaybeUninit<SQLWCHAR>]
-where
-    [SQLWCHAR]: DiagField<H, D>,
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-{
-}
-impl<H: Handle, D: Ident, T: Ident> DiagField<H, D> for MaybeUninit<T>
-where
-    T: DiagField<H, D>,
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-{
-}
-
-impl<H: Handle, D: Ident> DiagField<H, D> for &[SQLCHAR] where [SQLCHAR]: DiagField<H, D> {}
-impl<H: Handle, D: Ident> DiagField<H, D> for &[SQLWCHAR] where [SQLWCHAR]: DiagField<H, D> {}

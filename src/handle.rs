@@ -1,14 +1,17 @@
-use crate::stmt::{
-    SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC, SQL_ATTR_IMP_ROW_DESC,
-};
 use crate::c_types::DeferredBuf;
 use crate::extern_api;
-use crate::{Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER, SQLSMALLINT, SQL_SUCCESS};
+use crate::{sqlreturn::SQL_SUCCESS, Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER, SQLSMALLINT};
 use std::any::type_name;
 use std::cell::{Cell, UnsafeCell};
 use std::marker::PhantomData;
-use std::mem::{ManuallyDrop, MaybeUninit};
 use std::thread::panicking;
+
+#[cfg(feature = "odbc_debug")]
+use std::mem::{ManuallyDrop, MaybeUninit};
+#[cfg(feature = "odbc_debug")]
+use crate::stmt::{
+    SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC, SQL_ATTR_IMP_ROW_DESC,
+};
 
 pub unsafe trait AsSQLHANDLE {
     #[allow(non_snake_case)]
@@ -24,13 +27,6 @@ pub trait Handle {
 pub unsafe trait Allocate<'src>: Handle + Drop {
     type SrcHandle: AsSQLHANDLE;
     fn from_raw(handle: SQLHANDLE) -> Self;
-    // TODO: What is the point of this function? Is it because compiler cannot infer type?
-    fn uninit() -> MaybeUninit<Self>
-    where
-        Self: Sized,
-    {
-        MaybeUninit::uninit()
-    }
 }
 
 pub trait SQLCancelHandle: Handle {}
@@ -199,7 +195,22 @@ impl SQLHDBC<'_> {
     #[cfg(feature = "odbc_debug")]
     pub(crate) fn assert_not_connected(&self) {
         // TODO: Add a message that attribute should be set only before connection was established
+        // Also add a message that handle can only be disconnected once it's been disconnected
         assert_eq!(false, self.connected);
+    }
+
+    fn do_drop(&mut self) {
+        let sql_return =
+            unsafe { extern_api::SQLFreeHandle(SQL_HANDLE_DBC::IDENTIFIER, self.as_SQLHANDLE()) };
+
+        if sql_return != SQL_SUCCESS && !panicking() {
+            panic!(
+                "{}: SQLFreeHandle returned {:?}. \
+                Before being deallocated, handle must be disconnected(via SQLDisconnect).",
+                type_name::<Self>(),
+                sql_return
+            )
+        }
     }
 }
 impl Handle for SQLHDBC<'_> {
@@ -233,17 +244,18 @@ unsafe impl AsSQLHANDLE for SQLHDBC<'_> {
     }
 }
 impl Drop for SQLHDBC<'_> {
+    #[cfg(feature = "odbc_debug")]
     fn drop(&mut self) {
-        let sql_return =
-            unsafe { extern_api::SQLFreeHandle(SQL_HANDLE_DBC::IDENTIFIER, self.as_SQLHANDLE()) };
-
-        if sql_return != SQL_SUCCESS && !panicking() {
-            panic!(
-                "{}: SQLFreeHandle returned {:?}",
-                type_name::<Self>(),
-                sql_return
-            )
+        if !panicking() {
+            self.assert_not_connected();
         }
+
+        self.do_drop();
+    }
+
+    #[cfg(not(feature = "odbc_debug"))]
+    fn drop(&mut self) {
+        self.do_drop();
     }
 }
 
@@ -346,14 +358,22 @@ impl<'buf> SQLHSTMT<'_, '_, 'buf> {
 
     #[cfg(feature = "odbc_debug")]
     pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<'buf, TT>>(&self, TargetValuePtr: Option<B>) {
-        unimplemented!();
+        if let Some(explicit_ard) = self.explicit_ard.get() {
+            explicit_ard.bind_col(TargetValuePtr);
+        } else {
+            self.ard.bind_col(TargetValuePtr);
+        }
     }
     #[cfg(feature = "odbc_debug")]
     pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<'buf, TT>>(
         &self,
         TargetValuePtr: Option<B>,
     ) {
-        unimplemented!();
+        if let Some(explicit_apd) = self.explicit_apd.get() {
+            explicit_apd.bind_param(TargetValuePtr);
+        } else {
+            self.apd.bind_param(TargetValuePtr);
+        }
     }
     #[cfg(feature = "odbc_debug")]
     pub(crate) fn bind_strlen_or_ind(

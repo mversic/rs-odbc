@@ -1,14 +1,12 @@
+use crate::handle::{AppDesc, ImplDesc, RowDesc};
 use crate::{
-    Attr, AttrLen, AttrRead, AttrWrite, Ident, IntoSQLPOINTER, OdbcDefined, True, SQLHDESC,
-    SQLINTEGER, SQLLEN, SQLSMALLINT, SQLULEN, SQLUSMALLINT, OdbcBool, SQLCHAR
+    handle::SQLHDESC, Attr, AttrLen, AttrRead, AttrWrite, Ident, IntoSQLPOINTER, OdbcBool,
+    OdbcDefined, True, SQLCHAR, SQLINTEGER, SQLLEN, SQLSMALLINT, SQLULEN, SQLUSMALLINT,
 };
-use crate::handle::{DescType, ImplDesc, AppDesc, RowDesc};
 use rs_odbc_derive::{odbc_type, Ident};
 
 pub trait WriteDescField<DT, A: Ident>:
-    Attr<A>
-    + AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER>
-    + IntoSQLPOINTER
+    Attr<A> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER> + IntoSQLPOINTER
 {
     // TODO: Implement for buffers to bind their lifetimes
     fn update_handle(&self, _: &SQLHDESC<DT>) {
@@ -25,9 +23,34 @@ pub trait WriteDescField<DT, A: Ident>:
 
 // TODO: The statement attribute SQL_ATTR_USE_BOOKMARKS should always be set before calling SQLSetDescField to set bookmark fields. While this is not mandatory, it is strongly recommended.
 pub trait DescField<DT, A: crate::Ident>:
-    Attr<A> + AttrLen<<Self as Attr<A>>::DefinedBy, <Self as Attr<A>>::NonBinary, SQLINTEGER>
+    Attr<A> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>
 {
 }
+
+// TODO:
+//impl<'a, H: Handle, D: Ident> DescField<H, D> for &'a [SQLWCHAR]
+//where
+//    &'a [SQLCHAR]: DescField<H, D>,
+//    // TODO: This seems superflous
+//    &'a [SQLWCHAR]: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+//{
+//}
+//
+//impl<H: Handle, D: Ident, T: Ident> DescField<H, D> for std::mem::MaybeUninit<T>
+//where
+//    T: DescField<H, D>,
+//    Self: Attr<D> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+//{
+//}
+//impl<'a, H: Handle, D: Ident, T> DescField<H, D> for &'a [std::mem::MaybeUninit<T>]
+//where
+//    &'a [T]: DescField<H, D>,
+//    Self: Attr<D> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+//{
+//}
+
+//=====================================================================================//
+//-------------------------------------Attributes--------------------------------------//
 
 /////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////// Header fields ////////////////////////////////////
@@ -206,7 +229,7 @@ unsafe impl AttrRead<SQL_DESC_CATALOG_NAME> for [SQLCHAR] {}
 //    type NonBinary = True;
 //}
 //impl<DT> DescField<DT, SQL_DESC_DATA_PTR> for  {}
-//unsafe impl AttrRead<SQL_DESC_DATA_PTR> for  {}
+//unsafe impl AttrRead<SQL_DESC_DATA_PTR> for SQLPOINTER {}
 //unsafe impl AttrWrite<SQL_DESC_DATA_PTR> for  {}
 
 //#[derive(Ident)]
@@ -292,6 +315,8 @@ pub struct nQL_DESC_UNNAMED;
 //        //SQL_PARAM_IGNORE = 1,
 //    }
 
+//=====================================================================================//
+
 #[odbc_type(SQLSMALLINT)]
 pub struct AllocType;
 pub const SQL_DESC_ALLOC_AUTO: AllocType = AllocType(1);
@@ -301,24 +326,3 @@ pub const SQL_DESC_ALLOC_USER: AllocType = AllocType(2);
 pub struct BindType;
 pub const SQL_BIND_BY_COLUMN: BindType = BindType(1);
 pub use SQL_BIND_BY_COLUMN as SQL_BIND_TYPE_DEFAULT;
-
-//impl<'a, H: Handle, D: Ident> DescField<H, D> for &'a [SQLWCHAR]
-//where
-//    &'a [SQLCHAR]: DescField<H, D>,
-//    // TODO: This seems superflous
-//    &'a [SQLWCHAR]: AttrLen<<Self as Attr<D>>::DefinedBy, <Self as Attr<D>>::NonBinary, SQLSMALLINT>,
-//{
-//}
-//
-//impl<H: Handle, D: Ident, T: Ident> DescField<H, D> for std::mem::MaybeUninit<T>
-//where
-//    T: DescField<H, D>,
-//    Self: Attr<D> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-//{
-//}
-//impl<'a, H: Handle, D: Ident, T> DescField<H, D> for &'a [std::mem::MaybeUninit<T>]
-//where
-//    &'a [T]: DescField<H, D>,
-//    Self: Attr<D> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-//{
-//}

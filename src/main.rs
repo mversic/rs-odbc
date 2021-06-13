@@ -1,20 +1,24 @@
 use rs_odbc::{
-    env::OdbcVersion, handle::Allocate, SQLAllocHandle, SQLDisconnect, SQLDriverConnectA, SQLFetch,
-    SQLFreeHandle, SQLGetData, SQLGetEnvAttr, SQLGetStmtAttrA, SQLNumResultCols, SQLSetEnvAttr,
-    SQLSetStmtAttrA, SQLTablesA, StrLenOrInd, SQLCHAR, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT,
-    SQLSMALLINT, SQL_ATTR_ODBC_VERSION, SQL_DRIVER_COMPLETE, SQL_HANDLE_DBC, SQL_HANDLE_DESC,
-    SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_SUCCEEDED,
-    SQLGetConnectAttrW, SQLWCHAR, SQLSetConnectAttrW
+    env::OdbcVersion,
+    env::{SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3, SQL_OV_ODBC3_80},
+    handle::{
+        SQLHDBC, SQL_HANDLE_DBC, SQL_HANDLE_DESC, SQL_HANDLE_ENV,
+        SQL_HANDLE_STMT, SQL_NULL_HANDLE,
+    },
+    sqlreturn::SQL_SUCCEEDED,
+    SQLAllocHandle, SQLDisconnect, SQLDriverConnectA, SQLFetch, SQLFreeHandle, SQLGetConnectAttrW,
+    SQLGetData, SQLGetEnvAttr, SQLGetStmtAttrA, SQLNumResultCols, SQLSetConnectAttrW,
+    SQLSetEnvAttr, SQLSetStmtAttrA, SQLTablesA, StrLenOrInd, SQLCHAR, SQLWCHAR,
+    SQL_DRIVER_COMPLETE,
 };
 use std::convert::TryInto;
 use std::mem::MaybeUninit;
 
 fn main() {
     let mut env = MaybeUninit::uninit();
-    let mut conn = SQLHDBC::uninit();
-    let mut stmt = SQLHSTMT::uninit();
-    let stmt2 = SQLHSTMT::uninit();
-    let mut desc = SQLHDESC::uninit();
+    let mut conn = MaybeUninit::uninit();
+    let mut stmt = MaybeUninit::uninit();
+    let mut desc = MaybeUninit::uninit();
 
     let res = SQLAllocHandle(SQL_HANDLE_ENV, &mut SQL_NULL_HANDLE, &mut env);
     let mut env = unsafe { env.assume_init() };
@@ -24,12 +28,7 @@ fn main() {
     println!("{:?}", res);
 
     let mut val = SQL_OV_ODBC3_80;
-    let res = SQLGetEnvAttr(
-        &env,
-        SQL_ATTR_ODBC_VERSION,
-        Some(&mut val),
-        None
-    );
+    let res = SQLGetEnvAttr(&env, SQL_ATTR_ODBC_VERSION, Some(&mut val), None);
     match val {
         SQL_OV_ODBC3_80 => {
             println!("V3_8")
@@ -39,7 +38,7 @@ fn main() {
         }
         unknown => panic!("unknown value {:?}", unknown),
     }
-    let val: OdbcVersion = unsafe { val }.try_into().unwrap();
+    let val: OdbcVersion = val.try_into().unwrap();
     println!("{:?}", res);
     println!("{:?}", val);
 
@@ -47,21 +46,21 @@ fn main() {
     let mut conn = unsafe { conn.assume_init() };
     println!("{:?}", res);
 
-    let mut conn2 = SQLHDBC::uninit();
+    let mut conn2 = MaybeUninit::uninit();
     let res = SQLAllocHandle(SQL_HANDLE_DBC, &env, &mut conn2);
-    let conn2 = unsafe { conn2.assume_init() };
+    let conn2: SQLHDBC = unsafe { conn2.assume_init() };
     println!("{:?}", res);
 
-    let conn_string = "Driver=mysql;User=kita;Password=moja;Database=test;";
-    let mut outstr: [MaybeUninit<SQLCHAR>; 200] = unsafe { MaybeUninit::uninit().assume_init() };
+    let conn_string = "DSN=MariaDB;Database=rs_odbc_test;";
+    let mut outstr: [MaybeUninit<_>; 1024] = unsafe { MaybeUninit::uninit().assume_init() };
     let cap = outstr.len();
-    let outstrr: &mut [MaybeUninit<SQLCHAR>] = &mut outstr;
+    let outstrr: &mut [MaybeUninit<_>] = &mut outstr;
     let mut outstrlen = MaybeUninit::uninit();
     let res = SQLDriverConnectA(
         &mut conn,
         None,
         conn_string.as_bytes(),
-        outstrr,
+        Some(outstrr),
         &mut outstrlen,
         SQL_DRIVER_COMPLETE,
     );
@@ -70,7 +69,7 @@ fn main() {
             std::mem::ManuallyDrop::new(Box::new(outstr))
                 .as_mut_ptr()
                 .cast(),
-            unsafe {outstrlen.assume_init()} as usize,
+            unsafe { outstrlen.assume_init() } as usize,
             cap,
         )
     };
@@ -88,7 +87,7 @@ fn main() {
     //let mut col_cnt = MaybeUninit::uninit();
     //SQLTablesA(&mut stmt, "", "", "T", &[TABLE]);
     //SQLNumResultCols(&mut stmt, &mut col_cnt);
-    let val = std::cell::UnsafeCell::new(12);
+    let val = std::cell::UnsafeCell::new(12i32);
     let ref_val = &val;
     let Statement = "SELECT a from test.T";
     let k = rs_odbc::SQLPrepareA(&stmt, Statement.as_bytes());
@@ -98,13 +97,13 @@ fn main() {
     //let col_cnt = unsafe { col_cnt.assume_init() };
     //println!("col_cnt: {}", col_cnt);
     let mut row = 0;
-    let x = unsafe { SQLFetch(&stmt)};
+    let x = unsafe { SQLFetch(&stmt) };
     println!("{:?}", x);
     while SQL_SUCCEEDED(x) {
         println!("Row {}, val: {:?}\n", row, val);
 
         //for i in 1..col_cnt {
-        //    //let mut outstr = SQLCHARString::<SQLLEN>::with_capacity(200);
+        //    //let mut outstr = SQLCHARString::<SQLLEN>::with_capacity(1024);
         //    //let indicator;
 
         //    //if SQL_SUCCEEDED(SQLGetData(&mut stmt, i, SQL_C_CHAR, outstr, &indicator)) {
@@ -121,14 +120,25 @@ fn main() {
 
     let mut slice: [SQLCHAR; 0] = [];
     let mut slice: &mut [SQLCHAR] = &mut slice;
-    let mut slice2 = [MaybeUninit::uninit(),MaybeUninit::uninit(),MaybeUninit::uninit(),MaybeUninit::uninit(),MaybeUninit::uninit()];
+    let mut slice2 = [
+        MaybeUninit::uninit(),
+        MaybeUninit::uninit(),
+        MaybeUninit::uninit(),
+        MaybeUninit::uninit(),
+        MaybeUninit::uninit(),
+    ];
     let mut slice3: &mut [_] = &mut slice2;
     let mut len = MaybeUninit::uninit();
-    let res = SQLGetConnectAttrW(&conn, rs_odbc::conn::SQL_ATTR_CURRENT_CATALOG, Some(slice3), Some(&mut len));
-    let slice2: [SQLWCHAR; 5] = unsafe {std::mem::transmute(slice2)};
+    let res = SQLGetConnectAttrW(
+        &conn,
+        rs_odbc::conn::SQL_ATTR_CURRENT_CATALOG,
+        Some(slice3),
+        Some(&mut len),
+    );
+    let slice2: [SQLWCHAR; 5] = unsafe { std::mem::transmute(slice2) };
     let slice2: &[_] = &slice2;
     println!("{:?}", slice2);
-    println!("{:?}", unsafe {len.assume_init()});
+    println!("{:?}", unsafe { len.assume_init() });
     let res = SQLSetConnectAttrW(&conn, rs_odbc::conn::SQL_ATTR_CURRENT_CATALOG, slice2);
 
     let res = SQLSetStmtAttrA(&stmt, rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC, Some(&desc));
@@ -142,7 +152,9 @@ fn main() {
         None,
     );
     let read_desc: rs_odbc::stmt::RefSQLHDESC<_> = unsafe { read_desc.assume_init() };
-    unsafe {SQLFetch(&stmt); }
+    unsafe {
+        SQLFetch(&stmt);
+    }
     println!("KARA: {:?}", res);
 
     println!("{:?}", read_desc);

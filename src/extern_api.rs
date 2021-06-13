@@ -1,6 +1,6 @@
 use crate::handle::{HDBC, HDESC, HENV, HSTMT, SQLHWND};
 use crate::{
-    RETCODE, SQLCHAR, SQLHANDLE, SQLINTEGER, SQLLEN, SQLPOINTER, SQLRETURN,
+    handle::SQLHANDLE, sqlreturn::SQLRETURN, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER,
     SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
 
@@ -15,8 +15,14 @@ impl crate::Ident for ConstSQLPOINTER {
 
 // TODO: static linking is not supported for windows
 #[cfg_attr(windows, link(name = "odbc32", kind = "dylib"))]
-#[cfg_attr(all(not(windows), feature = "static"), link(name = "odbc", kind = "static"))]
-#[cfg_attr(all(not(windows), not(feature = "static")), link(name = "odbc", kind = "dylib"))]
+#[cfg_attr(
+    all(not(windows), feature = "static"),
+    link(name = "odbc", kind = "static")
+)]
+#[cfg_attr(
+    all(not(windows), not(feature = "static")),
+    link(name = "odbc", kind = "dylib")
+)]
 extern "system" {
     pub(crate) fn SQLAllocHandle(
         HandleType: SQLSMALLINT,

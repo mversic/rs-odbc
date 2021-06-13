@@ -1,7 +1,10 @@
-use proc_macro::TokenStream;
-use proc_macro2::Ident;
+use proc_macro::{token_stream, TokenStream};
+use proc_macro2::{Ident, TokenStream as TokenStream2};
 use quote::quote;
 use syn::{self, parse::Parse, parse::Parser};
+
+// TODO: Better message
+const ZST_MSG: &str = "`odbc_type` must be implemented on a zero-sized struct or an enum";
 
 #[proc_macro_derive(Ident, attributes(identifier))]
 pub fn into_identifier(input: TokenStream) -> TokenStream {
@@ -14,18 +17,18 @@ pub fn into_identifier(input: TokenStream) -> TokenStream {
     let mut identifier_type = None;
     for attr in ast.attrs.into_iter() {
         if attr.path.is_ident("identifier") {
-            if let syn::Meta::List(attr_list) = attr.parse_meta().unwrap() {
+            if let syn::Meta::List(attr_list) = attr.parse_meta().expect("Missing arguments") {
                 let mut attr_list = attr_list.nested.into_iter();
 
-                if let syn::NestedMeta::Meta(ref meta) = attr_list.next().unwrap() {
+                if let syn::NestedMeta::Meta(meta) = &attr_list.next().expect("Missing arguments") {
                     identifier_type = meta.path().get_ident().map(|x| x.to_owned());
                 } else {
-                    panic!("1st item not type");
+                    panic!("1st argument is not a valid ODBC type");
                 }
-                if let syn::NestedMeta::Lit(lit) = attr_list.next().unwrap() {
+                if let syn::NestedMeta::Lit(lit) = attr_list.next().expect("Missing 2nd argument") {
                     identifier = Some(lit);
                 } else {
-                    panic!("2nd item not literal");
+                    panic!("2nd argument is not a valid literal");
                 }
             }
         }
@@ -41,12 +44,13 @@ pub fn into_identifier(input: TokenStream) -> TokenStream {
     gen.into()
 }
 
-#[proc_macro_attribute]
-pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
-    let mut ast: syn::DeriveInput = syn::parse(input).unwrap();
-    let mut args = args.into_iter();
-    // TODO:
-    let inner_type: Ident = syn::parse(args.next().unwrap().into()).expect("KAR");
+fn parse_inner_type(mut args: token_stream::IntoIter) -> Ident {
+    let inner_type: Ident = syn::parse(args.next().unwrap().into()).unwrap();
+
+    if args.next().is_some() {
+        // TODO: Better message
+        panic!("Only one ODBC type can be declared");
+    }
 
     match inner_type.to_string().as_str() {
         // REQUIREMENT1: supported types must have a valid zero-byte representation because of AttrZeroFill
@@ -55,15 +59,13 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
         unsupported => panic!("{}: unsupported ODBC type", unsupported),
     }
 
-    if args.next().is_some() {
-        println!("`odbc type` can only declare one type");
-    }
+    inner_type
+}
 
+fn odbc_derive(ast: &mut syn::DeriveInput, inner_type: &Ident) -> TokenStream2 {
     ast.attrs.extend(
         syn::Attribute::parse_outer
-            .parse2(quote! {
-                #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-            })
+            .parse2(quote! { #[derive(Debug, Clone, Copy)] })
             .unwrap(),
     );
 
@@ -83,17 +85,10 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
                         .expect(&format!("{}: unknown ODBC type", inner_type)),
                 );
             } else {
-                panic!("`odbc_type` can only be implemente for ZST");
+                panic!("{}", ZST_MSG);
             }
 
             quote! {
-                #ast
-
-                unsafe impl crate::IntoSQLPOINTER for #type_name {
-                    fn into_SQLPOINTER(self) -> crate::SQLPOINTER {
-                        self.0 as _
-                    }
-                }
                 unsafe impl crate::AsMutSQLPOINTER for #type_name {
                     fn as_mut_SQLPOINTER(&mut self) -> crate::SQLPOINTER {
                         (self as *mut Self).cast()
@@ -102,12 +97,6 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
                 unsafe impl crate::AsMutSQLPOINTER for std::mem::MaybeUninit<#type_name> {
                     fn as_mut_SQLPOINTER(&mut self) -> crate::SQLPOINTER {
                         self.as_mut_ptr().cast()
-                    }
-                }
-
-                impl PartialEq<crate::#inner_type> for #type_name {
-                    fn eq(&self, other: &crate::#inner_type) -> bool {
-                        self.0 == *other
                     }
                 }
 
@@ -123,19 +112,6 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
             let variants = data.variants.iter().map(|v| &v.ident);
 
             quote! {
-                #ast
-
-                unsafe impl crate::IntoSQLPOINTER for #type_name {
-                    fn into_SQLPOINTER(self) -> crate::SQLPOINTER {
-                        self as crate::#inner_type as _
-                    }
-                }
-                impl PartialEq<crate::#inner_type> for #type_name {
-                    fn eq(&self, other: &crate::#inner_type) -> bool {
-                        *self as crate::#inner_type == *other
-                    }
-                }
-
                 impl std::convert::TryFrom<crate::#inner_type> for #type_name {
                     type Error = crate::#inner_type;
 
@@ -154,7 +130,7 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
                 }
             }
         }
-        _ => panic!("`odbc_type` can only be implemented for ZST structs or enums"),
+        _ => panic!("{}", ZST_MSG),
     };
 
     ret.extend(quote! {
@@ -163,11 +139,79 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
             const IDENTIFIER: Self::Type = <crate::#inner_type as crate::Ident>::IDENTIFIER;
         }
 
+        unsafe impl crate::IntoSQLPOINTER for #type_name {
+            fn into_SQLPOINTER(self) -> crate::SQLPOINTER {
+                self.identifier() as _
+            }
+        }
+
         impl crate::AttrZeroAssert for #type_name {
             #[inline]
             fn assert_zeroed(&self) {
                 // TODO: Check implementation on types in lib.rs
-                assert_eq!(0, *self);
+                assert_eq!(0, self.identifier());
+            }
+        }
+
+        #ast
+    });
+
+    ret
+}
+
+#[proc_macro_attribute]
+pub fn odbc_bitmask(args: TokenStream, input: TokenStream) -> TokenStream {
+    let mut ast: syn::DeriveInput = syn::parse(input).unwrap();
+
+    let inner_type = parse_inner_type(args.into_iter());
+    let mut odbc_bitmask = odbc_derive(&mut ast, &inner_type);
+
+    let type_name = &ast.ident;
+    odbc_bitmask.extend(quote! {
+        impl std::ops::BitAnd<crate::#inner_type> for #type_name {
+            type Output = crate::#inner_type;
+
+            fn bitand(self, other: crate::#inner_type) -> Self::Output {
+                self.identifier() & other
+            }
+        }
+        impl std::ops::BitAnd<#type_name> for #type_name {
+            type Output = crate::#inner_type;
+
+            fn bitand(self, other: #type_name) -> Self::Output {
+                self.identifier() & other.identifier()
+            }
+        }
+        impl std::ops::BitAnd<#type_name> for crate::#inner_type {
+            type Output = crate::#inner_type;
+
+            fn bitand(self, other: #type_name) -> Self::Output {
+                other & self
+            }
+        }
+    });
+
+    odbc_bitmask.into()
+}
+
+#[proc_macro_attribute]
+pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
+    let mut ast: syn::DeriveInput = syn::parse(input).unwrap();
+
+    ast.attrs.extend(
+        syn::Attribute::parse_outer
+            .parse2(quote! { #[derive(PartialEq, Eq)] })
+            .unwrap(),
+    );
+
+    let inner_type = parse_inner_type(args.into_iter());
+    let mut odbc_type = odbc_derive(&mut ast, &inner_type);
+
+    let type_name = &ast.ident;
+    odbc_type.extend(quote! {
+        impl PartialEq<crate::#inner_type> for #type_name {
+            fn eq(&self, other: &crate::#inner_type) -> bool {
+                self.identifier() == *other
             }
         }
 
@@ -178,5 +222,5 @@ pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-    ret.into()
+    odbc_type.into()
 }
