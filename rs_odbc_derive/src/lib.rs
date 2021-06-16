@@ -168,18 +168,18 @@ pub fn odbc_bitmask(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let type_name = &ast.ident;
     odbc_bitmask.extend(quote! {
-        impl std::ops::BitAnd<crate::#inner_type> for #type_name {
-            type Output = crate::#inner_type;
-
-            fn bitand(self, other: crate::#inner_type) -> Self::Output {
-                self.identifier() & other
-            }
-        }
         impl std::ops::BitAnd<#type_name> for #type_name {
             type Output = crate::#inner_type;
 
             fn bitand(self, other: #type_name) -> Self::Output {
                 self.identifier() & other.identifier()
+            }
+        }
+        impl std::ops::BitAnd<crate::#inner_type> for #type_name {
+            type Output = crate::#inner_type;
+
+            fn bitand(self, other: crate::#inner_type) -> Self::Output {
+                self.identifier() & other
             }
         }
         impl std::ops::BitAnd<#type_name> for crate::#inner_type {

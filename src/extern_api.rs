@@ -1,7 +1,7 @@
 use crate::handle::{HDBC, HDESC, HENV, HSTMT, SQLHWND};
 use crate::{
-    handle::SQLHANDLE, sqlreturn::SQLRETURN, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER,
-    SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
+    diag::SQLSTATE_SIZE, handle::SQLHANDLE, sqlreturn::SQLRETURN, RETCODE, SQLCHAR, SQLINTEGER,
+    SQLLEN, SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
 
 // TODO: Replace these two types with SQLPOINTER once library is stabilized
@@ -450,7 +450,7 @@ extern "system" {
         HandleType: SQLSMALLINT,
         Handle: SQLHANDLE,
         RecNumber: SQLSMALLINT,
-        SQLState: *mut [SQLCHAR; 6],
+        SQLState: *mut [SQLCHAR; SQLSTATE_SIZE + 1],
         NativeErrorPtr: *mut SQLINTEGER,
         MessageText: *mut SQLCHAR,
         BufferLength: SQLSMALLINT,
@@ -461,7 +461,7 @@ extern "system" {
         HandleType: SQLSMALLINT,
         Handle: SQLHANDLE,
         RecNumber: SQLSMALLINT,
-        SQLState: *mut [SQLWCHAR; 6],
+        SQLState: *mut [SQLWCHAR; SQLSTATE_SIZE + 1],
         NativeErrorPtr: *mut SQLINTEGER,
         MessageText: *mut SQLWCHAR,
         BufferLength: SQLSMALLINT,

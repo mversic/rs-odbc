@@ -1,4 +1,3 @@
-use crate::SQLSMALLINT;
 use rs_odbc_derive::odbc_type;
 
 /// Each function in ODBC returns a code, known as its return code, which indicates the

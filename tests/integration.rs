@@ -20,9 +20,7 @@ fn get_env_handle() -> SQLHENV {
     let res = SQLAllocHandle(SQL_HANDLE_ENV, &mut SQL_NULL_HANDLE, &mut env);
     assert_eq!(SQL_SUCCESS, res);
 
-    assert!(!env.as_ptr().is_null());
     let mut env = unsafe { env.assume_init() };
-
     let res = SQLSetEnvAttr(&mut env, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80);
     assert_eq!(SQL_SUCCESS, res);
 
@@ -35,9 +33,7 @@ fn connect_to_test_db<'env>(env: &'env mut SQLHENV) -> SQLHDBC<'env> {
     let res = SQLAllocHandle(SQL_HANDLE_DBC, env, &mut conn);
     assert_eq!(SQL_SUCCESS, res);
 
-    assert!(!conn.as_ptr().is_null());
     let mut conn = unsafe { conn.assume_init() };
-
     let conn_string = "DSN=MariaDB;Database=rs_odbc_test;";
     let mut outstrlen = MaybeUninit::zeroed();
     let res = SQLDriverConnectA(
@@ -66,9 +62,7 @@ fn set_get_env_attr() {
     let res = SQLAllocHandle(SQL_HANDLE_ENV, &mut SQL_NULL_HANDLE, &mut env);
     assert_eq!(SQL_SUCCESS, res);
 
-    assert!(!env.as_ptr().is_null());
     let mut env = unsafe { env.assume_init() };
-
     let res = SQLSetEnvAttr(&mut env, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80);
     assert_eq!(SQL_SUCCESS, res);
 
@@ -86,16 +80,13 @@ fn db_connect() {
     let res = SQLAllocHandle(SQL_HANDLE_ENV, &mut SQL_NULL_HANDLE, &mut env);
     assert_eq!(SQL_SUCCESS, res);
 
-    assert!(!env.as_ptr().is_null());
     let mut env = unsafe { env.assume_init() };
-
     let res = SQLSetEnvAttr(&mut env, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80);
     assert_eq!(SQL_SUCCESS, res);
 
     let res = SQLAllocHandle(SQL_HANDLE_DBC, &mut env, &mut conn);
     assert_eq!(SQL_SUCCESS, res);
 
-    assert!(!conn.as_ptr().is_null());
     let mut conn = unsafe { conn.assume_init() };
 
     let conn_string = "DSN=MariaDB;Database=rs_odbc_test;";
@@ -111,7 +102,6 @@ fn db_connect() {
     );
     assert_eq!(SQL_SUCCESS, res);
 
-    assert!(!outstrlen.as_ptr().is_null());
     let outstrlen: usize = unsafe { outstrlen.assume_init() } as usize;
     assert_eq!(34, outstrlen);
 
@@ -120,7 +110,6 @@ fn db_connect() {
         outstr[i] = MaybeUninit::zeroed();
     }
 
-    assert!(!outstr[0].as_ptr().is_null());
     let outstr: [SQLCHAR; 1024] = unsafe { std::mem::transmute(outstr) };
     assert_eq!(
         "DSN=MariaDB;Database=rs_odbc_test;".as_bytes(),
@@ -141,13 +130,9 @@ fn get_handle() {
     let res = SQLAllocHandle(SQL_HANDLE_STMT, &conn, &mut stmt);
     assert_eq!(SQL_SUCCESS, res);
 
-    assert!(!stmt.as_ptr().is_null());
     let stmt = unsafe { stmt.assume_init() };
-
     let res = SQLGetStmtAttrA(&stmt, SQL_ATTR_APP_ROW_DESC, Some(&mut desc), None);
     assert_eq!(SQL_SUCCESS, res);
-
-    assert!(!desc.as_ptr().is_null());
 
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     assert_eq!(SQL_SUCCESS, res);
@@ -164,9 +149,7 @@ fn get_info() {
 
     SQLGetInfoA(&conn, SQL_TXN_ISOLATION_OPTION, Some(&mut txn_isolation), None);
 
-    assert!(!txn_isolation.as_ptr().is_null());
     let txn_isolation = unsafe{ txn_isolation.assume_init() };
-
     assert_eq!(0x00000001, SQL_TXN_READ_UNCOMMITTED & txn_isolation);
     assert_eq!(0x00000002, SQL_TXN_READ_COMMITTED & txn_isolation);
     assert_eq!(0x00000004, SQL_TXN_REPEATABLE_READ & txn_isolation);

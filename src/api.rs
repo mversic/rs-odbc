@@ -10,7 +10,7 @@ use crate::{
     col::ColAttr,
     conn::ConnAttr,
     desc::{DescField, WriteDescField},
-    diag::DiagField,
+    diag::{DiagField, SQLSTATE},
     env::EnvAttr,
     handle::{SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
     info::InfoType,
@@ -1521,7 +1521,8 @@ where
 pub fn SQLGetDiagFieldA<H: Handle, D: Ident<Type = SQLSMALLINT>, T: DiagField<H, D>>(
     HandleType: H::Ident,
     Handle: &H,
-    RecNumber: SQLSMALLINT,
+    // TODO: Use NoneZeroI16?
+    RecNumber: std::num::NonZeroI16,
     DiagIdentifier: D,
     DiagInfoPtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
@@ -1543,7 +1544,7 @@ where
         extern_api::SQLGetDiagFieldA(
             H::Ident::IDENTIFIER,
             Handle.as_SQLHANDLE(),
-            RecNumber,
+            RecNumber.get(),
             D::IDENTIFIER,
             DiagInfoPtr.0,
             DiagInfoPtr.1,
@@ -1563,7 +1564,8 @@ where
 pub fn SQLGetDiagFieldW<H: Handle, D: Ident<Type = SQLSMALLINT>, T: DiagField<H, D>>(
     HandleType: H::Ident,
     Handle: &H,
-    RecNumber: SQLSMALLINT,
+    // TODO: Use NoneZeroI16?
+    RecNumber: std::num::NonZeroI16,
     DiagIdentifier: D,
     DiagInfoPtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
@@ -1585,7 +1587,7 @@ where
         extern_api::SQLGetDiagFieldW(
             H::Ident::IDENTIFIER,
             Handle.as_SQLHANDLE(),
-            RecNumber,
+            RecNumber.get(),
             D::IDENTIFIER,
             DiagInfoPtr.0,
             DiagInfoPtr.1,
@@ -1594,36 +1596,79 @@ where
     }
 }
 
-// TODO: Finish this functtion
-///// Returns the current values of multiple fields of a diagnostic record that contains error, warning, and status information. Unlike **SQLGetDiagField**, which returns one diagnostic field per call, **SQLGetDiagRec** returns several commonly used fields of a diagnostic record, including the SQLSTATE, the native error code, and the diagnostic message text.
-/////
-///// For complete documentation on SQLGetDiagRecA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdiagrec-function).
-/////
-///// # Returns
-///// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-//#[inline]
-//#[allow(non_snake_case, unused_variables)]
-//pub fn SQLGetDiagRecA<H: Handle>(HandleType: H::Identifier, Handle: &H, SQLState: SqlStateA, NativeErrorPtr: &mut I32, MessageText: &mut MC, TextLengthPtr: &mut I16) -> SQLRETURN
-//where H: AsSQLHANDLE {
-//    let MessageText = MessageText.as_mut_raw_slice();
-//
-//    unsafe{ extern_api::SQLGetDiagRecA(H::Identifier::IDENTIFIER, Handle.as_SQLHANDLE(), SqlState.0.as_mut_ptr(), NativeErrorPtr.as_mut_ptr(), MessageText.0, MessageText.1, TextLengthPtr.as_mut_ptr()) }
-//}
-//
-///// Returns the current values of multiple fields of a diagnostic record that contains error, warning, and status information. Unlike **SQLGetDiagField**, which returns one diagnostic field per call, **SQLGetDiagRec** returns several commonly used fields of a diagnostic record, including the SQLSTATE, the native error code, and the diagnostic message text.
-/////
-///// For complete documentation on SQLGetDiagRecW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdiagrec-function).
-/////
-///// # Returns
-///// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-//#[inline]
-//#[allow(non_snake_case, unused_variables)]
-//pub fn SQLGetDiagRecW<H: Handle>(HandleType: H::Identifier, Handle: &H, SQLState: SqlStateW, NativeErrorPtr: &mut I32, MessageText: &mut MC, TextLengthPtr: &mut I16) -> SQLRETURN
-//where H: AsSQLHANDLE {
-//    let MessageText = MessageText.as_mut_raw_slice();
-//
-//    unsafe{ extern_api::SQLGetDiagRecW(H::Identifier::IDENTIFIER, Handle.as_SQLHANDLE(), SqlState.0.as_mut_ptr(), NativeErrorPtr.as_mut_ptr(), MessageText.0, MessageText.1, TextLengthPtr.as_mut_ptr()) }
-//}
+/// Returns the current values of multiple fields of a diagnostic record that contains error, warning, and status information. Unlike **SQLGetDiagField**, which returns one diagnostic field per call, **SQLGetDiagRec** returns several commonly used fields of a diagnostic record, including the SQLSTATE, the native error code, and the diagnostic message text.
+///
+/// For complete documentation on SQLGetDiagRecA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdiagrec-function).
+///
+/// # Returns
+/// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+#[inline]
+#[allow(non_snake_case, unused_variables)]
+pub fn SQLGetDiagRecA<H: Handle>(
+    HandleType: H::Ident,
+    Handle: &H,
+    // TODO: Use NoneZeroI16?
+    RecNumber: std::num::NonZeroI16,
+    SQLState: &mut MaybeUninit<SQLSTATE<SQLCHAR>>,
+    NativeErrorPtr: &mut MaybeUninit<SQLINTEGER>,
+    MessageText: &mut [MaybeUninit<SQLCHAR>],
+    TextLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+) -> SQLRETURN
+where
+    H: AsSQLHANDLE,
+{
+    let MessageText = MessageText.as_mut_raw_slice();
+
+    unsafe {
+        extern_api::SQLGetDiagRecA(
+            H::Ident::IDENTIFIER,
+            Handle.as_SQLHANDLE(),
+            RecNumber.get(),
+            SQLState.as_mut_ptr().cast(),
+            NativeErrorPtr.as_mut_ptr(),
+            MessageText.0,
+            MessageText.1,
+            TextLengthPtr.as_mut_ptr(),
+        )
+    }
+}
+
+/// Returns the current values of multiple fields of a diagnostic record that contains error, warning, and status information. Unlike **SQLGetDiagField**, which returns one diagnostic field per call, **SQLGetDiagRec** returns several commonly used fields of a diagnostic record, including the SQLSTATE, the native error code, and the diagnostic message text.
+///
+/// For complete documentation on SQLGetDiagRecW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdiagrec-function).
+///
+/// # Returns
+/// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+#[inline]
+#[allow(non_snake_case, unused_variables)]
+pub fn SQLGetDiagRecW<H: Handle>(
+    HandleType: H::Ident,
+    Handle: &H,
+    // TODO: Use NoneZeroI16?
+    RecNumber: std::num::NonZeroI16,
+    SQLState: &mut MaybeUninit<SQLSTATE<SQLWCHAR>>,
+    NativeErrorPtr: &mut MaybeUninit<SQLINTEGER>,
+    MessageText: &mut [MaybeUninit<SQLWCHAR>],
+    TextLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+) -> SQLRETURN
+where
+    H: AsSQLHANDLE,
+{
+    let MessageText = MessageText.as_mut_raw_slice();
+
+    unsafe {
+        extern_api::SQLGetDiagRecW(
+            H::Ident::IDENTIFIER,
+            Handle.as_SQLHANDLE(),
+            RecNumber.get(),
+            SQLState.as_mut_ptr().cast(),
+            NativeErrorPtr.as_mut_ptr(),
+            MessageText.0,
+            MessageText.1,
+            TextLengthPtr.as_mut_ptr(),
+        )
+    }
+}
 
 /// Returns the current setting of an environment attribute.
 ///

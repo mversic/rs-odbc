@@ -8,9 +8,11 @@ edition = "2018"
 [build-dependencies]
 rustc_version = "*"
 
+[dev-dependencies]
+# mockall = "*"             # to be used with miri eventually
+
 [dependencies]
 rs_odbc_derive = {path = "./rs_odbc_derive", version = "*"}
-ucs2 = "0.3.2"
 
 [features]
 odbc_debug = []

@@ -56,9 +56,6 @@ pub type SQLSETPOSIROW = SQLUSMALLINT;
 #[cfg(target_pointer_width = "64")]
 pub type SQLSETPOSIROW = u64;
 
-pub struct SqlStateA([SQLCHAR; 6]);
-pub struct SqlStateW([SQLWCHAR; 6]);
-
 type UWORD = u16;
 pub type SQLPOINTER = *mut c_void;
 
@@ -235,7 +232,9 @@ impl AttrZeroAssert for SQLULEN {
         assert_eq!(0, *self);
     }
 }
-impl<T> AttrZeroAssert for MaybeUninit<T> {}
+impl<T> AttrZeroAssert for MaybeUninit<T> {
+    // MaybeUninit must not be read
+}
 impl<T> AttrZeroAssert for [T] {}
 
 /// Implementing type must have the same representation as SQLPOINTER
