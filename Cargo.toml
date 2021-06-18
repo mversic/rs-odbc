@@ -3,6 +3,7 @@ name = "rs-odbc"
 version = "0.1.0"
 authors = ["Marin Veršić <marin.versic101@gmail.com>"]
 build = "build.rs"
+license = "Apache-2.0"
 edition = "2018"
 
 [build-dependencies]
