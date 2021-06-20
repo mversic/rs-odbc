@@ -110,7 +110,7 @@ pub const SQL_LONGVARBINARY: SqlType = SqlType(-4);
 /// Fixed length GUID.
 ///
 /// SQL data type: GUID
-#[cfg(feature = "v3_5")]
+// TODO: This is V3_5
 pub const SQL_GUID: SqlType = SqlType(-11);
 
 /// Year, month, and day fields, conforming to the rules of the Gregorian calendar. (See Constraints of the Gregorian Calendar, later in this appendix.)
@@ -128,10 +128,8 @@ pub const SQL_TYPE_TIME: SqlType = SqlType(92);
 /// SQL data type: TIMESTAMP(p)
 pub const SQL_TYPE_TIMESTAMP: SqlType = SqlType(93);
 
-#[cfg(feature = "v4")]
+// TODO: These are V4
 pub const SQL_TYPE_TIME_WITH_TIMEZONE: SqlType = SqlType(94);
-
-#[cfg(feature = "v4")]
 pub const SQL_TYPE_TIMESTAMP_WITH_TIMEZONE: SqlType = SqlType(95);
 
 // TODO: These are not found in the reference implementation but exist in documentation

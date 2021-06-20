@@ -1,41 +1,44 @@
 use crate::{
-    Attr, AttrLen, AttrRead, Ident, OdbcDefined, True, SQLCHAR, SQLLEN, SQLSMALLINT, SQLWCHAR,
+    Attr, AttrLen, AttrRead, Ident, OdbcDefined, True, SQLCHAR, SQLLEN, SQLSMALLINT, SQLWCHAR, Version, V3, V3_8, V4
 };
 use rs_odbc_derive::Ident;
 use std::mem::MaybeUninit;
 
-pub trait ColAttr<A: Ident>:
+pub trait ColAttr<A: Ident, V: Version>:
     Attr<A> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>
 {
 }
 
-impl<A: Ident> ColAttr<A> for &[SQLCHAR] where [SQLCHAR]: ColAttr<A> {}
-impl<A: Ident> ColAttr<A> for &[SQLWCHAR] where [SQLWCHAR]: ColAttr<A> {}
+impl<A, V: Ident> ColAttr<A, V> for &[SQLCHAR] where [SQLCHAR]: ColAttr<A, V> {}
+impl<A, V: Ident> ColAttr<A, V> for &[SQLWCHAR] where [SQLWCHAR]: ColAttr<A, V> {}
 
-impl<A: Ident> ColAttr<A> for [SQLWCHAR]
+impl<A, V: Ident> ColAttr<A, V> for [SQLWCHAR]
 where
-    [SQLCHAR]: ColAttr<A, NonBinary = True>,
+    [SQLCHAR]: ColAttr<A, V, NonBinary = True>,
     [SQLWCHAR]: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<A: Ident> ColAttr<A> for [MaybeUninit<SQLCHAR>]
+impl<A, V: Ident> ColAttr<A, V> for [MaybeUninit<SQLCHAR>]
 where
-    [SQLCHAR]: ColAttr<A>,
+    [SQLCHAR]: ColAttr<A, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<A: Ident> ColAttr<A> for [MaybeUninit<SQLWCHAR>]
+impl<A, V: Ident> ColAttr<A, V> for [MaybeUninit<SQLWCHAR>]
 where
-    [SQLWCHAR]: ColAttr<A>,
+    [SQLWCHAR]: ColAttr<A, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<A: Ident, T: Ident> ColAttr<A> for MaybeUninit<T>
+impl<A, V: Ident, T: Ident> ColAttr<A, V> for MaybeUninit<T>
 where
-    T: ColAttr<A>,
+    T: ColAttr<A, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
+
+impl<A: Ident, T: ColAttr<A, V3>> ColAttr<A, V3_8> for T where T: ?Sized {}
+impl<A: Ident, T: ColAttr<A, V3_8>> ColAttr<A, V4> for T where T: ?Sized {}
 
 //=====================================================================================//
 //-------------------------------------Attributes--------------------------------------//
@@ -65,7 +68,6 @@ unsafe impl Attr<SQL_DESC_COUNT> for SQLLEN {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ColAttr<SQL_DESC_COUNT> for SQLLEN {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 2)]

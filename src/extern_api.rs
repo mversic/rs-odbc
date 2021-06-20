@@ -74,7 +74,6 @@ extern "system" {
 
     pub(crate) fn SQLCancel(StatementHandle: HSTMT) -> SQLRETURN;
 
-    #[cfg(feature = "v3_8")]
     pub(crate) fn SQLCancelHandle(HandleType: SQLSMALLINT, Handle: SQLHANDLE) -> SQLRETURN;
 
     pub(crate) fn SQLCloseCursor(StatementHandle: HSTMT) -> SQLRETURN;
@@ -147,7 +146,6 @@ extern "system" {
         NameLength4: SQLSMALLINT,
     ) -> SQLRETURN;
 
-    #[cfg(feature = "v3_8")]
     pub(crate) fn SQLCompleteAsync(
         HandleType: SQLSMALLINT,
         Handle: SQLHANDLE,

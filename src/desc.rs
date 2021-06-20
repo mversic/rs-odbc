@@ -9,7 +9,7 @@ pub trait WriteDescField<DT, A: Ident>:
     Attr<A> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER> + IntoSQLPOINTER
 {
     // TODO: Implement for buffers to bind their lifetimes
-    fn update_handle(&self, _: &SQLHDESC<DT>) {
+    fn update_handle<V>(&self, _: &SQLHDESC<V, DT>) {
         // TODO: If an application calls SQLSetDescField to set any field other than SQL_DESC_COUNT
         // or the deferred fields SQL_DESC_DATA_PTR, SQL_DESC_OCTET_LENGTH_PTR, or SQL_DESC_INDICATOR_PTR,
         // the record becomes unbound.

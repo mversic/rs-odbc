@@ -64,6 +64,14 @@ pub type SQLPOINTER = *mut c_void;
 // Use uninhabited type ! when it is available in std
 pub enum Void {}
 
+pub trait Version {}
+pub enum V3 {}
+impl Version for V3 {}
+pub enum V3_8 {}
+impl Version for V3_8 {}
+pub enum V4 {}
+impl Version for V4 {}
+
 const SQL_IS_POINTER: SQLSMALLINT = -4;
 const SQL_IS_UINTEGER: SQLSMALLINT = -5;
 const SQL_IS_INTEGER: SQLSMALLINT = -6;
@@ -293,7 +301,7 @@ impl<T> Ident for Option<&mut T> {
     const IDENTIFIER: Self::Type = SQL_IS_POINTER;
 }
 
-pub unsafe trait Attr<A: Ident> {
+pub unsafe trait Attr<H: crate::handle::Handle, A: Ident<Type = H::AttrType>>: AttrLen<Self::DefinedBy, Self::NonBinary, H::AttrLen> {
     type DefinedBy: Def;
 
     // Documentation says that binary buffers are allowed as ValuePtr arguments
@@ -302,7 +310,7 @@ pub unsafe trait Attr<A: Ident> {
     // in order to disambiguate between [SQLCHAR] and binary buffers
     type NonBinary: Bool;
 }
-unsafe impl<A: Ident> Attr<A> for [SQLWCHAR]
+unsafe impl<V: Version, A: Ident> Attr<A> for [SQLWCHAR]
 where
     [SQLCHAR]: Attr<A, NonBinary = True>,
 {

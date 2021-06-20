@@ -48,7 +48,7 @@ fn main() {
 
     let mut conn2 = MaybeUninit::uninit();
     let res = SQLAllocHandle(SQL_HANDLE_DBC, &env, &mut conn2);
-    let conn2: SQLHDBC = unsafe { conn2.assume_init() };
+    let conn2: SQLHDBC<()> = unsafe { conn2.assume_init() };
     println!("{:?}", res);
 
     let conn_string = "DSN=MariaDB;Database=rs_odbc_test;";
@@ -151,7 +151,7 @@ fn main() {
         Some(&mut read_desc),
         None,
     );
-    let read_desc: rs_odbc::stmt::RefSQLHDESC<_> = unsafe { read_desc.assume_init() };
+    let read_desc: rs_odbc::stmt::RefSQLHDESC<(), _> = unsafe { read_desc.assume_init() };
     unsafe {
         SQLFetch(&stmt);
     }

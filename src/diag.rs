@@ -151,7 +151,7 @@ unsafe impl Attr<SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_>, SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {}
+impl<V> DiagField<SQLHSTMT<'_, '_, '_, V>, SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {}
 unsafe impl AttrRead<SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {}
 
 #[derive(Ident)]
@@ -162,7 +162,7 @@ unsafe impl Attr<SQL_DIAG_DYNAMIC_FUNCTION> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_>, SQL_DIAG_DYNAMIC_FUNCTION> for [SQLCHAR] {}
+impl<V> DiagField<SQLHSTMT<'_, '_, '_, V>, SQL_DIAG_DYNAMIC_FUNCTION> for [SQLCHAR] {}
 unsafe impl AttrRead<SQL_DIAG_DYNAMIC_FUNCTION> for [SQLCHAR] {}
 
 #[derive(Ident)]
@@ -173,7 +173,7 @@ unsafe impl Attr<SQL_DIAG_DYNAMIC_FUNCTION_CODE> for DiagDynamicFunctionCode {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_>, SQL_DIAG_DYNAMIC_FUNCTION_CODE> for DiagDynamicFunctionCode {}
+impl<V> DiagField<SQLHSTMT<'_, '_, '_, V>, SQL_DIAG_DYNAMIC_FUNCTION_CODE> for DiagDynamicFunctionCode {}
 unsafe impl AttrRead<SQL_DIAG_DYNAMIC_FUNCTION_CODE> for DiagDynamicFunctionCode {}
 
 #[derive(Ident)]
@@ -206,7 +206,7 @@ unsafe impl Attr<SQL_DIAG_ROW_COUNT> for SQLLEN {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_>, SQL_DIAG_ROW_COUNT> for SQLLEN {}
+impl<V> DiagField<SQLHSTMT<'_, '_, '_, V>, SQL_DIAG_ROW_COUNT> for SQLLEN {}
 unsafe impl AttrRead<SQL_DIAG_ROW_COUNT> for SQLLEN {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -232,7 +232,7 @@ unsafe impl Attr<SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_>, SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {}
+impl<V> DiagField<SQLHSTMT<'_, '_, '_, V>, SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {}
 unsafe impl AttrRead<SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {}
 
 #[derive(Ident)]
@@ -276,7 +276,7 @@ unsafe impl Attr<SQL_DIAG_ROW_NUMBER> for DiagRowNumber {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_>, SQL_DIAG_ROW_NUMBER> for DiagRowNumber {}
+impl<V> DiagField<SQLHSTMT<'_, '_, '_, V>, SQL_DIAG_ROW_NUMBER> for DiagRowNumber {}
 unsafe impl AttrRead<SQL_DIAG_ROW_NUMBER> for DiagRowNumber {}
 
 #[derive(Ident)]
