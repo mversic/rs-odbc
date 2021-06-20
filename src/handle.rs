@@ -1,7 +1,10 @@
 use crate::c_types::DeferredBuf;
 use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::extern_api;
-use crate::{sqlreturn::SQL_SUCCESS, Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER, SQLSMALLINT};
+use crate::{
+    sqlreturn::SQL_SUCCESS, Bool, False, Ident, IntoSQLPOINTER, StrLenOrInd, True, SQLPOINTER,
+    SQLSMALLINT,
+};
 use std::any::type_name;
 use std::cell::{Cell, UnsafeCell};
 use std::marker::PhantomData;
@@ -105,6 +108,7 @@ pub type HDESC = SQLHANDLE;
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/environment-handles
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct SQLHENV<V: OdbcVersion> {
     pub(crate) handle: SQLHANDLE,
@@ -181,53 +185,63 @@ impl<V: OdbcVersion> SQLEndTranHandle for SQLHENV<V> {}
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/connection-handles
+#[derive(Debug)]
 #[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
-pub struct SQLHDBC<'env, V: OdbcVersion> {
+pub struct SQLHDBC<'env, C, V: OdbcVersion> {
     pub(crate) handle: SQLHANDLE,
 
     parent: PhantomData<&'env ()>,
+    connected: PhantomData<C>,
     version: PhantomData<V>,
-
-    #[cfg(feature = "odbc_debug")]
-    connected: bool,
 }
-impl<V: OdbcVersion> SQLHDBC<'_, V> {
-    #[inline]
-    #[cfg(feature = "odbc_debug")]
-    pub(crate) fn set_connected(&mut self) {
-        self.connected = true;
+impl<'env, V: OdbcVersion> SQLHDBC<'env, False, V> {
+    pub fn connected(self) -> SQLHDBC<'env, True, V> {
+        SQLHDBC {
+            handle: self.handle,
+            parent: self.parent,
+            connected: PhantomData,
+            version: PhantomData,
+        }
     }
-
-    #[inline]
-    #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn set_connected(&mut self) {}
-
-    #[inline]
-    #[cfg(feature = "odbc_debug")]
-    pub(crate) fn set_disconnected(&mut self) {
-        self.connected = false;
+}
+impl<'env, V: OdbcVersion> SQLHDBC<'env, True, V> {
+    pub fn disconnected(self) -> SQLHDBC<'env, False, V> {
+        SQLHDBC {
+            handle: self.handle,
+            parent: self.parent,
+            connected: PhantomData,
+            version: PhantomData,
+        }
     }
+}
+impl<C, V: OdbcVersion> Handle for SQLHDBC<'_, C, V> {
+    type Ident = SQL_HANDLE_DBC;
+}
+unsafe impl<'env, V: OdbcVersion> Allocate<'env> for SQLHDBC<'env, False, V> {
+    type SrcHandle = SQLHENV<V>;
 
-    #[inline]
-    #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn set_disconnected(&mut self) {}
+    fn from_raw(handle: SQLHANDLE) -> Self {
+        Self {
+            handle,
 
-    #[inline]
-    #[cfg(feature = "odbc_debug")]
-    pub(crate) fn assert_connected(&self) {
-        // TODO: Add a message that attribute should be set only after connection was established
-        assert_eq!(true, self.connected);
+            parent: PhantomData,
+            connected: PhantomData,
+            version: PhantomData,
+        }
     }
-
-    #[inline]
-    #[cfg(feature = "odbc_debug")]
-    pub(crate) fn assert_not_connected(&self) {
-        // TODO: Add a message that attribute should be set only before connection was established
-        // Also add a message that handle can only be disconnected once it's been disconnected
-        assert_eq!(false, self.connected);
+}
+impl SQLCancelHandle for SQLHDBC<'_, True, SQL_OV_ODBC3_80> {}
+impl SQLCancelHandle for SQLHDBC<'_, True, SQL_OV_ODBC4> {}
+impl SQLCompleteAsyncHandle for SQLHDBC<'_, True, SQL_OV_ODBC3_80> {}
+impl SQLCompleteAsyncHandle for SQLHDBC<'_, True, SQL_OV_ODBC4> {}
+impl<V: OdbcVersion> SQLEndTranHandle for SQLHDBC<'_, True, V> {}
+unsafe impl<C, V: OdbcVersion> AsSQLHANDLE for SQLHDBC<'_, C, V> {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.handle
     }
-
-    fn do_drop(&mut self) {
+}
+impl<C, V: OdbcVersion> Drop for SQLHDBC<'_, C, V> {
+    fn drop(&mut self) {
         let sql_return =
             unsafe { extern_api::SQLFreeHandle(SQL_HANDLE_DBC::IDENTIFIER, self.as_SQLHANDLE()) };
 
@@ -239,58 +253,6 @@ impl<V: OdbcVersion> SQLHDBC<'_, V> {
                 sql_return
             )
         }
-    }
-}
-impl<V: OdbcVersion> Handle for SQLHDBC<'_, V> {
-    type Ident = SQL_HANDLE_DBC;
-}
-unsafe impl<'env, V: OdbcVersion> Allocate<'env> for SQLHDBC<'env, V> {
-    type SrcHandle = SQLHENV<V>;
-
-    #[cfg(feature = "odbc_debug")]
-    fn from_raw(handle: SQLHANDLE) -> Self {
-        Self {
-            handle,
-
-            parent: PhantomData,
-            version: PhantomData,
-
-            connected: false,
-        }
-    }
-    #[cfg(not(feature = "odbc_debug"))]
-    fn from_raw(handle: SQLHANDLE) -> Self {
-        Self {
-            handle,
-
-            parent: PhantomData,
-            version: PhantomData,
-        }
-    }
-}
-impl SQLCancelHandle for SQLHDBC<'_, SQL_OV_ODBC3_80> {}
-impl SQLCancelHandle for SQLHDBC<'_, SQL_OV_ODBC4> {}
-impl SQLCompleteAsyncHandle for SQLHDBC<'_, SQL_OV_ODBC3_80> {}
-impl SQLCompleteAsyncHandle for SQLHDBC<'_, SQL_OV_ODBC4> {}
-impl<V: OdbcVersion> SQLEndTranHandle for SQLHDBC<'_, V> {}
-unsafe impl<V: OdbcVersion> AsSQLHANDLE for SQLHDBC<'_, V> {
-    fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        self.handle
-    }
-}
-impl<V: OdbcVersion> Drop for SQLHDBC<'_, V> {
-    #[cfg(feature = "odbc_debug")]
-    fn drop(&mut self) {
-        if !panicking() {
-            self.assert_not_connected();
-        }
-
-        self.do_drop();
-    }
-
-    #[cfg(not(feature = "odbc_debug"))]
-    fn drop(&mut self) {
-        self.do_drop();
     }
 }
 
@@ -316,6 +278,7 @@ impl<V: OdbcVersion> Drop for SQLHDBC<'_, V> {
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/statement-handles
+#[derive(Debug)]
 #[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
 pub struct SQLHSTMT<'conn, 'stmt, 'buf, V: OdbcVersion> {
     pub(crate) handle: SQLHANDLE,
@@ -435,7 +398,7 @@ impl<V: OdbcVersion> Handle for SQLHSTMT<'_, '_, '_, V> {
 }
 unsafe impl<'conn, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V> {
     // Valid because SQLHDBC is covariant
-    type SrcHandle = SQLHDBC<'conn, V>;
+    type SrcHandle = SQLHDBC<'conn, True, V>;
 
     #[cfg(feature = "odbc_debug")]
     fn from_raw(handle: SQLHANDLE) -> Self {
@@ -574,7 +537,7 @@ impl<'buf, V: OdbcVersion, T: DescType<'buf>> Handle for SQLHDESC<'_, T, V> {
 }
 unsafe impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'buf>, V> {
     // Valid because SQLHDBC is covariant
-    type SrcHandle = SQLHDBC<'conn, V>;
+    type SrcHandle = SQLHDBC<'conn, True, V>;
 
     fn from_raw(handle: SQLHANDLE) -> Self {
         SQLHDESC::from_raw(handle)
