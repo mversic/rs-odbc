@@ -1,6 +1,6 @@
 use crate::{
-    handle::SQLHDBC, info::TxnIsolation, stmt::StmtAttr, Attr, AttrLen, AttrRead, AttrWrite, Ident,
-    OdbcBool, OdbcDefined, True, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR, V3, V3_5, V3_8, V4, Version
+    handle::SQLHDBC, info::TxnIsolation, stmt::StmtAttr, Attr, AttrLen, AttrGet, AttrSet, Ident,
+    OdbcBool, OdbcDefined, True, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR, V3, V3_8, V4, Version
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
@@ -17,39 +17,42 @@ pub trait ConnAttr<A: Ident, V: Version>:
     fn check_attr(&self, ConnectionHandle: &SQLHDBC<V>) {}
 }
 
-impl<A: Ident> ConnAttr<A, V3> for &[SQLCHAR] where [SQLCHAR]: ConnAttr<A, V3> {}
-impl<A: Ident> ConnAttr<A, V3> for &[SQLWCHAR] where [SQLWCHAR]: ConnAttr<A, V3> {}
+// Implement ConnAttr for all versions of connection attributes
+impl<A: Ident, T: Ident> ConnAttr<A, V3_8> for T where T: ConnAttr<A, V3> {}
+impl<A: Ident, T: Ident> ConnAttr<A, V4> for T where T: ConnAttr<A, V3_8> {}
+impl<A: Ident> ConnAttr<A, V3_8> for [SQLCHAR] where [SQLCHAR]: ConnAttr<A, V3> {}
+impl<A: Ident> ConnAttr<A, V4> for [SQLCHAR] where [SQLCHAR]: ConnAttr<A, V3_8> {}
 
-impl<A: Ident> ConnAttr<A, V3> for [SQLWCHAR]
+// Implement ConnAttr for unicode character connection attributes
+impl<V: Version, A: Ident> ConnAttr<A, V> for [SQLWCHAR]
 where
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
-    [SQLCHAR]: ConnAttr<A, V3, NonBinary = True>,
+    [SQLCHAR]: ConnAttr<A, V, NonBinary = True>,
 {
 }
 
-impl<A: Ident, T: Ident> ConnAttr<A, V3> for MaybeUninit<T>
+// Implement ConnAttr for uninitialized connection attributes
+impl<V: Version, A: Ident, T: Ident> ConnAttr<A, V> for MaybeUninit<T>
 where
+    T: ConnAttr<A, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
-    T: ConnAttr<A, V3>,
+{
+}
+impl<V: Version, A: Ident> ConnAttr<A, V> for [MaybeUninit<SQLCHAR>]
+where
+    [SQLCHAR]: ConnAttr<A, V>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+{
+}
+impl<V: Version, A: Ident> ConnAttr<A, V> for [MaybeUninit<SQLWCHAR>]
+where
+    [SQLWCHAR]: ConnAttr<A, V>,
+    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }
 
-impl<A: Ident> ConnAttr<A, V3> for [MaybeUninit<SQLCHAR>]
-where
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
-    [SQLCHAR]: ConnAttr<A, V3>,
-{
-}
-
-impl<A: Ident> ConnAttr<A, V3> for [MaybeUninit<SQLWCHAR>]
-where
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
-    [SQLWCHAR]: ConnAttr<A, V3>,
-{
-}
-
-impl<A: Ident, T: ConnAttr<A, V3>> ConnAttr<A, V3_8> for T where T: ?Sized {}
-impl<A: Ident, T: ConnAttr<A, V3_8>> ConnAttr<A, V4> for T where T: ?Sized {}
+// Implement ConnAttr for references to character connection attributes (used by AttrSet)
+impl<V: Version, A: Ident> ConnAttr<A, V> for &[SQLCHAR] where [SQLCHAR]: ConnAttr<A, V> {}
+impl<V: Version, A: Ident> ConnAttr<A, V> for &[SQLWCHAR] where [SQLWCHAR]: ConnAttr<A, V> {}
 
 //=====================================================================================//
 //-------------------------------------Attributes--------------------------------------//
@@ -63,8 +66,8 @@ unsafe impl Attr<SQL_ATTR_ACCESS_MODE> for AccessMode {
     type NonBinary = True;
 }
 impl ConnAttr<SQL_ATTR_ACCESS_MODE, V3> for AccessMode {}
-unsafe impl AttrRead<SQL_ATTR_ACCESS_MODE> for AccessMode {}
-unsafe impl AttrWrite<SQL_ATTR_ACCESS_MODE> for AccessMode {}
+unsafe impl AttrGet<SQL_ATTR_ACCESS_MODE> for AccessMode {}
+unsafe impl AttrSet<SQL_ATTR_ACCESS_MODE> for AccessMode {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 102)]
@@ -75,8 +78,8 @@ unsafe impl Attr<SQL_ATTR_AUTOCOMMIT> for AutoCommit {
     type NonBinary = True;
 }
 impl ConnAttr<SQL_ATTR_AUTOCOMMIT, V3> for AutoCommit {}
-unsafe impl AttrRead<SQL_ATTR_AUTOCOMMIT> for AutoCommit {}
-unsafe impl AttrWrite<SQL_ATTR_AUTOCOMMIT> for AutoCommit {}
+unsafe impl AttrGet<SQL_ATTR_AUTOCOMMIT> for AutoCommit {}
+unsafe impl AttrSet<SQL_ATTR_AUTOCOMMIT> for AutoCommit {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 113)]
@@ -87,8 +90,8 @@ unsafe impl Attr<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {
     type NonBinary = True;
 }
 impl ConnAttr<SQL_ATTR_CONNECTION_TIMEOUT, V3> for SQLUINTEGER {}
-unsafe impl AttrRead<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {}
-unsafe impl AttrWrite<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {}
+unsafe impl AttrGet<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {}
+unsafe impl AttrSet<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 109)]
@@ -99,8 +102,8 @@ unsafe impl Attr<SQL_ATTR_CURRENT_CATALOG> for [SQLCHAR] {
     type NonBinary = True;
 }
 impl ConnAttr<SQL_ATTR_CURRENT_CATALOG, V3> for [SQLCHAR] {}
-unsafe impl AttrRead<SQL_ATTR_CURRENT_CATALOG> for [SQLCHAR] {}
-unsafe impl AttrWrite<SQL_ATTR_CURRENT_CATALOG> for &[SQLCHAR] {}
+unsafe impl AttrGet<SQL_ATTR_CURRENT_CATALOG> for [SQLCHAR] {}
+unsafe impl AttrSet<SQL_ATTR_CURRENT_CATALOG> for &[SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 103)]
@@ -116,8 +119,8 @@ impl ConnAttr<SQL_ATTR_LOGIN_TIMEOUT, V3> for SQLUINTEGER {
         ConnectionHandle.assert_not_connected();
     }
 }
-unsafe impl AttrRead<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
-unsafe impl AttrWrite<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
+unsafe impl AttrGet<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
+unsafe impl AttrSet<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 112)]
@@ -133,8 +136,8 @@ impl ConnAttr<SQL_ATTR_PACKET_SIZE, V3> for SQLUINTEGER {
         ConnectionHandle.assert_not_connected();
     }
 }
-unsafe impl AttrRead<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
-unsafe impl AttrWrite<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
+unsafe impl AttrGet<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
+unsafe impl AttrSet<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 104)]
@@ -145,8 +148,8 @@ unsafe impl Attr<SQL_ATTR_TRACE> for Trace {
     type NonBinary = True;
 }
 impl ConnAttr<SQL_ATTR_TRACE, V3> for Trace {}
-unsafe impl AttrRead<SQL_ATTR_TRACE> for Trace {}
-unsafe impl AttrWrite<SQL_ATTR_TRACE> for Trace {}
+unsafe impl AttrGet<SQL_ATTR_TRACE> for Trace {}
+unsafe impl AttrSet<SQL_ATTR_TRACE> for Trace {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 105)]
@@ -157,8 +160,8 @@ unsafe impl Attr<SQL_ATTR_TRACEFILE> for [SQLCHAR] {
     type NonBinary = True;
 }
 impl ConnAttr<SQL_ATTR_TRACEFILE, V3> for [SQLCHAR] {}
-unsafe impl AttrRead<SQL_ATTR_TRACEFILE> for [SQLCHAR] {}
-unsafe impl AttrWrite<SQL_ATTR_TRACEFILE> for &[SQLCHAR] {}
+unsafe impl AttrGet<SQL_ATTR_TRACEFILE> for [SQLCHAR] {}
+unsafe impl AttrSet<SQL_ATTR_TRACEFILE> for &[SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 106)]
@@ -174,8 +177,8 @@ impl ConnAttr<SQL_ATTR_TRANSLATE_LIB, V3> for [SQLCHAR] {
         ConnectionHandle.assert_connected();
     }
 }
-unsafe impl AttrRead<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {}
-unsafe impl AttrWrite<SQL_ATTR_TRANSLATE_LIB> for &[SQLCHAR] {}
+unsafe impl AttrGet<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {}
+unsafe impl AttrSet<SQL_ATTR_TRANSLATE_LIB> for &[SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 10001)]
@@ -187,7 +190,7 @@ unsafe impl Attr<SQL_ATTR_AUTO_IPD> for OdbcBool {
     type NonBinary = True;
 }
 impl ConnAttr<SQL_ATTR_AUTO_IPD, V3> for OdbcBool {}
-unsafe impl AttrRead<SQL_ATTR_AUTO_IPD> for OdbcBool {}
+unsafe impl AttrGet<SQL_ATTR_AUTO_IPD> for OdbcBool {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 117)]
@@ -198,10 +201,11 @@ unsafe impl Attr<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnabl
     type NonBinary = True;
 }
 impl ConnAttr<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE, V3_8> for AsyncDbcFunctionsEnable {}
-unsafe impl AttrRead<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {}
-unsafe impl AttrWrite<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {}
+unsafe impl AttrGet<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {}
+unsafe impl AttrSet<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {}
 
-// TODO: It is not 3.5 in implementation ???
+
+// TODO: Spec says this is 3.5, but it is not 3.5 in implementation ???
 // but it says that drivers conforming to earlier versions can support this field
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 1209)]
@@ -212,13 +216,13 @@ unsafe impl Attr<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_CONNECTION_DEAD, V3_5> for ConnectionDead {
+impl ConnAttr<SQL_ATTR_CONNECTION_DEAD, V3_8> for ConnectionDead {
     #[cfg(feature = "odbc_debug")]
     fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
         ConnectionHandle.assert_connected();
     }
 }
-unsafe impl AttrRead<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {}
+unsafe impl AttrGet<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 108)]
@@ -234,8 +238,8 @@ impl ConnAttr<SQL_ATTR_TXN_ISOLATION, V3> for TxnIsolation {
         ConnectionHandle.assert_connected();
     }
 }
-unsafe impl AttrRead<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
-unsafe impl AttrWrite<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
+unsafe impl AttrGet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
+unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 107)]
@@ -251,8 +255,8 @@ unsafe impl AttrWrite<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 //        ConnectionHandle.assert_connected();
 //    }
 //}
-//unsafe impl AttrRead<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
-//unsafe impl AttrWrite<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
+//unsafe impl AttrGet<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
+//unsafe impl AttrSet<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
 
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 118)]
@@ -264,14 +268,14 @@ unsafe impl AttrWrite<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 //        assert_connected(ConnectionHandle);
 //    }
 //}
-//impl AttrWrite<SQL_ATTR_DBC_INFO_TOKEN> for SQLPOINTER {}
+//impl AttrSet<SQL_ATTR_DBC_INFO_TOKEN> for SQLPOINTER {}
 
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 119)]
 //pub struct SQL_ATTR_ASYNC_DBC_EVENT;
 //impl ConnAttr<SQL_ATTR_ASYNC_DBC_EVENT, V3_8> for SQLPOINTER {}
 //// TODO: It's an Event handle. Should probably implement event handle
-//impl AttrRead<SQL_ATTR_ASYNC_DBC_EVENT> for SQLPOINTER {}
+//impl AttrGet<SQL_ATTR_ASYNC_DBC_EVENT> for SQLPOINTER {}
 
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 111)]
@@ -309,8 +313,8 @@ unsafe impl AttrWrite<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_ANSI_APP;
 //impl ConnAttr<SQL_ATTR_ANSI_APP, V3_51> for AnsiApp {}
-//impl AttrRead<SQL_ATTR_ANSI_APP>> for AnsiApp {}
-//impl AttrWrite<SQL_ATTR_ANSI_APP> for AnsiApp {}
+//impl AttrGet<SQL_ATTR_ANSI_APP>> for AnsiApp {}
+//impl AttrSet<SQL_ATTR_ANSI_APP> for AnsiApp {}
 
 //pub enum AnsiApp {
 //    SQL_AA_TRUE = 1,  /* the application is an ANSI app */
@@ -322,8 +326,8 @@ unsafe impl AttrWrite<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_RESET_CONNECTION;
 //impl ConnAttr<SQL_ATTR_RESET_CONNECTION, V3_8> for ResetConnection {}
-//impl AttrRead<SQL_ATTR_RESET_CONNECTION>> for ResetConnection {}
-//impl AttrWrite<SQL_ATTR_RESET_CONNECTION> for ResetConnection {}
+//impl AttrGet<SQL_ATTR_RESET_CONNECTION>> for ResetConnection {}
+//impl AttrSet<SQL_ATTR_RESET_CONNECTION> for ResetConnection {}
 
 //#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 //pub enum ResetConnection {
@@ -339,8 +343,8 @@ unsafe impl AttrWrite<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 //    type NonBinary = True;
 //}
 //impl ConnAttr<SQL_ATTR_CREDENTIALS, V4> for [SQLCHAR] {}
-//unsafe impl AttrRead<SQL_ATTR_CREDENTIALS> for [SQLCHAR] {}
-//unsafe impl AttrWrite<SQL_ATTR_CREDENTIALS> for [SQLCHAR] {}
+//unsafe impl AttrGet<SQL_ATTR_CREDENTIALS> for [SQLCHAR] {}
+//unsafe impl AttrSet<SQL_ATTR_CREDENTIALS> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 123)]
@@ -351,27 +355,27 @@ unsafe impl Attr<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {
     type NonBinary = True;
 }
 impl ConnAttr<SQL_ATTR_REFRESH_CONNECTION, V4> for RefreshConnection {}
-unsafe impl AttrRead<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {}
-unsafe impl AttrWrite<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {}
+unsafe impl AttrGet<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {}
+unsafe impl AttrSet<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {}
 
 // Re-exported as connection attribute
 pub use crate::stmt::SQL_ATTR_ASYNC_ENABLE;
-impl<'stmt, 'buf, V: Version, T: Ident> ConnAttr<SQL_ATTR_ASYNC_ENABLE, V> for T where
-    T: StmtAttr<'stmt, 'buf, SQL_ATTR_ASYNC_ENABLE, V>
+impl<'stmt, 'buf, T: Ident> ConnAttr<SQL_ATTR_ASYNC_ENABLE, V3> for T where
+    T: StmtAttr<'stmt, 'buf, SQL_ATTR_ASYNC_ENABLE, V3>
 {
 }
-impl<'stmt, 'buf, V: Version, T> ConnAttr<SQL_ATTR_ASYNC_ENABLE, V> for [T] where
-    [T]: StmtAttr<'stmt, 'buf, SQL_ATTR_ASYNC_ENABLE, V>
+impl<'stmt, 'buf, T> ConnAttr<SQL_ATTR_ASYNC_ENABLE, V3> for [T] where
+    [T]: StmtAttr<'stmt, 'buf, SQL_ATTR_ASYNC_ENABLE, V3>
 {
 }
 
 pub use crate::stmt::SQL_ATTR_METADATA_ID;
-impl<'stmt, 'buf, V: Version, T: Ident> ConnAttr<SQL_ATTR_METADATA_ID, V3> for T where
-    T: StmtAttr<'stmt, 'buf, SQL_ATTR_METADATA_ID, V>
+impl<'stmt, 'buf, T: Ident> ConnAttr<SQL_ATTR_METADATA_ID, V3> for T where
+    T: StmtAttr<'stmt, 'buf, SQL_ATTR_METADATA_ID, V3>
 {
 }
-impl<'stmt, 'buf, V: Version, T> ConnAttr<SQL_ATTR_METADATA_ID, V> for [T] where
-    [T]: StmtAttr<'stmt, 'buf, SQL_ATTR_METADATA_ID, V>
+impl<'stmt, 'buf, T> ConnAttr<SQL_ATTR_METADATA_ID, V3> for [T] where
+    [T]: StmtAttr<'stmt, 'buf, SQL_ATTR_METADATA_ID, V3>
 {
 }
 

@@ -3,7 +3,7 @@ use crate::Ident;
 use crate::{
     AsMutSQLPOINTER, AsSQLPOINTER, IntoSQLPOINTER, SQLBIGINT, SQLCHAR, SQLDOUBLE, SQLINTEGER,
     SQLLEN, SQLPOINTER, SQLREAL, SQLSCHAR, SQLSMALLINT, SQLUBIGINT, SQLUINTEGER, SQLUSMALLINT,
-    SQLWCHAR, SQL_PARAM_INPUT, SQL_PARAM_INPUT_OUTPUT, SQL_PARAM_OUTPUT, V4, V3_5
+    SQLWCHAR, SQL_PARAM_INPUT, SQL_PARAM_INPUT_OUTPUT, SQL_PARAM_OUTPUT, V3_8, V4,
 };
 
 use std::cell::UnsafeCell;
@@ -183,13 +183,14 @@ impl Ident for SQL_C_NUMERIC {
 }
 impl<V> CData<V, SQL_C_NUMERIC> for SQL_NUMERIC_STRUCT {}
 
+// TODO: This is 3.5
 #[allow(non_camel_case_types)]
 pub struct SQL_C_GUID;
 impl Ident for SQL_C_GUID {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_GUID.identifier();
 }
-impl CData<V3_5, SQL_C_GUID> for SQLGUID {}
+impl CData<V3_8, SQL_C_GUID> for SQLGUID {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_DATE;
@@ -598,7 +599,10 @@ unsafe impl<T: ScalarCType> AsMutSQLPOINTER for MaybeUninit<T> {
 impl<V, TT: Ident, T> CData<V, TT> for [MaybeUninit<T>] where [T]: CData<V, TT> {}
 impl<V, TT: Ident, T: ScalarCType> CData<V, TT> for MaybeUninit<T> where T: CData<V, TT> {}
 
-unsafe impl<'buf, V, TT: Ident, T> DeferredBuf<'buf, V, TT> for &'buf [UnsafeCell<T>] where [T]: CData<V, TT> {}
+unsafe impl<'buf, V, TT: Ident, T> DeferredBuf<'buf, V, TT> for &'buf [UnsafeCell<T>] where
+    [T]: CData<V, TT>
+{
+}
 unsafe impl<'buf, V, TT: Ident, T: ScalarCType> DeferredBuf<'buf, V, TT> for &'buf UnsafeCell<T> where
     T: CData<V, TT>
 {

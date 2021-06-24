@@ -17,6 +17,7 @@ use std::cell::UnsafeCell;
 use std::convert::TryFrom;
 use std::ffi::c_void;
 use std::fmt::Debug;
+use env::OdbcVersion;
 use std::mem::MaybeUninit;
 pub use {api::*, c_types::*, sql_types::*};
 pub use {
@@ -59,18 +60,30 @@ pub type SQLSETPOSIROW = u64;
 type UWORD = u16;
 pub type SQLPOINTER = *mut c_void;
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 // TODO: https://github.com/rust-lang/rust/issues/35121
 // Use uninhabited type ! when it is available in std
 pub enum Void {}
 
-pub trait Version {}
+pub trait Version {
+    const IDENTIFIER: OdbcVersion;
+}
+#[derive(Debug)]
 pub enum V3 {}
-impl Version for V3 {}
-pub enum V3_8 {}
-impl Version for V3_8 {}
+impl Version for V3 {
+    const IDENTIFIER: OdbcVersion = env::SQL_OV_ODBC3;
+}
+#[derive(Debug)]
+pub enum V3_8 {
+}
+impl Version for V3_8 {
+    const IDENTIFIER: OdbcVersion = env::SQL_OV_ODBC3_80;
+}
+#[derive(Debug)]
 pub enum V4 {}
-impl Version for V4 {}
+impl Version for V4 {
+    const IDENTIFIER: OdbcVersion = env::SQL_OV_ODBC4;
+}
 
 const SQL_IS_POINTER: SQLSMALLINT = -4;
 const SQL_IS_UINTEGER: SQLSMALLINT = -5;
@@ -301,7 +314,7 @@ impl<T> Ident for Option<&mut T> {
     const IDENTIFIER: Self::Type = SQL_IS_POINTER;
 }
 
-pub unsafe trait Attr<H: crate::handle::Handle, A: Ident<Type = H::AttrType>>: AttrLen<Self::DefinedBy, Self::NonBinary, H::AttrLen> {
+pub unsafe trait Attr<A: Ident> {
     type DefinedBy: Def;
 
     // Documentation says that binary buffers are allowed as ValuePtr arguments
@@ -310,7 +323,7 @@ pub unsafe trait Attr<H: crate::handle::Handle, A: Ident<Type = H::AttrType>>: A
     // in order to disambiguate between [SQLCHAR] and binary buffers
     type NonBinary: Bool;
 }
-unsafe impl<V: Version, A: Ident> Attr<A> for [SQLWCHAR]
+unsafe impl<A: Ident> Attr<A> for [SQLWCHAR]
 where
     [SQLCHAR]: Attr<A, NonBinary = True>,
 {
@@ -528,25 +541,25 @@ impl Def for OdbcDefined {}
 pub enum DriverDefined {}
 impl Def for DriverDefined {}
 
-pub unsafe trait AttrRead<A>: AsMutSQLPOINTER + AttrZeroAssert {}
-pub unsafe trait AttrWrite<A>: IntoSQLPOINTER {}
+pub unsafe trait AttrGet<A>: AsMutSQLPOINTER + AttrZeroAssert {}
+pub unsafe trait AttrSet<A>: IntoSQLPOINTER {}
 
-unsafe impl<A> AttrRead<A> for [SQLWCHAR] where [SQLCHAR]: AttrRead<A> {}
-unsafe impl<'a, A> AttrWrite<A> for &'a [SQLWCHAR] where &'a [SQLCHAR]: AttrWrite<A> {}
-unsafe impl<A: Ident, T: Ident> AttrWrite<A> for MaybeUninit<T>
+unsafe impl<A> AttrGet<A> for [SQLWCHAR] where [SQLCHAR]: AttrGet<A> {}
+unsafe impl<'a, A> AttrSet<A> for &'a [SQLWCHAR] where &'a [SQLCHAR]: AttrSet<A> {}
+unsafe impl<A: Ident, T: Ident> AttrSet<A> for MaybeUninit<T>
 where
     Self: IntoSQLPOINTER,
-    T: AttrWrite<A>,
+    T: AttrSet<A>,
 {
 }
-unsafe impl<A: Ident, T: Ident> AttrRead<A> for MaybeUninit<T>
+unsafe impl<A: Ident, T: Ident> AttrGet<A> for MaybeUninit<T>
 where
     Self: AsMutSQLPOINTER,
-    T: AttrRead<A>,
+    T: AttrGet<A>,
 {
 }
-unsafe impl<A: Ident> AttrRead<A> for [MaybeUninit<SQLCHAR>] where [SQLCHAR]: AttrRead<A> {}
-unsafe impl<A: Ident> AttrRead<A> for [MaybeUninit<SQLWCHAR>] where [SQLWCHAR]: AttrRead<A> {}
+unsafe impl<A: Ident> AttrGet<A> for [MaybeUninit<SQLCHAR>] where [SQLCHAR]: AttrGet<A> {}
+unsafe impl<A: Ident> AttrGet<A> for [MaybeUninit<SQLWCHAR>] where [SQLWCHAR]: AttrGet<A> {}
 
 pub trait AnsiType {}
 pub trait UnicodeType {}

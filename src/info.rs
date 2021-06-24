@@ -1,6 +1,6 @@
 use crate::{
-    Attr, AttrLen, AttrRead, Ident, OdbcDefined, True, SQLCHAR, SQLSMALLINT, SQLUINTEGER,
-    SQLUSMALLINT, SQLWCHAR, Version, V3, V3_8, V4
+    Attr, AttrLen, AttrGet, Ident, OdbcDefined, True, Version, SQLCHAR, SQLSMALLINT, SQLUINTEGER,
+    SQLUSMALLINT, SQLWCHAR, V3, V3_8, V4,
 };
 use rs_odbc_derive::{odbc_bitmask, odbc_type, Ident};
 use std::mem::MaybeUninit;
@@ -10,34 +10,37 @@ pub trait InfoType<I: Ident, V: Version>:
 {
 }
 
-impl<I: Ident> InfoType<I, V3> for [SQLWCHAR]
-where
-    [SQLCHAR]: InfoType<I, V3, NonBinary = True>,
-    [SQLWCHAR]: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+// Implement InfoType for all versions of info type attributes
+impl<I: Ident, T: Ident> InfoType<I, V3_8> for T where T: InfoType<I, V3> {}
+impl<I: Ident, T: Ident> InfoType<I, V4> for T where T: InfoType<I, V3_8> {}
+impl<I: Ident> InfoType<I, V3_8> for [SQLCHAR] where [SQLCHAR]: InfoType<I, V3> {}
+impl<I: Ident> InfoType<I, V4> for [SQLCHAR] where [SQLCHAR]: InfoType<I, V3_8> {}
+
+// Implement InfoType for unicode character info type attributes
+impl<V: Version, I: Ident> InfoType<I, V> for [SQLWCHAR] where
+    [SQLCHAR]: InfoType<I, V, NonBinary = True>
 {
 }
 
-impl<I: Ident> InfoType<I, V3> for [MaybeUninit<SQLCHAR>]
+// Implement InfoType for uninitialized info type attributes
+impl<V: Version, I: Ident, T: Ident> InfoType<I, V> for MaybeUninit<T>
 where
-    [SQLCHAR]: InfoType<I, V3>,
+    T: InfoType<I, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<I: Ident> InfoType<I, V3> for [MaybeUninit<SQLWCHAR>]
+impl<V: Version, I: Ident> InfoType<I, V> for [MaybeUninit<SQLCHAR>]
 where
-    [SQLWCHAR]: InfoType<I, V3>,
+    [SQLCHAR]: InfoType<I, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<I: Ident, T: Ident> InfoType<I, V3> for MaybeUninit<T>
+impl<V: Version, I: Ident> InfoType<I, V> for [MaybeUninit<SQLWCHAR>]
 where
-    T: InfoType<I, V3>,
+    [SQLWCHAR]: InfoType<I, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-
-impl<A: Ident, T: InfoType<A, V3>> InfoType<A, V3_8> for T where T: ?Sized {}
-impl<A: Ident, T: InfoType<A, V3_8>> InfoType<A, V4> for T where T: ?Sized {}
 
 //=====================================================================================//
 //-------------------------------------Attributes--------------------------------------//
@@ -79,7 +82,7 @@ unsafe impl Attr<SQL_DM_VER> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DM_VER> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_DM_VER> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10000)]
@@ -90,7 +93,7 @@ unsafe impl Attr<SQL_XOPEN_CLI_YEAR> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_XOPEN_CLI_YEAR> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_XOPEN_CLI_YEAR> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 134)]
@@ -101,7 +104,7 @@ unsafe impl Attr<SQL_CREATE_VIEW> for CreateView {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CREATE_VIEW> for CreateView {}
+unsafe impl AttrGet<SQL_CREATE_VIEW> for CreateView {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 155)]
@@ -112,7 +115,7 @@ unsafe impl Attr<SQL_SQL92_DATETIME_FUNCTIONS> for Sql92DatetimeFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SQL92_DATETIME_FUNCTIONS> for Sql92DatetimeFunctions {}
+unsafe impl AttrGet<SQL_SQL92_DATETIME_FUNCTIONS> for Sql92DatetimeFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 156)]
@@ -123,7 +126,7 @@ unsafe impl Attr<SQL_SQL92_FOREIGN_KEY_DELETE_RULE> for Sql92ForeignKeyDeleteRul
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SQL92_FOREIGN_KEY_DELETE_RULE> for Sql92ForeignKeyDeleteRule {}
+unsafe impl AttrGet<SQL_SQL92_FOREIGN_KEY_DELETE_RULE> for Sql92ForeignKeyDeleteRule {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 157)]
@@ -134,7 +137,7 @@ unsafe impl Attr<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE> for Sql92ForeignKeyUpdateRul
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE> for Sql92ForeignKeyUpdateRule {}
+unsafe impl AttrGet<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE> for Sql92ForeignKeyUpdateRule {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 158)]
@@ -145,7 +148,7 @@ unsafe impl Attr<SQL_SQL92_GRANT> for Sql92Grant {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SQL92_GRANT> for Sql92Grant {}
+unsafe impl AttrGet<SQL_SQL92_GRANT> for Sql92Grant {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 119)]
@@ -156,7 +159,7 @@ unsafe impl Attr<SQL_DATETIME_LITERALS> for DatetimeLiterals {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DATETIME_LITERALS> for DatetimeLiterals {}
+unsafe impl AttrGet<SQL_DATETIME_LITERALS> for DatetimeLiterals {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 159)]
@@ -167,7 +170,7 @@ unsafe impl Attr<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS> for Sql92NumericValueFunctio
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS> for Sql92NumericValueFunctions {}
+unsafe impl AttrGet<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS> for Sql92NumericValueFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 160)]
@@ -178,7 +181,7 @@ unsafe impl Attr<SQL_SQL92_PREDICATES> for Sql92Predicates {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SQL92_PREDICATES> for Sql92Predicates {}
+unsafe impl AttrGet<SQL_SQL92_PREDICATES> for Sql92Predicates {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 161)]
@@ -189,7 +192,7 @@ unsafe impl Attr<SQL_SQL92_RELATIONAL_JOIN_OPERATORS> for Sql92RelationalJoinOpe
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SQL92_RELATIONAL_JOIN_OPERATORS> for Sql92RelationalJoinOperators {}
+unsafe impl AttrGet<SQL_SQL92_RELATIONAL_JOIN_OPERATORS> for Sql92RelationalJoinOperators {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 162)]
@@ -200,7 +203,7 @@ unsafe impl Attr<SQL_SQL92_REVOKE> for Sql92Revoke {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SQL92_REVOKE> for Sql92Revoke {}
+unsafe impl AttrGet<SQL_SQL92_REVOKE> for Sql92Revoke {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 163)]
@@ -211,7 +214,7 @@ unsafe impl Attr<SQL_SQL92_ROW_VALUE_CONSTRUCTOR> for Sql92RowValueConstructor {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SQL92_ROW_VALUE_CONSTRUCTOR> for Sql92RowValueConstructor {}
+unsafe impl AttrGet<SQL_SQL92_ROW_VALUE_CONSTRUCTOR> for Sql92RowValueConstructor {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 164)]
@@ -222,7 +225,7 @@ unsafe impl Attr<SQL_SQL92_STRING_FUNCTIONS> for Sql92StringFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SQL92_STRING_FUNCTIONS> for Sql92StringFunctions {}
+unsafe impl AttrGet<SQL_SQL92_STRING_FUNCTIONS> for Sql92StringFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 165)]
@@ -233,7 +236,7 @@ unsafe impl Attr<SQL_SQL92_VALUE_EXPRESSIONS> for Sql92ValueExpressions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SQL92_VALUE_EXPRESSIONS> for Sql92ValueExpressions {}
+unsafe impl AttrGet<SQL_SQL92_VALUE_EXPRESSIONS> for Sql92ValueExpressions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 166)]
@@ -244,7 +247,7 @@ unsafe impl Attr<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
+unsafe impl AttrGet<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 
 // TODO: What about these
 //#[derive(Ident)]
@@ -256,7 +259,7 @@ unsafe impl AttrRead<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
 //}
-//unsafe impl AttrRead<SQL_INFO_FIRST> for {}
+//unsafe impl AttrGet<SQL_INFO_FIRST> for {}
 
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 12)]
@@ -267,7 +270,7 @@ unsafe impl AttrRead<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
 //}
-//unsafe impl AttrRead<SQL_ODBC_SAG_CLI_CONFORMANCE> for {}
+//unsafe impl AttrGet<SQL_ODBC_SAG_CLI_CONFORMANCE> for {}
 
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, SQL_UNION)]
@@ -278,7 +281,7 @@ unsafe impl AttrRead<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
 //}
-//unsafe impl AttrRead<SQL_UNION_STATEMENT> for {}
+//unsafe impl AttrGet<SQL_UNION_STATEMENT> for {}
 
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 174)]
@@ -289,7 +292,7 @@ unsafe impl AttrRead<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
 //}
-//unsafe impl AttrRead<SQL_SCHEMA_INFERENCE> for {}
+//unsafe impl AttrGet<SQL_SCHEMA_INFERENCE> for {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 175)]
@@ -300,7 +303,7 @@ unsafe impl Attr<SQL_BINARY_FUNCTIONS> for BinaryFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_BINARY_FUNCTIONS> for BinaryFunctions {}
+unsafe impl AttrGet<SQL_BINARY_FUNCTIONS> for BinaryFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 176)]
@@ -311,7 +314,7 @@ unsafe impl Attr<SQL_ISO_STRING_FUNCTIONS> for Sql92StringFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ISO_STRING_FUNCTIONS> for Sql92StringFunctions {}
+unsafe impl AttrGet<SQL_ISO_STRING_FUNCTIONS> for Sql92StringFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 177)]
@@ -322,7 +325,7 @@ unsafe impl Attr<SQL_ISO_BINARY_FUNCTIONS> for IsoBinaryFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ISO_BINARY_FUNCTIONS> for IsoBinaryFunctions {}
+unsafe impl AttrGet<SQL_ISO_BINARY_FUNCTIONS> for IsoBinaryFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 178)]
@@ -333,7 +336,7 @@ unsafe impl Attr<SQL_LIMIT_ESCAPE_CLAUSE> for LimitEscapeClause {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_LIMIT_ESCAPE_CLAUSE> for LimitEscapeClause {}
+unsafe impl AttrGet<SQL_LIMIT_ESCAPE_CLAUSE> for LimitEscapeClause {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 179)]
@@ -344,7 +347,7 @@ unsafe impl Attr<SQL_NATIVE_ESCAPE_CLAUSE> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_NATIVE_ESCAPE_CLAUSE> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_NATIVE_ESCAPE_CLAUSE> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 180)]
@@ -355,7 +358,7 @@ unsafe impl Attr<SQL_RETURN_ESCAPE_CLAUSE> for ReturnEscapeClause {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_RETURN_ESCAPE_CLAUSE> for ReturnEscapeClause {}
+unsafe impl AttrGet<SQL_RETURN_ESCAPE_CLAUSE> for ReturnEscapeClause {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 181)]
@@ -366,7 +369,7 @@ unsafe impl Attr<SQL_FORMAT_ESCAPE_CLAUSE> for FormatEscapeClause {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_FORMAT_ESCAPE_CLAUSE> for FormatEscapeClause {}
+unsafe impl AttrGet<SQL_FORMAT_ESCAPE_CLAUSE> for FormatEscapeClause {}
 
 #[cfg(feature = "v4")]
 pub use SQL_SQL92_DATETIME_FUNCTIONS as SQL_ISO_DATETIME_FUNCTIONS;
@@ -411,7 +414,7 @@ unsafe impl Attr<SQL_ACTIVE_ENVIRONMENTS> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ACTIVE_ENVIRONMENTS> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_ACTIVE_ENVIRONMENTS> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10023)]
@@ -422,7 +425,7 @@ unsafe impl Attr<SQL_ASYNC_DBC_FUNCTIONS> for AsyncDbcFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ASYNC_DBC_FUNCTIONS> for AsyncDbcFunctions {}
+unsafe impl AttrGet<SQL_ASYNC_DBC_FUNCTIONS> for AsyncDbcFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10021)]
@@ -433,7 +436,7 @@ unsafe impl Attr<SQL_ASYNC_MODE> for AsyncMode {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ASYNC_MODE> for AsyncMode {}
+unsafe impl AttrGet<SQL_ASYNC_MODE> for AsyncMode {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10025)]
@@ -444,7 +447,7 @@ unsafe impl Attr<SQL_ASYNC_NOTIFICATION> for AsyncNotification {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ASYNC_NOTIFICATION> for AsyncNotification {}
+unsafe impl AttrGet<SQL_ASYNC_NOTIFICATION> for AsyncNotification {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 120)]
@@ -455,7 +458,7 @@ unsafe impl Attr<SQL_BATCH_ROW_COUNT> for BatchRowCount {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_BATCH_ROW_COUNT> for BatchRowCount {}
+unsafe impl AttrGet<SQL_BATCH_ROW_COUNT> for BatchRowCount {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 121)]
@@ -466,7 +469,7 @@ unsafe impl Attr<SQL_BATCH_SUPPORT> for BatchSupport {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_BATCH_SUPPORT> for BatchSupport {}
+unsafe impl AttrGet<SQL_BATCH_SUPPORT> for BatchSupport {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 2)]
@@ -477,7 +480,7 @@ unsafe impl Attr<SQL_DATA_SOURCE_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DATA_SOURCE_NAME> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_DATA_SOURCE_NAME> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10024)]
@@ -488,7 +491,7 @@ unsafe impl Attr<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSuppo
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSupported {}
+unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSupported {}
 
 // TODO: How are these handles used?
 //#[derive(Ident)]
@@ -500,7 +503,7 @@ unsafe impl AttrRead<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingS
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
 //}
-//unsafe impl AttrRead<SQL_DRIVER_HDBC> for {}
+//unsafe impl AttrGet<SQL_DRIVER_HDBC> for {}
 //
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 135)]
@@ -511,7 +514,7 @@ unsafe impl AttrRead<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingS
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
 //}
-//unsafe impl AttrRead<SQL_DRIVER_HDESC> for {}
+//unsafe impl AttrGet<SQL_DRIVER_HDESC> for {}
 //
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 4)]
@@ -522,7 +525,7 @@ unsafe impl AttrRead<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingS
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
 //}
-//unsafe impl AttrRead<SQL_DRIVER_HENV> for {}
+//unsafe impl AttrGet<SQL_DRIVER_HENV> for {}
 //
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 76)]
@@ -533,7 +536,7 @@ unsafe impl AttrRead<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingS
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
 //}
-//unsafe impl AttrRead<SQL_DRIVER_HLIB> for {}
+//unsafe impl AttrGet<SQL_DRIVER_HLIB> for {}
 //
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 5)]
@@ -544,7 +547,7 @@ unsafe impl AttrRead<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingS
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
 //}
-//unsafe impl AttrRead<SQL_DRIVER_HSTMT> for {}
+//unsafe impl AttrGet<SQL_DRIVER_HSTMT> for {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 6)]
@@ -555,7 +558,7 @@ unsafe impl Attr<SQL_DRIVER_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DRIVER_NAME> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_DRIVER_NAME> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 77)]
@@ -566,7 +569,7 @@ unsafe impl Attr<SQL_DRIVER_ODBC_VER> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DRIVER_ODBC_VER> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_DRIVER_ODBC_VER> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 7)]
@@ -577,7 +580,7 @@ unsafe impl Attr<SQL_DRIVER_VER> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DRIVER_VER> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_DRIVER_VER> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 144)]
@@ -588,7 +591,7 @@ unsafe impl Attr<SQL_DYNAMIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DYNAMIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
+unsafe impl AttrGet<SQL_DYNAMIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 145)]
@@ -599,7 +602,7 @@ unsafe impl Attr<SQL_DYNAMIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DYNAMIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
+unsafe impl AttrGet<SQL_DYNAMIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 146)]
@@ -610,7 +613,7 @@ unsafe impl Attr<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
+unsafe impl AttrGet<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 147)]
@@ -621,7 +624,7 @@ unsafe impl Attr<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
+unsafe impl AttrGet<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 84)]
@@ -632,7 +635,7 @@ unsafe impl Attr<SQL_FILE_USAGE> for FileUsage {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_FILE_USAGE> for FileUsage {}
+unsafe impl AttrGet<SQL_FILE_USAGE> for FileUsage {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 81)]
@@ -643,7 +646,7 @@ unsafe impl Attr<SQL_GETDATA_EXTENSIONS> for GetdataExtensions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_GETDATA_EXTENSIONS> for GetdataExtensions {}
+unsafe impl AttrGet<SQL_GETDATA_EXTENSIONS> for GetdataExtensions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 149)]
@@ -654,7 +657,7 @@ unsafe impl Attr<SQL_INFO_SCHEMA_VIEWS> for InfoSchemaViews {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_INFO_SCHEMA_VIEWS> for InfoSchemaViews {}
+unsafe impl AttrGet<SQL_INFO_SCHEMA_VIEWS> for InfoSchemaViews {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 150)]
@@ -665,7 +668,7 @@ unsafe impl Attr<SQL_KEYSET_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_KEYSET_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
+unsafe impl AttrGet<SQL_KEYSET_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 151)]
@@ -676,7 +679,7 @@ unsafe impl Attr<SQL_KEYSET_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_KEYSET_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
+unsafe impl AttrGet<SQL_KEYSET_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10022)]
@@ -687,7 +690,7 @@ unsafe impl Attr<SQL_MAX_ASYNC_CONCURRENT_STATEMENTS> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_ASYNC_CONCURRENT_STATEMENTS> for SQLUINTEGER {}
+unsafe impl AttrGet<SQL_MAX_ASYNC_CONCURRENT_STATEMENTS> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 1)]
@@ -698,7 +701,7 @@ unsafe impl Attr<SQL_MAX_CONCURRENT_ACTIVITIES> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_CONCURRENT_ACTIVITIES> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_CONCURRENT_ACTIVITIES> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 0)]
@@ -709,7 +712,7 @@ unsafe impl Attr<SQL_MAX_DRIVER_CONNECTIONS> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_DRIVER_CONNECTIONS> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_DRIVER_CONNECTIONS> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 152)]
@@ -720,7 +723,7 @@ unsafe impl Attr<SQL_ODBC_INTERFACE_CONFORMANCE> for OdbcInterfaceConformance {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ODBC_INTERFACE_CONFORMANCE> for OdbcInterfaceConformance {}
+unsafe impl AttrGet<SQL_ODBC_INTERFACE_CONFORMANCE> for OdbcInterfaceConformance {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10)]
@@ -731,7 +734,7 @@ unsafe impl Attr<SQL_ODBC_VER> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ODBC_VER> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_ODBC_VER> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 153)]
@@ -742,7 +745,7 @@ unsafe impl Attr<SQL_PARAM_ARRAY_ROW_COUNTS> for ParamArrayRowCounts {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_PARAM_ARRAY_ROW_COUNTS> for ParamArrayRowCounts {}
+unsafe impl AttrGet<SQL_PARAM_ARRAY_ROW_COUNTS> for ParamArrayRowCounts {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 154)]
@@ -753,7 +756,7 @@ unsafe impl Attr<SQL_PARAM_ARRAY_SELECTS> for ParamArraySelects {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_PARAM_ARRAY_SELECTS> for ParamArraySelects {}
+unsafe impl AttrGet<SQL_PARAM_ARRAY_SELECTS> for ParamArraySelects {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 11)]
@@ -764,7 +767,7 @@ unsafe impl Attr<SQL_ROW_UPDATES> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ROW_UPDATES> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_ROW_UPDATES> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 14)]
@@ -775,7 +778,7 @@ unsafe impl Attr<SQL_SEARCH_PATTERN_ESCAPE> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SEARCH_PATTERN_ESCAPE> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_SEARCH_PATTERN_ESCAPE> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 13)]
@@ -786,7 +789,7 @@ unsafe impl Attr<SQL_SERVER_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SERVER_NAME> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_SERVER_NAME> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 167)]
@@ -797,7 +800,7 @@ unsafe impl Attr<SQL_STATIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_STATIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
+unsafe impl AttrGet<SQL_STATIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 168)]
@@ -808,7 +811,7 @@ unsafe impl Attr<SQL_STATIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_STATIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
+unsafe impl AttrGet<SQL_STATIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////// DBMS Product Information ////////////////////////////////
@@ -823,7 +826,7 @@ unsafe impl Attr<SQL_DATABASE_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DATABASE_NAME> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_DATABASE_NAME> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 17)]
@@ -834,7 +837,7 @@ unsafe impl Attr<SQL_DBMS_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DBMS_NAME> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_DBMS_NAME> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 18)]
@@ -845,7 +848,7 @@ unsafe impl Attr<SQL_DBMS_VER> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DBMS_VER> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_DBMS_VER> for [SQLCHAR] {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////// Data Source Information /////////////////////////////////
@@ -860,7 +863,7 @@ unsafe impl Attr<SQL_ACCESSIBLE_PROCEDURES> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ACCESSIBLE_PROCEDURES> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_ACCESSIBLE_PROCEDURES> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 19)]
@@ -871,7 +874,7 @@ unsafe impl Attr<SQL_ACCESSIBLE_TABLES> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ACCESSIBLE_TABLES> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_ACCESSIBLE_TABLES> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 82)]
@@ -882,7 +885,7 @@ unsafe impl Attr<SQL_BOOKMARK_PERSISTENCE> for BookmarkPersistence {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_BOOKMARK_PERSISTENCE> for BookmarkPersistence {}
+unsafe impl AttrGet<SQL_BOOKMARK_PERSISTENCE> for BookmarkPersistence {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 42)]
@@ -893,7 +896,7 @@ unsafe impl Attr<SQL_CATALOG_TERM> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CATALOG_TERM> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_CATALOG_TERM> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10004)]
@@ -904,7 +907,7 @@ unsafe impl Attr<SQL_COLLATION_SEQ> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_COLLATION_SEQ> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_COLLATION_SEQ> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 22)]
@@ -915,7 +918,7 @@ unsafe impl Attr<SQL_CONCAT_NULL_BEHAVIOR> for ConcatNullBehavior {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONCAT_NULL_BEHAVIOR> for ConcatNullBehavior {}
+unsafe impl AttrGet<SQL_CONCAT_NULL_BEHAVIOR> for ConcatNullBehavior {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 23)]
@@ -926,7 +929,7 @@ unsafe impl Attr<SQL_CURSOR_COMMIT_BEHAVIOR> for CursorBehavior {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CURSOR_COMMIT_BEHAVIOR> for CursorBehavior {}
+unsafe impl AttrGet<SQL_CURSOR_COMMIT_BEHAVIOR> for CursorBehavior {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 24)]
@@ -937,7 +940,7 @@ unsafe impl Attr<SQL_CURSOR_ROLLBACK_BEHAVIOR> for CursorBehavior {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CURSOR_ROLLBACK_BEHAVIOR> for CursorBehavior {}
+unsafe impl AttrGet<SQL_CURSOR_ROLLBACK_BEHAVIOR> for CursorBehavior {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10001)]
@@ -948,7 +951,7 @@ unsafe impl Attr<SQL_CURSOR_SENSITIVITY> for CursorSensitivity {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CURSOR_SENSITIVITY> for CursorSensitivity {}
+unsafe impl AttrGet<SQL_CURSOR_SENSITIVITY> for CursorSensitivity {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 25)]
@@ -959,7 +962,7 @@ unsafe impl Attr<SQL_DATA_SOURCE_READ_ONLY> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DATA_SOURCE_READ_ONLY> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_DATA_SOURCE_READ_ONLY> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 26)]
@@ -970,7 +973,7 @@ unsafe impl Attr<SQL_DEFAULT_TXN_ISOLATION> for TxnIsolation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DEFAULT_TXN_ISOLATION> for TxnIsolation {}
+unsafe impl AttrGet<SQL_DEFAULT_TXN_ISOLATION> for TxnIsolation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10002)]
@@ -981,7 +984,7 @@ unsafe impl Attr<SQL_DESCRIBE_PARAMETER> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DESCRIBE_PARAMETER> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_DESCRIBE_PARAMETER> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 36)]
@@ -992,7 +995,7 @@ unsafe impl Attr<SQL_MULT_RESULT_SETS> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MULT_RESULT_SETS> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_MULT_RESULT_SETS> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 37)]
@@ -1003,7 +1006,7 @@ unsafe impl Attr<SQL_MULTIPLE_ACTIVE_TXN> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MULTIPLE_ACTIVE_TXN> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_MULTIPLE_ACTIVE_TXN> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 111)]
@@ -1014,7 +1017,7 @@ unsafe impl Attr<SQL_NEED_LONG_DATA_LEN> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_NEED_LONG_DATA_LEN> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_NEED_LONG_DATA_LEN> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 85)]
@@ -1025,7 +1028,7 @@ unsafe impl Attr<SQL_NULL_COLLATION> for NullCollation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_NULL_COLLATION> for NullCollation {}
+unsafe impl AttrGet<SQL_NULL_COLLATION> for NullCollation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 40)]
@@ -1036,7 +1039,7 @@ unsafe impl Attr<SQL_PROCEDURE_TERM> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_PROCEDURE_TERM> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_PROCEDURE_TERM> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 39)]
@@ -1047,7 +1050,7 @@ unsafe impl Attr<SQL_SCHEMA_TERM> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SCHEMA_TERM> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_SCHEMA_TERM> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 44)]
@@ -1058,7 +1061,7 @@ unsafe impl Attr<SQL_SCROLL_OPTIONS> for ScrollOptions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SCROLL_OPTIONS> for ScrollOptions {}
+unsafe impl AttrGet<SQL_SCROLL_OPTIONS> for ScrollOptions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 45)]
@@ -1069,7 +1072,7 @@ unsafe impl Attr<SQL_TABLE_TERM> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_TABLE_TERM> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_TABLE_TERM> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 46)]
@@ -1080,7 +1083,7 @@ unsafe impl Attr<SQL_TXN_CAPABLE> for TxnCapable {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_TXN_CAPABLE> for TxnCapable {}
+unsafe impl AttrGet<SQL_TXN_CAPABLE> for TxnCapable {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 72)]
@@ -1091,7 +1094,7 @@ unsafe impl Attr<SQL_TXN_ISOLATION_OPTION> for TxnIsolation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_TXN_ISOLATION_OPTION> for TxnIsolation {}
+unsafe impl AttrGet<SQL_TXN_ISOLATION_OPTION> for TxnIsolation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 47)]
@@ -1102,7 +1105,7 @@ unsafe impl Attr<SQL_USER_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_USER_NAME> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_USER_NAME> for [SQLCHAR] {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////// Supported SQL //////////////////////////////////////
@@ -1117,7 +1120,7 @@ unsafe impl Attr<SQL_AGGREGATE_FUNCTIONS> for AggregateFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_AGGREGATE_FUNCTIONS> for AggregateFunctions {}
+unsafe impl AttrGet<SQL_AGGREGATE_FUNCTIONS> for AggregateFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 117)]
@@ -1128,7 +1131,7 @@ unsafe impl Attr<SQL_ALTER_DOMAIN> for AlterDomain {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ALTER_DOMAIN> for AlterDomain {}
+unsafe impl AttrGet<SQL_ALTER_DOMAIN> for AlterDomain {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 86)]
@@ -1139,7 +1142,7 @@ unsafe impl Attr<SQL_ALTER_TABLE> for AlterTable {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ALTER_TABLE> for AlterTable {}
+unsafe impl AttrGet<SQL_ALTER_TABLE> for AlterTable {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 114)]
@@ -1150,7 +1153,7 @@ unsafe impl Attr<SQL_CATALOG_LOCATION> for CatalogLocation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CATALOG_LOCATION> for CatalogLocation {}
+unsafe impl AttrGet<SQL_CATALOG_LOCATION> for CatalogLocation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10003)]
@@ -1161,7 +1164,7 @@ unsafe impl Attr<SQL_CATALOG_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CATALOG_NAME> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_CATALOG_NAME> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 41)]
@@ -1172,7 +1175,7 @@ unsafe impl Attr<SQL_CATALOG_NAME_SEPARATOR> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CATALOG_NAME_SEPARATOR> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_CATALOG_NAME_SEPARATOR> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 92)]
@@ -1183,7 +1186,7 @@ unsafe impl Attr<SQL_CATALOG_USAGE> for CatalogUsage {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CATALOG_USAGE> for CatalogUsage {}
+unsafe impl AttrGet<SQL_CATALOG_USAGE> for CatalogUsage {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 87)]
@@ -1194,7 +1197,7 @@ unsafe impl Attr<SQL_COLUMN_ALIAS> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_COLUMN_ALIAS> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_COLUMN_ALIAS> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 74)]
@@ -1205,7 +1208,7 @@ unsafe impl Attr<SQL_CORRELATION_NAME> for CorrelationName {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CORRELATION_NAME> for CorrelationName {}
+unsafe impl AttrGet<SQL_CORRELATION_NAME> for CorrelationName {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 127)]
@@ -1216,7 +1219,7 @@ unsafe impl Attr<SQL_CREATE_ASSERTION> for CreateAssertion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CREATE_ASSERTION> for CreateAssertion {}
+unsafe impl AttrGet<SQL_CREATE_ASSERTION> for CreateAssertion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 128)]
@@ -1227,7 +1230,7 @@ unsafe impl Attr<SQL_CREATE_CHARACTER_SET> for CreateCharacterSet {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CREATE_CHARACTER_SET> for CreateCharacterSet {}
+unsafe impl AttrGet<SQL_CREATE_CHARACTER_SET> for CreateCharacterSet {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 129)]
@@ -1238,7 +1241,7 @@ unsafe impl Attr<SQL_CREATE_COLLATION> for CreateCollation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CREATE_COLLATION> for CreateCollation {}
+unsafe impl AttrGet<SQL_CREATE_COLLATION> for CreateCollation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 130)]
@@ -1249,7 +1252,7 @@ unsafe impl Attr<SQL_CREATE_DOMAIN> for CreateDomain {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CREATE_DOMAIN> for CreateDomain {}
+unsafe impl AttrGet<SQL_CREATE_DOMAIN> for CreateDomain {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 131)]
@@ -1260,7 +1263,7 @@ unsafe impl Attr<SQL_CREATE_SCHEMA> for CreateSchema {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CREATE_SCHEMA> for CreateSchema {}
+unsafe impl AttrGet<SQL_CREATE_SCHEMA> for CreateSchema {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 132)]
@@ -1271,7 +1274,7 @@ unsafe impl Attr<SQL_CREATE_TABLE> for CreateTable {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CREATE_TABLE> for CreateTable {}
+unsafe impl AttrGet<SQL_CREATE_TABLE> for CreateTable {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 133)]
@@ -1282,7 +1285,7 @@ unsafe impl Attr<SQL_CREATE_TRANSLATION> for CreateTranslation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CREATE_TRANSLATION> for CreateTranslation {}
+unsafe impl AttrGet<SQL_CREATE_TRANSLATION> for CreateTranslation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 170)]
@@ -1293,7 +1296,7 @@ unsafe impl Attr<SQL_DDL_INDEX> for DdlIndex {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DDL_INDEX> for DdlIndex {}
+unsafe impl AttrGet<SQL_DDL_INDEX> for DdlIndex {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 136)]
@@ -1304,7 +1307,7 @@ unsafe impl Attr<SQL_DROP_ASSERTION> for DropAssertion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DROP_ASSERTION> for DropAssertion {}
+unsafe impl AttrGet<SQL_DROP_ASSERTION> for DropAssertion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 137)]
@@ -1315,7 +1318,7 @@ unsafe impl Attr<SQL_DROP_CHARACTER_SET> for DropCharacterSet {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DROP_CHARACTER_SET> for DropCharacterSet {}
+unsafe impl AttrGet<SQL_DROP_CHARACTER_SET> for DropCharacterSet {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 138)]
@@ -1326,7 +1329,7 @@ unsafe impl Attr<SQL_DROP_COLLATION> for DropCollation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DROP_COLLATION> for DropCollation {}
+unsafe impl AttrGet<SQL_DROP_COLLATION> for DropCollation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 139)]
@@ -1337,7 +1340,7 @@ unsafe impl Attr<SQL_DROP_DOMAIN> for DropDomain {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DROP_DOMAIN> for DropDomain {}
+unsafe impl AttrGet<SQL_DROP_DOMAIN> for DropDomain {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 140)]
@@ -1348,7 +1351,7 @@ unsafe impl Attr<SQL_DROP_SCHEMA> for DropSchema {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DROP_SCHEMA> for DropSchema {}
+unsafe impl AttrGet<SQL_DROP_SCHEMA> for DropSchema {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 141)]
@@ -1359,7 +1362,7 @@ unsafe impl Attr<SQL_DROP_TABLE> for DropTable {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DROP_TABLE> for DropTable {}
+unsafe impl AttrGet<SQL_DROP_TABLE> for DropTable {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 142)]
@@ -1370,7 +1373,7 @@ unsafe impl Attr<SQL_DROP_TRANSLATION> for DropTranslation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DROP_TRANSLATION> for DropTranslation {}
+unsafe impl AttrGet<SQL_DROP_TRANSLATION> for DropTranslation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 143)]
@@ -1381,7 +1384,7 @@ unsafe impl Attr<SQL_DROP_VIEW> for DropView {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_DROP_VIEW> for DropView {}
+unsafe impl AttrGet<SQL_DROP_VIEW> for DropView {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 27)]
@@ -1392,7 +1395,7 @@ unsafe impl Attr<SQL_EXPRESSIONS_IN_ORDERBY> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_EXPRESSIONS_IN_ORDERBY> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_EXPRESSIONS_IN_ORDERBY> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 88)]
@@ -1403,7 +1406,7 @@ unsafe impl Attr<SQL_GROUP_BY> for GroupBy {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_GROUP_BY> for GroupBy {}
+unsafe impl AttrGet<SQL_GROUP_BY> for GroupBy {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 28)]
@@ -1414,7 +1417,7 @@ unsafe impl Attr<SQL_IDENTIFIER_CASE> for IdentifierCase {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_IDENTIFIER_CASE> for IdentifierCase {}
+unsafe impl AttrGet<SQL_IDENTIFIER_CASE> for IdentifierCase {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 29)]
@@ -1425,7 +1428,7 @@ unsafe impl Attr<SQL_IDENTIFIER_QUOTE_CHAR> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_IDENTIFIER_QUOTE_CHAR> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_IDENTIFIER_QUOTE_CHAR> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 148)]
@@ -1436,7 +1439,7 @@ unsafe impl Attr<SQL_INDEX_KEYWORDS> for IndexKeywords {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_INDEX_KEYWORDS> for IndexKeywords {}
+unsafe impl AttrGet<SQL_INDEX_KEYWORDS> for IndexKeywords {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 171)]
@@ -1447,7 +1450,7 @@ unsafe impl Attr<SQL_INSERT_STATEMENT> for InsertStatement {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_INSERT_STATEMENT> for InsertStatement {}
+unsafe impl AttrGet<SQL_INSERT_STATEMENT> for InsertStatement {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 73)]
@@ -1458,7 +1461,7 @@ unsafe impl Attr<SQL_INTEGRITY> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_INTEGRITY> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_INTEGRITY> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 89)]
@@ -1469,7 +1472,7 @@ unsafe impl Attr<SQL_KEYWORDS> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_KEYWORDS> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_KEYWORDS> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 113)]
@@ -1480,7 +1483,7 @@ unsafe impl Attr<SQL_LIKE_ESCAPE_CLAUSE> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_LIKE_ESCAPE_CLAUSE> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_LIKE_ESCAPE_CLAUSE> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 75)]
@@ -1491,7 +1494,7 @@ unsafe impl Attr<SQL_NON_NULLABLE_COLUMNS> for NonNullableColumns {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_NON_NULLABLE_COLUMNS> for NonNullableColumns {}
+unsafe impl AttrGet<SQL_NON_NULLABLE_COLUMNS> for NonNullableColumns {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 115)]
@@ -1502,7 +1505,7 @@ unsafe impl Attr<SQL_OJ_CAPABILITIES> for OjCapabilities {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_OJ_CAPABILITIES> for OjCapabilities {}
+unsafe impl AttrGet<SQL_OJ_CAPABILITIES> for OjCapabilities {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 90)]
@@ -1513,7 +1516,7 @@ unsafe impl Attr<SQL_ORDER_BY_COLUMNS_IN_SELECT> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_ORDER_BY_COLUMNS_IN_SELECT> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_ORDER_BY_COLUMNS_IN_SELECT> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 38)]
@@ -1524,7 +1527,7 @@ unsafe impl Attr<SQL_OUTER_JOINS> for OuterJoins {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_OUTER_JOINS> for OuterJoins {}
+unsafe impl AttrGet<SQL_OUTER_JOINS> for OuterJoins {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 21)]
@@ -1535,7 +1538,7 @@ unsafe impl Attr<SQL_PROCEDURES> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_PROCEDURES> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_PROCEDURES> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 93)]
@@ -1546,7 +1549,7 @@ unsafe impl Attr<SQL_QUOTED_IDENTIFIER_CASE> for IdentifierCase {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_QUOTED_IDENTIFIER_CASE> for IdentifierCase {}
+unsafe impl AttrGet<SQL_QUOTED_IDENTIFIER_CASE> for IdentifierCase {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 91)]
@@ -1557,7 +1560,7 @@ unsafe impl Attr<SQL_SCHEMA_USAGE> for SchemaUsage {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SCHEMA_USAGE> for SchemaUsage {}
+unsafe impl AttrGet<SQL_SCHEMA_USAGE> for SchemaUsage {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 94)]
@@ -1568,7 +1571,7 @@ unsafe impl Attr<SQL_SPECIAL_CHARACTERS> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SPECIAL_CHARACTERS> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_SPECIAL_CHARACTERS> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 118)]
@@ -1579,7 +1582,7 @@ unsafe impl Attr<SQL_SQL_CONFORMANCE> for SqlConformance {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SQL_CONFORMANCE> for SqlConformance {}
+unsafe impl AttrGet<SQL_SQL_CONFORMANCE> for SqlConformance {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 95)]
@@ -1590,7 +1593,7 @@ unsafe impl Attr<SQL_SUBQUERIES> for Subqueries {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SUBQUERIES> for Subqueries {}
+unsafe impl AttrGet<SQL_SUBQUERIES> for Subqueries {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 96)]
@@ -1601,7 +1604,7 @@ unsafe impl Attr<SQL_UNION> for Union {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_UNION> for Union {}
+unsafe impl AttrGet<SQL_UNION> for Union {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////// SQL Limits ///////////////////////////////////////
@@ -1616,7 +1619,7 @@ unsafe impl Attr<SQL_MAX_BINARY_LITERAL_LEN> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_BINARY_LITERAL_LEN> for SQLUINTEGER {}
+unsafe impl AttrGet<SQL_MAX_BINARY_LITERAL_LEN> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 34)]
@@ -1627,7 +1630,7 @@ unsafe impl Attr<SQL_MAX_CATALOG_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_CATALOG_NAME_LEN> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_CATALOG_NAME_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 108)]
@@ -1638,7 +1641,7 @@ unsafe impl Attr<SQL_MAX_CHAR_LITERAL_LEN> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_CHAR_LITERAL_LEN> for SQLUINTEGER {}
+unsafe impl AttrGet<SQL_MAX_CHAR_LITERAL_LEN> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 30)]
@@ -1649,7 +1652,7 @@ unsafe impl Attr<SQL_MAX_COLUMN_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_COLUMN_NAME_LEN> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_COLUMN_NAME_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 97)]
@@ -1660,7 +1663,7 @@ unsafe impl Attr<SQL_MAX_COLUMNS_IN_GROUP_BY> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_COLUMNS_IN_GROUP_BY> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_GROUP_BY> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 98)]
@@ -1671,7 +1674,7 @@ unsafe impl Attr<SQL_MAX_COLUMNS_IN_INDEX> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_COLUMNS_IN_INDEX> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_INDEX> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 99)]
@@ -1682,7 +1685,7 @@ unsafe impl Attr<SQL_MAX_COLUMNS_IN_ORDER_BY> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_COLUMNS_IN_ORDER_BY> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_ORDER_BY> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 100)]
@@ -1693,7 +1696,7 @@ unsafe impl Attr<SQL_MAX_COLUMNS_IN_SELECT> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_COLUMNS_IN_SELECT> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_SELECT> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 101)]
@@ -1704,7 +1707,7 @@ unsafe impl Attr<SQL_MAX_COLUMNS_IN_TABLE> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_COLUMNS_IN_TABLE> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_TABLE> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 31)]
@@ -1715,7 +1718,7 @@ unsafe impl Attr<SQL_MAX_CURSOR_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_CURSOR_NAME_LEN> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_CURSOR_NAME_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10005)]
@@ -1726,7 +1729,7 @@ unsafe impl Attr<SQL_MAX_IDENTIFIER_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_IDENTIFIER_LEN> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_IDENTIFIER_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 102)]
@@ -1737,7 +1740,7 @@ unsafe impl Attr<SQL_MAX_INDEX_SIZE> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_INDEX_SIZE> for SQLUINTEGER {}
+unsafe impl AttrGet<SQL_MAX_INDEX_SIZE> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 33)]
@@ -1748,7 +1751,7 @@ unsafe impl Attr<SQL_MAX_PROCEDURE_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_PROCEDURE_NAME_LEN> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_PROCEDURE_NAME_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 104)]
@@ -1759,7 +1762,7 @@ unsafe impl Attr<SQL_MAX_ROW_SIZE> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_ROW_SIZE> for SQLUINTEGER {}
+unsafe impl AttrGet<SQL_MAX_ROW_SIZE> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 103)]
@@ -1770,7 +1773,7 @@ unsafe impl Attr<SQL_MAX_ROW_SIZE_INCLUDES_LONG> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_ROW_SIZE_INCLUDES_LONG> for [SQLCHAR] {}
+unsafe impl AttrGet<SQL_MAX_ROW_SIZE_INCLUDES_LONG> for [SQLCHAR] {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 32)]
@@ -1781,7 +1784,7 @@ unsafe impl Attr<SQL_MAX_SCHEMA_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_SCHEMA_NAME_LEN> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_SCHEMA_NAME_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 105)]
@@ -1792,7 +1795,7 @@ unsafe impl Attr<SQL_MAX_STATEMENT_LEN> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_STATEMENT_LEN> for SQLUINTEGER {}
+unsafe impl AttrGet<SQL_MAX_STATEMENT_LEN> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 35)]
@@ -1803,7 +1806,7 @@ unsafe impl Attr<SQL_MAX_TABLE_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_TABLE_NAME_LEN> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_TABLE_NAME_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 106)]
@@ -1814,7 +1817,7 @@ unsafe impl Attr<SQL_MAX_TABLES_IN_SELECT> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_TABLES_IN_SELECT> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_TABLES_IN_SELECT> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 107)]
@@ -1825,7 +1828,7 @@ unsafe impl Attr<SQL_MAX_USER_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_MAX_USER_NAME_LEN> for SQLUSMALLINT {}
+unsafe impl AttrGet<SQL_MAX_USER_NAME_LEN> for SQLUSMALLINT {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// Scalar Function Information //////////////////////////////
@@ -1840,7 +1843,7 @@ unsafe impl Attr<SQL_CONVERT_FUNCTIONS> for ConvertFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_FUNCTIONS> for ConvertFunctions {}
+unsafe impl AttrGet<SQL_CONVERT_FUNCTIONS> for ConvertFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 49)]
@@ -1851,7 +1854,7 @@ unsafe impl Attr<SQL_NUMERIC_FUNCTIONS> for NumericFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_NUMERIC_FUNCTIONS> for NumericFunctions {}
+unsafe impl AttrGet<SQL_NUMERIC_FUNCTIONS> for NumericFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 50)]
@@ -1862,7 +1865,7 @@ unsafe impl Attr<SQL_STRING_FUNCTIONS> for StringFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_STRING_FUNCTIONS> for StringFunctions {}
+unsafe impl AttrGet<SQL_STRING_FUNCTIONS> for StringFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 51)]
@@ -1873,7 +1876,7 @@ unsafe impl Attr<SQL_SYSTEM_FUNCTIONS> for SystemFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_SYSTEM_FUNCTIONS> for SystemFunctions {}
+unsafe impl AttrGet<SQL_SYSTEM_FUNCTIONS> for SystemFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 109)]
@@ -1884,7 +1887,7 @@ unsafe impl Attr<SQL_TIMEDATE_ADD_INTERVALS> for TimedateIntervals {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_TIMEDATE_ADD_INTERVALS> for TimedateIntervals {}
+unsafe impl AttrGet<SQL_TIMEDATE_ADD_INTERVALS> for TimedateIntervals {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 110)]
@@ -1895,7 +1898,7 @@ unsafe impl Attr<SQL_TIMEDATE_DIFF_INTERVALS> for TimedateIntervals {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_TIMEDATE_DIFF_INTERVALS> for TimedateIntervals {}
+unsafe impl AttrGet<SQL_TIMEDATE_DIFF_INTERVALS> for TimedateIntervals {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 52)]
@@ -1906,7 +1909,7 @@ unsafe impl Attr<SQL_TIMEDATE_FUNCTIONS> for TimedateFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_TIMEDATE_FUNCTIONS> for TimedateFunctions {}
+unsafe impl AttrGet<SQL_TIMEDATE_FUNCTIONS> for TimedateFunctions {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// Conversion Information /////////////////////////////////
@@ -1921,7 +1924,7 @@ unsafe impl Attr<SQL_CONVERT_BIGINT> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_BIGINT> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_BIGINT> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 54)]
@@ -1932,7 +1935,7 @@ unsafe impl Attr<SQL_CONVERT_BINARY> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_BINARY> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_BINARY> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 55)]
@@ -1943,7 +1946,7 @@ unsafe impl Attr<SQL_CONVERT_BIT> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_BIT> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_BIT> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 56)]
@@ -1954,7 +1957,7 @@ unsafe impl Attr<SQL_CONVERT_CHAR> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_CHAR> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_CHAR> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 57)]
@@ -1965,7 +1968,7 @@ unsafe impl Attr<SQL_CONVERT_DATE> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_DATE> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_DATE> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 58)]
@@ -1976,7 +1979,7 @@ unsafe impl Attr<SQL_CONVERT_DECIMAL> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_DECIMAL> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_DECIMAL> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 59)]
@@ -1987,7 +1990,7 @@ unsafe impl Attr<SQL_CONVERT_DOUBLE> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_DOUBLE> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_DOUBLE> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 60)]
@@ -1998,7 +2001,7 @@ unsafe impl Attr<SQL_CONVERT_FLOAT> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_FLOAT> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_FLOAT> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 61)]
@@ -2009,7 +2012,7 @@ unsafe impl Attr<SQL_CONVERT_INTEGER> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_INTEGER> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_INTEGER> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 123)]
@@ -2020,7 +2023,7 @@ unsafe impl Attr<SQL_CONVERT_INTERVAL_DAY_TIME> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_INTERVAL_DAY_TIME> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_INTERVAL_DAY_TIME> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 124)]
@@ -2031,7 +2034,7 @@ unsafe impl Attr<SQL_CONVERT_INTERVAL_YEAR_MONTH> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_INTERVAL_YEAR_MONTH> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_INTERVAL_YEAR_MONTH> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 71)]
@@ -2042,7 +2045,7 @@ unsafe impl Attr<SQL_CONVERT_LONGVARBINARY> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_LONGVARBINARY> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_LONGVARBINARY> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 62)]
@@ -2053,7 +2056,7 @@ unsafe impl Attr<SQL_CONVERT_LONGVARCHAR> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_LONGVARCHAR> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_LONGVARCHAR> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 63)]
@@ -2064,7 +2067,7 @@ unsafe impl Attr<SQL_CONVERT_NUMERIC> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_NUMERIC> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_NUMERIC> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 64)]
@@ -2075,7 +2078,7 @@ unsafe impl Attr<SQL_CONVERT_REAL> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_REAL> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_REAL> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 65)]
@@ -2086,7 +2089,7 @@ unsafe impl Attr<SQL_CONVERT_SMALLINT> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_SMALLINT> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_SMALLINT> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 66)]
@@ -2097,7 +2100,7 @@ unsafe impl Attr<SQL_CONVERT_TIME> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_TIME> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_TIME> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 67)]
@@ -2108,7 +2111,7 @@ unsafe impl Attr<SQL_CONVERT_TIMESTAMP> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_TIMESTAMP> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_TIMESTAMP> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 68)]
@@ -2119,7 +2122,7 @@ unsafe impl Attr<SQL_CONVERT_TINYINT> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_TINYINT> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_TINYINT> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 69)]
@@ -2130,7 +2133,7 @@ unsafe impl Attr<SQL_CONVERT_VARBINARY> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_VARBINARY> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_VARBINARY> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 70)]
@@ -2141,7 +2144,7 @@ unsafe impl Attr<SQL_CONVERT_VARCHAR> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_VARCHAR> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_VARCHAR> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 173)]
@@ -2152,7 +2155,7 @@ unsafe impl Attr<SQL_CONVERT_GUID> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrRead<SQL_CONVERT_GUID> for Conversion {}
+unsafe impl AttrGet<SQL_CONVERT_GUID> for Conversion {}
 
 //=====================================================================================//
 
@@ -2942,23 +2945,23 @@ pub struct ReturnEscapeClause;
 pub const SQL_RC_NONE: ReturnEscapeClause = ReturnEscapeClause(0x00000000);
 pub const SQL_RC_INSERT_SINGLE_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000001);
 pub const SQL_RC_INSERT_SINGLE_ANY: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000002 | SQL_RC_INSERT_SINGLE_ROWID);
+    ReturnEscapeClause(0x00000002 | SQL_RC_INSERT_SINGLE_ROWID.0);
 pub const SQL_RC_INSERT_MULTIPLE_ROWID: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000004 | SQL_RC_INSERT_SINGLE_ROWID);
+    ReturnEscapeClause(0x00000004 | SQL_RC_INSERT_SINGLE_ROWID.0);
 pub const SQL_RC_INSERT_MULTIPLE_ANY: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000008 | SQL_RC_INSERT_MULTIPLE_ROWID | SQL_RC_INSERT_SINGLE_ANY);
+    ReturnEscapeClause(0x00000008 | SQL_RC_INSERT_MULTIPLE_ROWID.0 | SQL_RC_INSERT_SINGLE_ANY.0);
 pub const SQL_RC_INSERT_SELECT_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000010);
 pub const SQL_RC_INSERT_SELECT_ANY: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000020 | SQL_RC_INSERT_SELECT_ROWID);
+    ReturnEscapeClause(0x00000020 | SQL_RC_INSERT_SELECT_ROWID.0);
 pub const SQL_RC_UPDATE_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000040);
 pub const SQL_RC_UPDATE_ANY: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000080 | SQL_RC_UPDATE_ROWID);
+    ReturnEscapeClause(0x00000080 | SQL_RC_UPDATE_ROWID.0);
 pub const SQL_RC_DELETE_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000100);
 pub const SQL_RC_DELETE_ANY: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000200 | SQL_RC_DELETE_ROWID);
+    ReturnEscapeClause(0x00000200 | SQL_RC_DELETE_ROWID.0);
 pub const SQL_RC_SELECT_INTO_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000400);
 pub const SQL_RC_SELECT_INTO_ANY: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000800 | SQL_RC_SELECT_INTO_ROWID);
+    ReturnEscapeClause(0x00000800 | SQL_RC_SELECT_INTO_ROWID.0);
 
 #[odbc_bitmask(SQLUINTEGER)]
 pub struct FormatEscapeClause;

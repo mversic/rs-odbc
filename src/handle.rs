@@ -1,17 +1,23 @@
 use crate::c_types::DeferredBuf;
+use crate::env::SQL_ATTR_ODBC_VERSION;
 use crate::extern_api;
-use crate::{sqlreturn::SQL_SUCCESS, Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER, SQLSMALLINT, V3_8, V4, Version, SQLINTEGER};
+use crate::{
+    sqlreturn::SQL_SUCCESS, Ident, IntoSQLPOINTER, StrLenOrInd, Version, SQLPOINTER,
+    SQLSMALLINT, V3_8, V4,
+};
 use std::any::type_name;
 use std::cell::{Cell, UnsafeCell};
 use std::marker::PhantomData;
 use std::thread::panicking;
 
 #[cfg(feature = "odbc_debug")]
-use std::mem::{ManuallyDrop, MaybeUninit};
-#[cfg(feature = "odbc_debug")]
 use crate::stmt::{
     SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC, SQL_ATTR_IMP_ROW_DESC,
 };
+#[cfg(feature = "odbc_debug")]
+use crate::SQLINTEGER;
+#[cfg(feature = "odbc_debug")]
+use std::mem::{ManuallyDrop, MaybeUninit};
 
 pub unsafe trait AsSQLHANDLE {
     #[allow(non_snake_case)]
@@ -20,9 +26,6 @@ pub unsafe trait AsSQLHANDLE {
 
 pub trait Handle {
     type Ident: crate::Ident<Type = SQLSMALLINT>;
-
-    type AttrType: Copy;
-    type AttrLen: Copy;
 }
 
 // TODO: Should be unsafe?
@@ -112,19 +115,37 @@ pub struct SQLHENV<V: Version> {
 }
 impl<V: Version> Handle for SQLHENV<V> {
     type Ident = SQL_HANDLE_ENV;
-
-    type AttrType = SQLINTEGER;
-    type AttrLen = SQLINTEGER;
 }
-unsafe impl<V> Allocate<'_> for SQLHENV<V> {
+unsafe impl<V: Version> Allocate<'_> for SQLHENV<V> {
     type SrcHandle = SQL_NULL_HANDLE;
 
     fn from_raw(handle: SQLHANDLE) -> Self {
-        SQLHENV { handle, version: PhantomData }
+        let val = Self {
+            handle,
+            version: PhantomData,
+        };
+
+        let sql_return = unsafe {
+            extern_api::SQLSetEnvAttr(
+                val.as_SQLHANDLE(),
+                SQL_ATTR_ODBC_VERSION::IDENTIFIER,
+                V::IDENTIFIER.into_SQLPOINTER(),
+                0, // TODO: Use AttrLen::len()
+            )
+        };
+
+        if sql_return != SQL_SUCCESS {
+            panic!(
+                "SQL_ATTR_ODBC_VERSION({}): SQLSetEnvAttr returned {:?}",
+                type_name::<V>(),
+                sql_return
+            )
+        }
+
+        val
     }
 }
-impl<V: Version> SQLEndTranHandle for SQLHENV<V> {}
-unsafe impl<V> AsSQLHANDLE for SQLHENV<V> {
+unsafe impl<V: Version> AsSQLHANDLE for SQLHENV<V> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.handle
     }
@@ -143,6 +164,7 @@ impl<V: Version> Drop for SQLHENV<V> {
         }
     }
 }
+impl<V: Version> SQLEndTranHandle for SQLHENV<V> {}
 
 /// Connection handle identifies a structure that contains connection information, such as the following:
 /// * The state of the connection
@@ -332,9 +354,7 @@ pub struct SQLHSTMT<'conn, 'stmt, 'buf, V: Version> {
 }
 impl<'buf, V: Version> SQLHSTMT<'_, '_, 'buf, V> {
     #[cfg(feature = "odbc_debug")]
-    unsafe fn get_descriptor_handle<A: Ident<Type = crate::SQLINTEGER>>(
-        handle: SQLHANDLE,
-    ) -> SQLHANDLE {
+    unsafe fn get_descriptor_handle<A: Ident<Type = SQLINTEGER>>(handle: SQLHANDLE) -> SQLHANDLE {
         let mut descriptor_handle = MaybeUninit::uninit();
 
         let sql_return = extern_api::SQLGetStmtAttrA(
@@ -356,7 +376,11 @@ impl<'buf, V: Version> SQLHSTMT<'_, '_, 'buf, V> {
     }
 
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<'buf, V, TT>>(&self, TargetValuePtr: Option<B>) {}
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<'buf, V, TT>>(
+        &self,
+        TargetValuePtr: Option<B>,
+    ) {
+    }
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<'buf, V, TT>>(
         &self,
@@ -371,7 +395,10 @@ impl<'buf, V: Version> SQLHSTMT<'_, '_, 'buf, V> {
     }
 
     #[cfg(feature = "odbc_debug")]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<'buf, V, TT>>(&self, TargetValuePtr: Option<B>) {
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<'buf, V, TT>>(
+        &self,
+        TargetValuePtr: Option<B>,
+    ) {
         if let Some(explicit_ard) = self.explicit_ard.get() {
             explicit_ard.bind_col(TargetValuePtr);
         } else {
@@ -401,7 +428,7 @@ impl<'buf, V: Version> SQLHSTMT<'_, '_, 'buf, V> {
 impl<V: Version> Handle for SQLHSTMT<'_, '_, '_, V> {
     type Ident = SQL_HANDLE_STMT;
 }
-unsafe impl<'conn, V> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V> {
+unsafe impl<'conn, V: Version> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V> {
     // Valid because SQLHDBC is covariant
     type SrcHandle = SQLHDBC<'conn, V>;
 
@@ -529,7 +556,7 @@ impl<'buf, V: Version, T: DescType<'buf>> SQLHDESC<'_, V, T> {
 impl<'buf, V: Version, T: DescType<'buf>> Handle for SQLHDESC<'_, V, T> {
     type Ident = SQL_HANDLE_DESC;
 }
-unsafe impl<'conn, 'buf, V> Allocate<'conn> for SQLHDESC<'conn, V, AppDesc<'buf>> {
+unsafe impl<'conn, 'buf, V: Version> Allocate<'conn> for SQLHDESC<'conn, V, AppDesc<'buf>> {
     // Valid because SQLHDBC is covariant
     type SrcHandle = SQLHDBC<'conn, V>;
 

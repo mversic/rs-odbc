@@ -17,10 +17,5 @@ rs_odbc_derive = {path = "./rs_odbc_derive", version = "*"}
 
 [features]
 odbc_debug = []
-default = ["v3_8"]
+default = []
 static = []
-
-v3_5 = []
-v3_8 = ["v3_5"]
-v4 = ["v3_8"]
-

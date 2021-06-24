@@ -17,11 +17,12 @@ use crate::{
     sql_types::SqlType,
     sqlreturn::{SQLRETURN, SQL_SUCCEEDED, SQL_SUCCESS},
     stmt::StmtAttr,
-    AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLPOINTER, AttrRead,
-    AttrWrite, BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion,
+    AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLPOINTER, AttrGet,
+    AttrSet, BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion,
     FreeStmtOption, FunctionId, IOType, Ident, IdentifierType, IntoSQLPOINTER, LockType,
-    NullAllowed, Operation, Reserved, Scope, StrLenOrInd, UnicodeType, Unique, RETCODE, SQLCHAR,
-    SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR, Attr, Version, OdbcDefined
+    NullAllowed, Operation, Reserved, Scope, StrLenOrInd, UnicodeType, Unique, Version, RETCODE,
+    SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT,
+    SQLWCHAR,
 };
 
 /// Allocates an environment, connection, statement, or descriptor handle.
@@ -67,7 +68,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLBindCol<'buf, V, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'buf, V, TT>>(
+pub fn SQLBindCol<'buf, V: Version, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'buf, V, TT>>(
     StatementHandle: &SQLHSTMT<'_, '_, 'buf, V>,
     ColumnNumber: SQLUSMALLINT,
     TargetType: TT,
@@ -107,7 +108,12 @@ pub fn SQLBindCol<'buf, V, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'buf, V
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLBindParameter<'buf, V, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'buf, V, TT>>(
+pub fn SQLBindParameter<
+    'buf,
+    V: Version,
+    TT: Ident<Type = SQLSMALLINT>,
+    B: DeferredBuf<'buf, V, TT>,
+>(
     StatementHandle: &SQLHSTMT<'_, '_, 'buf, V>,
     ParameterNumber: SQLUSMALLINT,
     InputOutputType: IOType,
@@ -156,7 +162,7 @@ pub fn SQLBindParameter<'buf, V, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLBrowseConnectA<V>(
+pub fn SQLBrowseConnectA<V: Version>(
     ConnectionHandle: &mut SQLHDBC<V>,
     InConnectionString: &[SQLCHAR],
     OutConnectionString: Option<&mut [MaybeUninit<SQLCHAR>]>,
@@ -192,7 +198,7 @@ pub fn SQLBrowseConnectA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLBrowseConnectW<V>(
+pub fn SQLBrowseConnectW<V: Version>(
     ConnectionHandle: &mut SQLHDBC<V>,
     InConnectionString: &[SQLWCHAR],
     OutConnectionString: Option<&mut [MaybeUninit<SQLWCHAR>]>,
@@ -228,7 +234,10 @@ pub fn SQLBrowseConnectW<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLBulkOperations<V>(StatementHandle: &SQLHSTMT<V>, Operation: BulkOperation) -> SQLRETURN {
+pub fn SQLBulkOperations<V: Version>(
+    StatementHandle: &SQLHSTMT<V>,
+    Operation: BulkOperation,
+) -> SQLRETURN {
     unsafe {
         extern_api::SQLBulkOperations(StatementHandle.as_SQLHANDLE(), Operation as SQLUSMALLINT)
     }
@@ -243,7 +252,7 @@ pub fn SQLBulkOperations<V>(StatementHandle: &SQLHSTMT<V>, Operation: BulkOperat
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLCancel<V>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
+pub fn SQLCancel<V: Version>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
     unsafe { extern_api::SQLCancel(StatementHandle.as_SQLHANDLE()) }
 }
 
@@ -270,7 +279,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLCloseCursor<V>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
+pub fn SQLCloseCursor<V: Version>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
     unsafe { extern_api::SQLCloseCursor(StatementHandle.as_SQLHANDLE()) }
 }
 
@@ -282,7 +291,7 @@ pub fn SQLCloseCursor<V>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLColAttributeA<V, A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
+pub fn SQLColAttributeA<V: Version, A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
     StatementHandle: &SQLHSTMT<V>,
     ColumnNumber: SQLUSMALLINT,
     FieldIdentifier: A,
@@ -291,7 +300,7 @@ pub fn SQLColAttributeA<V, A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
     NumericAttributePtr: &mut MaybeUninit<SQLLEN>,
 ) -> SQLRETURN
 where
-    T: AttrRead<A> + AnsiType + ?Sized,
+    T: AttrGet<A> + AnsiType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
     // TODO: With MaybeUnint it's not possible to check that value is zeroed
@@ -328,7 +337,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLColAttributeW<V, A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
+pub fn SQLColAttributeW<V: Version, A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
     StatementHandle: &SQLHSTMT<V>,
     ColumnNumber: SQLUSMALLINT,
     FieldIdentifier: A,
@@ -337,7 +346,7 @@ pub fn SQLColAttributeW<V, A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
     NumericAttributePtr: &mut MaybeUninit<SQLLEN>,
 ) -> SQLRETURN
 where
-    T: AttrRead<A> + UnicodeType + ?Sized,
+    T: AttrGet<A> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
     // TODO: With MaybeUnint it's not possible to check that value is zeroed
@@ -374,7 +383,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLColumnPrivilegesA<V>(
+pub fn SQLColumnPrivilegesA<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLCHAR],
     SchemaName: &[SQLCHAR],
@@ -409,7 +418,7 @@ pub fn SQLColumnPrivilegesA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLColumnPrivilegesW<V>(
+pub fn SQLColumnPrivilegesW<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLWCHAR],
     SchemaName: &[SQLWCHAR],
@@ -444,7 +453,7 @@ pub fn SQLColumnPrivilegesW<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLColumnsA<V>(
+pub fn SQLColumnsA<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLCHAR],
     SchemaName: &[SQLCHAR],
@@ -479,7 +488,7 @@ pub fn SQLColumnsA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLColumnsW<V>(
+pub fn SQLColumnsW<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLWCHAR],
     SchemaName: &[SQLWCHAR],
@@ -543,7 +552,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLConnectA<V>(
+pub fn SQLConnectA<V: Version>(
     ConnectionHandle: &mut SQLHDBC<V>,
     ServerName: &[SQLCHAR],
     UserName: &[SQLCHAR],
@@ -580,7 +589,7 @@ pub fn SQLConnectA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLConnectW<V>(
+pub fn SQLConnectW<V: Version>(
     ConnectionHandle: &mut SQLHDBC<V>,
     ServerName: &[SQLWCHAR],
     UserName: &[SQLWCHAR],
@@ -619,7 +628,7 @@ pub fn SQLConnectW<V>(
 #[allow(non_snake_case)]
 // TODO: Not sure if application and implementation descriptors can be interchangeably copied
 // TODO: Do they have to have the same version?
-pub fn SQLCopyDesc<V, DT1, DT2>(
+pub fn SQLCopyDesc<V: Version, DT1, DT2>(
     SourceDescHandle: &SQLHDESC<V, DT1>,
     TargetDescHandle: &SQLHDESC<V, DT2>,
 ) -> SQLRETURN
@@ -643,7 +652,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDataSourcesA<V>(
+pub fn SQLDataSourcesA<V: Version>(
     EnvironmentHandle: &SQLHENV<V>,
     Direction: SQLUSMALLINT,
     ServerName: &mut [MaybeUninit<SQLCHAR>],
@@ -676,7 +685,7 @@ pub fn SQLDataSourcesA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDataSourcesW<V>(
+pub fn SQLDataSourcesW<V: Version>(
     EnvironmentHandle: &SQLHENV<V>,
     Direction: SQLUSMALLINT,
     ServerName: &mut [MaybeUninit<SQLWCHAR>],
@@ -709,7 +718,7 @@ pub fn SQLDataSourcesW<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDescribeColA<V>(
+pub fn SQLDescribeColA<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     ColumnNumber: SQLUSMALLINT,
     ColumnName: &mut [MaybeUninit<SQLCHAR>],
@@ -744,7 +753,7 @@ pub fn SQLDescribeColA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDescribeColW<V>(
+pub fn SQLDescribeColW<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     ColumnNumber: SQLUSMALLINT,
     ColumnName: &mut [MaybeUninit<SQLWCHAR>],
@@ -779,7 +788,7 @@ pub fn SQLDescribeColW<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDescribeParam<V>(
+pub fn SQLDescribeParam<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     ParameterNumber: SQLUSMALLINT,
     DataTypePtr: &mut MaybeUninit<SQLSMALLINT>,
@@ -807,7 +816,7 @@ pub fn SQLDescribeParam<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDisconnect<V>(ConnectionHandle: &mut SQLHDBC<V>) -> SQLRETURN {
+pub fn SQLDisconnect<V: Version>(ConnectionHandle: &mut SQLHDBC<V>) -> SQLRETURN {
     let sql_return = unsafe { extern_api::SQLDisconnect(ConnectionHandle.as_SQLHANDLE()) };
 
     if SQL_SUCCEEDED(sql_return) {
@@ -825,7 +834,7 @@ pub fn SQLDisconnect<V>(ConnectionHandle: &mut SQLHDBC<V>) -> SQLRETURN {
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDriverConnectA<V>(
+pub fn SQLDriverConnectA<V: Version>(
     ConnectionHandle: &mut SQLHDBC<V>,
     WindowHandle: Option<SQLHWND>,
     InConnectionString: &[SQLCHAR],
@@ -866,7 +875,7 @@ pub fn SQLDriverConnectA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDriverConnectW<V>(
+pub fn SQLDriverConnectW<V: Version>(
     ConnectionHandle: &mut SQLHDBC<V>,
     WindowHandle: Option<SQLHWND>,
     InConnectionString: &[SQLWCHAR],
@@ -907,7 +916,7 @@ pub fn SQLDriverConnectW<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDriversA<V>(
+pub fn SQLDriversA<V: Version>(
     EnvironmentHandle: &SQLHENV<V>,
     Direction: SQLUSMALLINT,
     DriverDescription: &mut [MaybeUninit<SQLCHAR>],
@@ -940,7 +949,7 @@ pub fn SQLDriversA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDriversW<V>(
+pub fn SQLDriversW<V: Version>(
     EnvironmentHandle: &SQLHENV<V>,
     Direction: SQLUSMALLINT,
     DriverDescription: &mut [MaybeUninit<SQLWCHAR>],
@@ -998,7 +1007,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
 #[inline]
 #[allow(non_snake_case)]
-pub unsafe fn SQLExecDirectA<V>(
+pub unsafe fn SQLExecDirectA<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     StatementText: &[SQLCHAR],
 ) -> SQLRETURN {
@@ -1019,7 +1028,7 @@ pub unsafe fn SQLExecDirectA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
 #[inline]
 #[allow(non_snake_case)]
-pub unsafe fn SQLExecDirectW<V>(
+pub unsafe fn SQLExecDirectW<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     StatementText: &[SQLWCHAR],
 ) -> SQLRETURN {
@@ -1040,7 +1049,7 @@ pub unsafe fn SQLExecDirectW<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
 #[inline]
 #[allow(non_snake_case)]
-pub unsafe fn SQLExecute<V>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
+pub unsafe fn SQLExecute<V: Version>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
     extern_api::SQLExecute(StatementHandle.as_SQLHANDLE())
 }
 
@@ -1052,7 +1061,7 @@ pub unsafe fn SQLExecute<V>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub unsafe fn SQLFetch<V>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
+pub unsafe fn SQLFetch<V: Version>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
     extern_api::SQLFetch(StatementHandle.as_SQLHANDLE())
 }
 
@@ -1065,7 +1074,7 @@ pub unsafe fn SQLFetch<V>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub unsafe fn SQLFetchScroll<V>(
+pub unsafe fn SQLFetchScroll<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     FetchOrientation: SQLSMALLINT,
     FetchOffset: SQLLEN,
@@ -1090,7 +1099,7 @@ pub unsafe fn SQLFetchScroll<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLForeignKeysA<V>(
+pub fn SQLForeignKeysA<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     PKCatalogName: &[SQLCHAR],
     PKSchemaName: &[SQLCHAR],
@@ -1138,7 +1147,7 @@ pub fn SQLForeignKeysA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLForeignKeysW<V>(
+pub fn SQLForeignKeysW<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     PKCatalogName: &[SQLWCHAR],
     PKSchemaName: &[SQLWCHAR],
@@ -1193,7 +1202,7 @@ pub fn SQLFreeHandle<H: Handle>(HandleType: H::Ident, Handle: H) -> SQLRETURN {
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLFreeStmt<V>(StatementHandle: &SQLHSTMT<V>, Option: FreeStmtOption) -> SQLRETURN {
+pub fn SQLFreeStmt<V: Version>(StatementHandle: &SQLHSTMT<V>, Option: FreeStmtOption) -> SQLRETURN {
     unsafe { extern_api::SQLFreeStmt(StatementHandle.as_SQLHANDLE(), Option as SQLUSMALLINT) }
 }
 
@@ -1205,14 +1214,14 @@ pub fn SQLFreeStmt<V>(StatementHandle: &SQLHSTMT<V>, Option: FreeStmtOption) -> 
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetConnectAttrA<V, A: Ident<Type = SQLINTEGER>, T: ConnAttr<V, A>>(
+pub fn SQLGetConnectAttrA<V: Version, A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>>(
     ConnectionHandle: &SQLHDBC<V>,
     Attribute: A,
     ValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrRead<A> + AnsiType + ?Sized,
+    T: AttrGet<A> + AnsiType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -1242,14 +1251,14 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetConnectAttrW<V, A: Ident<Type = SQLINTEGER>, T: ConnAttr<V, A>>(
+pub fn SQLGetConnectAttrW<V: Version, A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>>(
     ConnectionHandle: &SQLHDBC<V>,
     Attribute: A,
     ValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrRead<A> + UnicodeType + ?Sized,
+    T: AttrGet<A> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -1279,7 +1288,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetCursorNameA<V>(
+pub fn SQLGetCursorNameA<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CursorName: &mut [MaybeUninit<SQLCHAR>],
     NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
@@ -1304,7 +1313,7 @@ pub fn SQLGetCursorNameA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetCursorNameW<V>(
+pub fn SQLGetCursorNameW<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CursorName: &mut [MaybeUninit<SQLWCHAR>],
     NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
@@ -1330,7 +1339,7 @@ pub fn SQLGetCursorNameW<V>(
 #[inline]
 #[allow(non_snake_case, unused_variables)]
 // TODO: This function must be unsafe if SQL_ARD_TYPE and SQL_APD_TYPE are allowed to be used
-pub fn SQLGetData<V, TT: Ident<Type = SQLSMALLINT>, B: CData<V, TT>>(
+pub fn SQLGetData<V: Version, TT: Ident<Type = SQLSMALLINT>, B: CData<V, TT>>(
     StatementHandle: &SQLHSTMT<V>,
     Col_or_Param_Num: SQLUSMALLINT,
     TargetType: TT,
@@ -1361,7 +1370,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetDescFieldA<V, DT, A: Ident<Type = SQLSMALLINT>, T: DescField<DT, A>>(
+pub fn SQLGetDescFieldA<V: Version, DT, A: Ident<Type = SQLSMALLINT>, T: DescField<DT, A>>(
     DescriptorHandle: &mut SQLHDESC<V, DT>,
     RecNumber: SQLSMALLINT,
     FieldIdentifier: A,
@@ -1369,7 +1378,7 @@ pub fn SQLGetDescFieldA<V, DT, A: Ident<Type = SQLSMALLINT>, T: DescField<DT, A>
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrRead<A> + AnsiType + ?Sized,
+    T: AttrGet<A> + AnsiType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -1400,7 +1409,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetDescFieldW<V, DT, A: Ident<Type = SQLSMALLINT>, T: DescField<DT, A>>(
+pub fn SQLGetDescFieldW<V: Version, DT, A: Ident<Type = SQLSMALLINT>, T: DescField<DT, A>>(
     DescriptorHandle: &mut SQLHDESC<V, DT>,
     RecNumber: SQLSMALLINT,
     FieldIdentifier: A,
@@ -1408,7 +1417,7 @@ pub fn SQLGetDescFieldW<V, DT, A: Ident<Type = SQLSMALLINT>, T: DescField<DT, A>
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrRead<A> + UnicodeType + ?Sized,
+    T: AttrGet<A> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -1439,7 +1448,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetDescRecA<V, DT>(
+pub fn SQLGetDescRecA<V: Version, DT>(
     DescriptorHandle: &SQLHDESC<V, DT>,
     RecNumber: SQLSMALLINT,
     Name: Option<&mut [MaybeUninit<SQLCHAR>]>,
@@ -1481,7 +1490,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetDescRecW<V, DT>(
+pub fn SQLGetDescRecW<V: Version, DT>(
     DescriptorHandle: &SQLHDESC<V, DT>,
     RecNumber: SQLSMALLINT,
     Name: Option<&mut [MaybeUninit<SQLWCHAR>]>,
@@ -1534,7 +1543,7 @@ pub fn SQLGetDiagFieldA<H: Handle, D: Ident<Type = SQLSMALLINT>, T: DiagField<H,
 ) -> SQLRETURN
 where
     H: AsSQLHANDLE,
-    T: AttrRead<D> + AnsiType + ?Sized,
+    T: AttrGet<D> + AnsiType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
     let DiagInfoPtr = DiagInfoPtr.map_or((ptr::null_mut(), 0), |DiagInfoPtr| {
@@ -1577,7 +1586,7 @@ pub fn SQLGetDiagFieldW<H: Handle, D: Ident<Type = SQLSMALLINT>, T: DiagField<H,
 ) -> SQLRETURN
 where
     H: AsSQLHANDLE,
-    T: AttrRead<D> + UnicodeType + ?Sized,
+    T: AttrGet<D> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
     let DiagInfoPtr = DiagInfoPtr.map_or((ptr::null_mut(), 0), |DiagInfoPtr| {
@@ -1683,14 +1692,14 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetEnvAttr<V: Version, A: Ident, T: Attr<SQLHENV<V>, A, DefinedBy = OdbcDefined>>(
+pub fn SQLGetEnvAttr<V: Version, A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>>(
     EnvironmentHandle: &SQLHENV<V>,
     Attribute: A,
     ValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrRead<A> + ?Sized,
+    T: AttrGet<A> + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -1716,7 +1725,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetFunctions<V>(
+pub fn SQLGetFunctions<V: Version>(
     ConnectionHandle: &SQLHDBC<V>,
     FunctionId: FunctionId,
     SupportedPtr: &mut MaybeUninit<SQLUSMALLINT>,
@@ -1738,14 +1747,14 @@ pub fn SQLGetFunctions<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetInfoA<V, I: Ident<Type = SQLUSMALLINT>, T: InfoType<I>>(
+pub fn SQLGetInfoA<V: Version, I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>>(
     ConnectionHandle: &SQLHDBC<V>,
     InfoType: I,
     InfoValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrRead<I> + AnsiType + ?Sized,
+    T: AttrGet<I> + AnsiType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
     let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
@@ -1771,14 +1780,14 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetInfoW<V, I: Ident<Type = SQLUSMALLINT>, T: InfoType<I>>(
+pub fn SQLGetInfoW<V: Version, I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>>(
     ConnectionHandle: &SQLHDBC<V>,
     InfoType: I,
     InfoValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrRead<I> + UnicodeType + ?Sized,
+    T: AttrGet<I> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
     let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
@@ -1804,14 +1813,20 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetStmtAttrA<'stmt, 'buf, V, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'stmt, 'buf, A, V>>(
+pub fn SQLGetStmtAttrA<
+    'stmt,
+    'buf,
+    V: Version,
+    A: Ident<Type = SQLINTEGER>,
+    T: StmtAttr<'stmt, 'buf, A, V>,
+>(
     StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
     Attribute: A,
     ValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrRead<A> + AnsiType,
+    T: AttrGet<A> + AnsiType,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     if let Some(ValuePtr) = ValuePtr {
@@ -1841,14 +1856,20 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetStmtAttrW<'stmt, 'buf, V, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'stmt, 'buf, A, V>>(
+pub fn SQLGetStmtAttrW<
+    'stmt,
+    'buf,
+    V: Version,
+    A: Ident<Type = SQLINTEGER>,
+    T: StmtAttr<'stmt, 'buf, A, V>,
+>(
     StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
     Attribute: A,
     ValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrRead<A> + UnicodeType + ?Sized,
+    T: AttrGet<A> + UnicodeType + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     if let Some(ValuePtr) = ValuePtr {
@@ -1878,7 +1899,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetTypeInfoA<V>(StatementHandle: &SQLHSTMT<V>, DataType: SqlType) -> SQLRETURN {
+pub fn SQLGetTypeInfoA<V: Version>(StatementHandle: &SQLHSTMT<V>, DataType: SqlType) -> SQLRETURN {
     unsafe { extern_api::SQLGetTypeInfoA(StatementHandle.as_SQLHANDLE(), DataType.identifier()) }
 }
 
@@ -1890,7 +1911,7 @@ pub fn SQLGetTypeInfoA<V>(StatementHandle: &SQLHSTMT<V>, DataType: SqlType) -> S
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetTypeInfoW<V>(StatementHandle: &SQLHSTMT<V>, DataType: SqlType) -> SQLRETURN {
+pub fn SQLGetTypeInfoW<V: Version>(StatementHandle: &SQLHSTMT<V>, DataType: SqlType) -> SQLRETURN {
     unsafe { extern_api::SQLGetTypeInfoW(StatementHandle.as_SQLHANDLE(), DataType.identifier()) }
 }
 
@@ -1902,7 +1923,7 @@ pub fn SQLGetTypeInfoW<V>(StatementHandle: &SQLHSTMT<V>, DataType: SqlType) -> S
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, OR SQL_PARAM_DATA_AVAILABLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLMoreResults<V>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
+pub fn SQLMoreResults<V: Version>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
     unsafe { extern_api::SQLMoreResults(StatementHandle.as_SQLHANDLE()) }
 }
 
@@ -1914,7 +1935,7 @@ pub fn SQLMoreResults<V>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLNativeSqlA<V>(
+pub fn SQLNativeSqlA<V: Version>(
     ConnectionHandle: &SQLHDBC<V>,
     InStatementText: &[SQLCHAR],
     OutStatementText: &mut [MaybeUninit<SQLCHAR>],
@@ -1943,7 +1964,7 @@ pub fn SQLNativeSqlA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLNativeSqlW<V>(
+pub fn SQLNativeSqlW<V: Version>(
     ConnectionHandle: &SQLHDBC<V>,
     InStatementText: &[SQLWCHAR],
     OutStatementText: &mut [MaybeUninit<SQLWCHAR>],
@@ -1972,7 +1993,7 @@ pub fn SQLNativeSqlW<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLNumParams<V>(
+pub fn SQLNumParams<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     ParameterCountPtr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> SQLRETURN {
@@ -1992,7 +2013,7 @@ pub fn SQLNumParams<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLNumResultCols<V>(
+pub fn SQLNumResultCols<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     ColumnCountPtr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> SQLRETURN {
@@ -2009,7 +2030,7 @@ pub fn SQLNumResultCols<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLParamData<V>(
+pub fn SQLParamData<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     ValuePtrPtr: &mut MaybeUninit<SQLPOINTER>,
 ) -> SQLRETURN {
@@ -2024,7 +2045,10 @@ pub fn SQLParamData<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLPrepareA<V>(StatementHandle: &SQLHSTMT<V>, StatementText: &[SQLCHAR]) -> SQLRETURN {
+pub fn SQLPrepareA<V: Version>(
+    StatementHandle: &SQLHSTMT<V>,
+    StatementText: &[SQLCHAR],
+) -> SQLRETURN {
     let StatementText = StatementText.as_raw_slice();
 
     unsafe {
@@ -2044,7 +2068,10 @@ pub fn SQLPrepareA<V>(StatementHandle: &SQLHSTMT<V>, StatementText: &[SQLCHAR]) 
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLPrepareW<V>(StatementHandle: &SQLHSTMT<V>, StatementText: &[SQLWCHAR]) -> SQLRETURN {
+pub fn SQLPrepareW<V: Version>(
+    StatementHandle: &SQLHSTMT<V>,
+    StatementText: &[SQLWCHAR],
+) -> SQLRETURN {
     let StatementText = StatementText.as_raw_slice();
 
     unsafe {
@@ -2064,7 +2091,7 @@ pub fn SQLPrepareW<V>(StatementHandle: &SQLHSTMT<V>, StatementText: &[SQLWCHAR])
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLPrimaryKeysA<V>(
+pub fn SQLPrimaryKeysA<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLCHAR],
     SchemaName: &[SQLCHAR],
@@ -2095,7 +2122,7 @@ pub fn SQLPrimaryKeysA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLPrimaryKeysW<V>(
+pub fn SQLPrimaryKeysW<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLWCHAR],
     SchemaName: &[SQLWCHAR],
@@ -2126,7 +2153,7 @@ pub fn SQLPrimaryKeysW<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLProcedureColumnsA<V>(
+pub fn SQLProcedureColumnsA<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLCHAR],
     SchemaName: &[SQLCHAR],
@@ -2161,7 +2188,7 @@ pub fn SQLProcedureColumnsA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLProcedureColumnsW<V>(
+pub fn SQLProcedureColumnsW<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLWCHAR],
     SchemaName: &[SQLWCHAR],
@@ -2196,7 +2223,7 @@ pub fn SQLProcedureColumnsW<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLProceduresA<V>(
+pub fn SQLProceduresA<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLCHAR],
     SchemaName: &[SQLCHAR],
@@ -2227,7 +2254,7 @@ pub fn SQLProceduresA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLProceduresW<V>(
+pub fn SQLProceduresW<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLWCHAR],
     SchemaName: &[SQLWCHAR],
@@ -2258,7 +2285,7 @@ pub fn SQLProceduresW<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub unsafe fn SQLPutData<V, TT: Ident, B: CData<V, TT>>(
+pub unsafe fn SQLPutData<V: Version, TT: Ident, B: CData<V, TT>>(
     StatementHandle: &SQLHSTMT<V>,
     DataPtr: Option<&B>,
 ) -> SQLRETURN
@@ -2281,7 +2308,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLRowCount<V>(
+pub fn SQLRowCount<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     RowCountPtr: &mut MaybeUninit<SQLLEN>,
 ) -> SQLRETURN {
@@ -2296,13 +2323,13 @@ pub fn SQLRowCount<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetConnectAttrA<V, A: Ident<Type = SQLINTEGER>, T: ConnAttr<V, A>>(
+pub fn SQLSetConnectAttrA<V: Version, A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>>(
     ConnectionHandle: &SQLHDBC<V>,
     Attribute: A,
     ValuePtr: T,
 ) -> SQLRETURN
 where
-    T: AttrWrite<A> + AnsiType,
+    T: AttrSet<A> + AnsiType,
 {
     ValuePtr.check_attr(ConnectionHandle);
 
@@ -2324,13 +2351,13 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetConnectAttrW<V, A: Ident<Type = SQLINTEGER>, T: ConnAttr<V, A>>(
+pub fn SQLSetConnectAttrW<V: Version, A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>>(
     ConnectionHandle: &SQLHDBC<V>,
     Attribute: A,
     ValuePtr: T,
 ) -> SQLRETURN
 where
-    T: AttrWrite<A> + UnicodeType,
+    T: AttrSet<A> + UnicodeType,
 {
     ValuePtr.check_attr(ConnectionHandle);
 
@@ -2352,7 +2379,10 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLSetCursorNameA<V>(StatementHandle: &SQLHSTMT<V>, CursorName: &[SQLCHAR]) -> SQLRETURN {
+pub fn SQLSetCursorNameA<V: Version>(
+    StatementHandle: &SQLHSTMT<V>,
+    CursorName: &[SQLCHAR],
+) -> SQLRETURN {
     let CursorName = CursorName.as_raw_slice();
 
     unsafe {
@@ -2368,7 +2398,10 @@ pub fn SQLSetCursorNameA<V>(StatementHandle: &SQLHSTMT<V>, CursorName: &[SQLCHAR
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLSetCursorNameW<V>(StatementHandle: &SQLHSTMT<V>, CursorName: &[SQLWCHAR]) -> SQLRETURN {
+pub fn SQLSetCursorNameW<V: Version>(
+    StatementHandle: &SQLHSTMT<V>,
+    CursorName: &[SQLWCHAR],
+) -> SQLRETURN {
     let CursorName = CursorName.as_raw_slice();
 
     unsafe {
@@ -2384,7 +2417,7 @@ pub fn SQLSetCursorNameW<V>(StatementHandle: &SQLHSTMT<V>, CursorName: &[SQLWCHA
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetDescFieldA<V, DT, A: Ident<Type = SQLSMALLINT>, T: WriteDescField<DT, A>>(
+pub fn SQLSetDescFieldA<V: Version, DT, A: Ident<Type = SQLSMALLINT>, T: WriteDescField<DT, A>>(
     DescriptorHandle: &SQLHDESC<V, DT>,
     RecNumber: SQLSMALLINT,
     FieldIdentifier: A,
@@ -2422,7 +2455,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetDescFieldW<V, DT, A: Ident<Type = SQLSMALLINT>, T: WriteDescField<DT, A>>(
+pub fn SQLSetDescFieldW<V: Version, DT, A: Ident<Type = SQLSMALLINT>, T: WriteDescField<DT, A>>(
     DescriptorHandle: &SQLHDESC<V, DT>,
     RecNumber: SQLSMALLINT,
     FieldIdentifier: A,
@@ -2461,7 +2494,7 @@ where
 #[inline]
 #[allow(non_snake_case)]
 // TODO: Must not accept IRD
-pub fn SQLSetDescRec<'buf, V, DT, PTR>(
+pub fn SQLSetDescRec<'buf, V: Version, DT, PTR>(
     DescriptorHandle: &SQLHDESC<V, DT>,
     RecNumber: SQLSMALLINT,
     Type: SqlType,
@@ -2503,7 +2536,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetEnvAttr<V: Version, A: Ident, T: Attr<SQLHENV<V>, A, DefinedBy = OdbcDefined>>(
+pub fn SQLSetEnvAttr<V: Version, A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>>(
     // Reference to SQLHENV is mutable to make it impossible to have a connection
     // handle allocated on the environment handle when calling this function
     EnvironmentHandle: &mut SQLHENV<V>,
@@ -2511,7 +2544,7 @@ pub fn SQLSetEnvAttr<V: Version, A: Ident, T: Attr<SQLHENV<V>, A, DefinedBy = Od
     ValuePtr: T,
 ) -> SQLRETURN
 where
-    T: AttrWrite<A>,
+    T: AttrSet<A>,
 {
     unsafe {
         extern_api::SQLSetEnvAttr(
@@ -2531,7 +2564,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub unsafe fn SQLSetPos<V>(
+pub unsafe fn SQLSetPos<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     RowNumber: SQLSETPOSIROW,
     Operation: Operation,
@@ -2553,13 +2586,19 @@ pub unsafe fn SQLSetPos<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetStmtAttrA<'conn, 'stmt, 'buf, V: Version, A: Ident, T: Attr<SQLHSTMT<'conn, 'stmt, 'buf, V>, A>>(
+pub fn SQLSetStmtAttrA<
+    'stmt,
+    'buf,
+    V: Version,
+    A: Ident<Type = SQLINTEGER>,
+    T: StmtAttr<'stmt, 'buf, A, V>,
+>(
     StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, V>,
     Attribute: A,
     ValuePtr: T,
 ) -> SQLRETURN
 where
-    T: AttrWrite<A> + AnsiType,
+    T: AttrSet<A> + AnsiType,
 {
     let sql_return = unsafe {
         extern_api::SQLSetStmtAttrA(
@@ -2585,13 +2624,19 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetStmtAttrW<'stmt, 'buf, V, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'stmt, 'buf, A, V>>(
+pub fn SQLSetStmtAttrW<
+    'stmt,
+    'buf,
+    V: Version,
+    A: Ident<Type = SQLINTEGER>,
+    T: StmtAttr<'stmt, 'buf, A, V>,
+>(
     StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, V>,
     Attribute: A,
     ValuePtr: T,
 ) -> SQLRETURN
 where
-    T: AttrWrite<A> + UnicodeType,
+    T: AttrSet<A> + UnicodeType,
 {
     let sql_return = unsafe {
         extern_api::SQLSetStmtAttrW(
@@ -2620,7 +2665,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLSpecialColumnsA<V>(
+pub fn SQLSpecialColumnsA<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     IdentifierType: IdentifierType,
     CatalogName: &[SQLCHAR],
@@ -2660,7 +2705,7 @@ pub fn SQLSpecialColumnsA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLSpecialColumnsW<V>(
+pub fn SQLSpecialColumnsW<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     IdentifierType: IdentifierType,
     CatalogName: &[SQLWCHAR],
@@ -2697,7 +2742,7 @@ pub fn SQLSpecialColumnsW<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLStatisticsA<V>(
+pub fn SQLStatisticsA<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLCHAR],
     SchemaName: &[SQLCHAR],
@@ -2732,7 +2777,7 @@ pub fn SQLStatisticsA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLStatisticsW<V>(
+pub fn SQLStatisticsW<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLWCHAR],
     SchemaName: &[SQLWCHAR],
@@ -2767,7 +2812,7 @@ pub fn SQLStatisticsW<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLTablePrivilegesA<V>(
+pub fn SQLTablePrivilegesA<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLCHAR],
     SchemaName: &[SQLCHAR],
@@ -2798,7 +2843,7 @@ pub fn SQLTablePrivilegesA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLTablePrivilegesW<V>(
+pub fn SQLTablePrivilegesW<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLWCHAR],
     SchemaName: &[SQLWCHAR],
@@ -2829,7 +2874,7 @@ pub fn SQLTablePrivilegesW<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLTablesA<V>(
+pub fn SQLTablesA<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLCHAR],
     SchemaName: &[SQLCHAR],
@@ -2864,7 +2909,7 @@ pub fn SQLTablesA<V>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLTablesW<V>(
+pub fn SQLTablesW<V: Version>(
     StatementHandle: &SQLHSTMT<V>,
     CatalogName: &[SQLWCHAR],
     SchemaName: &[SQLWCHAR],

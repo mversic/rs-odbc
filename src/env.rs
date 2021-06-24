@@ -1,28 +1,42 @@
 use crate::{
-    Attr, AttrLen, AttrRead, AttrWrite, Ident, OdbcDefined, True, Version, SQLCHAR, SQLINTEGER, V3,
-    V3_8, V4,
+    Attr, AttrLen, AttrGet, AttrSet, Ident, OdbcDefined, True, SQLCHAR, SQLINTEGER,
+    SQLWCHAR, V3, V3_8, V4,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
 
-pub trait EnvAttr<A: Ident, V: Version>:
+pub trait EnvAttr<A: Ident, V>:
     Attr<A, DefinedBy = OdbcDefined> + AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>
 {
 }
 
-impl<A: Ident> EnvAttr<A, V3> for &[SQLCHAR] where [SQLCHAR]: EnvAttr<A, V3> {}
+// Implement EnvAttr for all versions of environment attributes
+impl<A: Ident, T: Ident> EnvAttr<A, V3_8> for T where T: EnvAttr<A, V3> {}
+impl<A: Ident, T: Ident> EnvAttr<A, V4> for T where T: EnvAttr<A, V3_8> {}
+impl<A: Ident> EnvAttr<A, V3_8> for [SQLCHAR] where [SQLCHAR]: EnvAttr<A, V3> {}
+impl<A: Ident> EnvAttr<A, V4> for [SQLCHAR] where [SQLCHAR]: EnvAttr<A, V3_8> {}
 
-impl<A: Ident, T: Ident> EnvAttr<A, V3> for MaybeUninit<T> where T: EnvAttr<A, V3> {}
+// Implement EnvAttr for unicode character environment attributes
+impl<V, A: Ident> EnvAttr<A, V> for [SQLWCHAR] where [SQLCHAR]: EnvAttr<A, V, NonBinary = True> {}
 
-impl<A: Ident> EnvAttr<A, V3> for [MaybeUninit<SQLCHAR>]
+// Implement EnvAttr for uninitialized environment attributes
+impl<V, A: Ident, T: Ident> EnvAttr<A, V> for MaybeUninit<T> where T: EnvAttr<A, V> {}
+impl<V, A: Ident> EnvAttr<A, V> for [MaybeUninit<SQLCHAR>]
 where
+    [SQLCHAR]: EnvAttr<A, V>,
     Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
-    [SQLCHAR]: EnvAttr<A, V3>,
+{
+}
+impl<V, A: Ident> EnvAttr<A, V> for [MaybeUninit<SQLWCHAR>]
+where
+    [SQLWCHAR]: EnvAttr<A, V>,
+    Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
 {
 }
 
-impl<A: Ident, T: EnvAttr<A, V3>> EnvAttr<A, V3_8> for T where T: ?Sized {}
-impl<A: Ident, T: EnvAttr<A, V3_8>> EnvAttr<A, V4> for T where T: ?Sized {}
+// Implement EnvAttr for references to character environment attributes (used by AttrSet)
+impl<V, A: Ident> EnvAttr<A, V> for &[SQLCHAR] where [SQLCHAR]: EnvAttr<A, V> {}
+impl<V, A: Ident> EnvAttr<A, V> for &[SQLWCHAR] where [SQLWCHAR]: EnvAttr<A, V> {}
 
 //=====================================================================================//
 //-------------------------------------Attributes--------------------------------------//
@@ -30,14 +44,14 @@ impl<A: Ident, T: EnvAttr<A, V3_8>> EnvAttr<A, V4> for T where T: ?Sized {}
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 200)]
 #[allow(non_camel_case_types)]
+// This is read-only attribute becaues it's handled by type system
 pub struct SQL_ATTR_ODBC_VERSION;
 unsafe impl Attr<SQL_ATTR_ODBC_VERSION> for OdbcVersion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
 impl EnvAttr<SQL_ATTR_ODBC_VERSION, V3> for OdbcVersion {}
-unsafe impl AttrRead<SQL_ATTR_ODBC_VERSION> for OdbcVersion {}
-unsafe impl AttrWrite<SQL_ATTR_ODBC_VERSION> for OdbcVersion {}
+unsafe impl AttrGet<SQL_ATTR_ODBC_VERSION> for OdbcVersion {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 202)]
@@ -48,8 +62,8 @@ unsafe impl Attr<SQL_ATTR_CP_MATCH> for CpMatch {
     type NonBinary = True;
 }
 impl EnvAttr<SQL_ATTR_CP_MATCH, V3> for CpMatch {}
-unsafe impl AttrRead<SQL_ATTR_CP_MATCH> for CpMatch {}
-unsafe impl AttrWrite<SQL_ATTR_CP_MATCH> for CpMatch {}
+unsafe impl AttrGet<SQL_ATTR_CP_MATCH> for CpMatch {}
+unsafe impl AttrSet<SQL_ATTR_CP_MATCH> for CpMatch {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 201)]
@@ -60,8 +74,8 @@ unsafe impl Attr<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {
     type NonBinary = True;
 }
 impl EnvAttr<SQL_ATTR_CONNECTION_POOLING, V3_8> for ConnectionPooling {}
-unsafe impl AttrRead<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {}
-unsafe impl AttrWrite<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {}
+unsafe impl AttrGet<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {}
+unsafe impl AttrSet<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {}
 
 //=====================================================================================//
 
