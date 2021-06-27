@@ -1,41 +1,42 @@
+use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::{
-    Attr, AttrLen, AttrGet, Ident, OdbcDefined, True, Version, SQLCHAR, SQLSMALLINT, SQLUINTEGER,
-    SQLUSMALLINT, SQLWCHAR, V3, V3_8, V4,
+    Attr, AttrGet, AttrLen, Ident, OdbcDefined, True, SQLCHAR, SQLSMALLINT, SQLUINTEGER,
+    SQLUSMALLINT, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_bitmask, odbc_type, Ident};
 use std::mem::MaybeUninit;
 
-pub trait InfoType<I: Ident, V: Version>:
+pub trait InfoType<I: Ident, V: OdbcVersion>:
     Attr<I> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>
 {
 }
 
 // Implement InfoType for all versions of info type attributes
-impl<I: Ident, T: Ident> InfoType<I, V3_8> for T where T: InfoType<I, V3> {}
-impl<I: Ident, T: Ident> InfoType<I, V4> for T where T: InfoType<I, V3_8> {}
-impl<I: Ident> InfoType<I, V3_8> for [SQLCHAR] where [SQLCHAR]: InfoType<I, V3> {}
-impl<I: Ident> InfoType<I, V4> for [SQLCHAR] where [SQLCHAR]: InfoType<I, V3_8> {}
+impl<I: Ident, T: Ident> InfoType<I, SQL_OV_ODBC3_80> for T where T: InfoType<I, SQL_OV_ODBC3> {}
+impl<I: Ident, T: Ident> InfoType<I, SQL_OV_ODBC4> for T where T: InfoType<I, SQL_OV_ODBC3_80> {}
+impl<I: Ident> InfoType<I, SQL_OV_ODBC3_80> for [SQLCHAR] where [SQLCHAR]: InfoType<I, SQL_OV_ODBC3> {}
+impl<I: Ident> InfoType<I, SQL_OV_ODBC4> for [SQLCHAR] where [SQLCHAR]: InfoType<I, SQL_OV_ODBC3_80> {}
 
 // Implement InfoType for unicode character info type attributes
-impl<V: Version, I: Ident> InfoType<I, V> for [SQLWCHAR] where
+impl<V: OdbcVersion, I: Ident> InfoType<I, V> for [SQLWCHAR] where
     [SQLCHAR]: InfoType<I, V, NonBinary = True>
 {
 }
 
 // Implement InfoType for uninitialized info type attributes
-impl<V: Version, I: Ident, T: Ident> InfoType<I, V> for MaybeUninit<T>
+impl<V: OdbcVersion, I: Ident, T: Ident> InfoType<I, V> for MaybeUninit<T>
 where
     T: InfoType<I, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<V: Version, I: Ident> InfoType<I, V> for [MaybeUninit<SQLCHAR>]
+impl<V: OdbcVersion, I: Ident> InfoType<I, V> for [MaybeUninit<SQLCHAR>]
 where
     [SQLCHAR]: InfoType<I, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<V: Version, I: Ident> InfoType<I, V> for [MaybeUninit<SQLWCHAR>]
+impl<V: OdbcVersion, I: Ident> InfoType<I, V> for [MaybeUninit<SQLWCHAR>]
 where
     [SQLWCHAR]: InfoType<I, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
@@ -77,7 +78,7 @@ pub use SQL_MAX_ROW_SIZE as SQL_MAXIMUM_ROW_SIZE;
 #[identifier(SQLUSMALLINT, 171)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DM_VER;
-impl InfoType<SQL_DM_VER, V3> for [SQLCHAR] {}
+impl InfoType<SQL_DM_VER, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_DM_VER> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -88,7 +89,7 @@ unsafe impl AttrGet<SQL_DM_VER> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 10000)]
 #[allow(non_camel_case_types)]
 pub struct SQL_XOPEN_CLI_YEAR;
-impl InfoType<SQL_XOPEN_CLI_YEAR, V3> for [SQLCHAR] {}
+impl InfoType<SQL_XOPEN_CLI_YEAR, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_XOPEN_CLI_YEAR> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -99,7 +100,7 @@ unsafe impl AttrGet<SQL_XOPEN_CLI_YEAR> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 134)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CREATE_VIEW;
-impl InfoType<SQL_CREATE_VIEW, V3> for CreateView {}
+impl InfoType<SQL_CREATE_VIEW, SQL_OV_ODBC3> for CreateView {}
 unsafe impl Attr<SQL_CREATE_VIEW> for CreateView {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -110,7 +111,7 @@ unsafe impl AttrGet<SQL_CREATE_VIEW> for CreateView {}
 #[identifier(SQLUSMALLINT, 155)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_DATETIME_FUNCTIONS;
-impl InfoType<SQL_SQL92_DATETIME_FUNCTIONS, V3> for Sql92DatetimeFunctions {}
+impl InfoType<SQL_SQL92_DATETIME_FUNCTIONS, SQL_OV_ODBC3> for Sql92DatetimeFunctions {}
 unsafe impl Attr<SQL_SQL92_DATETIME_FUNCTIONS> for Sql92DatetimeFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -121,7 +122,7 @@ unsafe impl AttrGet<SQL_SQL92_DATETIME_FUNCTIONS> for Sql92DatetimeFunctions {}
 #[identifier(SQLUSMALLINT, 156)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_FOREIGN_KEY_DELETE_RULE;
-impl InfoType<SQL_SQL92_FOREIGN_KEY_DELETE_RULE, V3> for Sql92ForeignKeyDeleteRule {}
+impl InfoType<SQL_SQL92_FOREIGN_KEY_DELETE_RULE, SQL_OV_ODBC3> for Sql92ForeignKeyDeleteRule {}
 unsafe impl Attr<SQL_SQL92_FOREIGN_KEY_DELETE_RULE> for Sql92ForeignKeyDeleteRule {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -132,7 +133,7 @@ unsafe impl AttrGet<SQL_SQL92_FOREIGN_KEY_DELETE_RULE> for Sql92ForeignKeyDelete
 #[identifier(SQLUSMALLINT, 157)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_FOREIGN_KEY_UPDATE_RULE;
-impl InfoType<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE, V3> for Sql92ForeignKeyUpdateRule {}
+impl InfoType<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE, SQL_OV_ODBC3> for Sql92ForeignKeyUpdateRule {}
 unsafe impl Attr<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE> for Sql92ForeignKeyUpdateRule {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -143,7 +144,7 @@ unsafe impl AttrGet<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE> for Sql92ForeignKeyUpdate
 #[identifier(SQLUSMALLINT, 158)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_GRANT;
-impl InfoType<SQL_SQL92_GRANT, V3> for Sql92Grant {}
+impl InfoType<SQL_SQL92_GRANT, SQL_OV_ODBC3> for Sql92Grant {}
 unsafe impl Attr<SQL_SQL92_GRANT> for Sql92Grant {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -154,7 +155,7 @@ unsafe impl AttrGet<SQL_SQL92_GRANT> for Sql92Grant {}
 #[identifier(SQLUSMALLINT, 119)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DATETIME_LITERALS;
-impl InfoType<SQL_DATETIME_LITERALS, V3> for DatetimeLiterals {}
+impl InfoType<SQL_DATETIME_LITERALS, SQL_OV_ODBC3> for DatetimeLiterals {}
 unsafe impl Attr<SQL_DATETIME_LITERALS> for DatetimeLiterals {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -165,7 +166,7 @@ unsafe impl AttrGet<SQL_DATETIME_LITERALS> for DatetimeLiterals {}
 #[identifier(SQLUSMALLINT, 159)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_NUMERIC_VALUE_FUNCTIONS;
-impl InfoType<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS, V3> for Sql92NumericValueFunctions {}
+impl InfoType<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS, SQL_OV_ODBC3> for Sql92NumericValueFunctions {}
 unsafe impl Attr<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS> for Sql92NumericValueFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -176,7 +177,7 @@ unsafe impl AttrGet<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS> for Sql92NumericValueFunc
 #[identifier(SQLUSMALLINT, 160)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_PREDICATES;
-impl InfoType<SQL_SQL92_PREDICATES, V3> for Sql92Predicates {}
+impl InfoType<SQL_SQL92_PREDICATES, SQL_OV_ODBC3> for Sql92Predicates {}
 unsafe impl Attr<SQL_SQL92_PREDICATES> for Sql92Predicates {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -187,7 +188,7 @@ unsafe impl AttrGet<SQL_SQL92_PREDICATES> for Sql92Predicates {}
 #[identifier(SQLUSMALLINT, 161)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_RELATIONAL_JOIN_OPERATORS;
-impl InfoType<SQL_SQL92_RELATIONAL_JOIN_OPERATORS, V3> for Sql92RelationalJoinOperators {}
+impl InfoType<SQL_SQL92_RELATIONAL_JOIN_OPERATORS, SQL_OV_ODBC3> for Sql92RelationalJoinOperators {}
 unsafe impl Attr<SQL_SQL92_RELATIONAL_JOIN_OPERATORS> for Sql92RelationalJoinOperators {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -198,7 +199,7 @@ unsafe impl AttrGet<SQL_SQL92_RELATIONAL_JOIN_OPERATORS> for Sql92RelationalJoin
 #[identifier(SQLUSMALLINT, 162)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_REVOKE;
-impl InfoType<SQL_SQL92_REVOKE, V3> for Sql92Revoke {}
+impl InfoType<SQL_SQL92_REVOKE, SQL_OV_ODBC3> for Sql92Revoke {}
 unsafe impl Attr<SQL_SQL92_REVOKE> for Sql92Revoke {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -209,7 +210,7 @@ unsafe impl AttrGet<SQL_SQL92_REVOKE> for Sql92Revoke {}
 #[identifier(SQLUSMALLINT, 163)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_ROW_VALUE_CONSTRUCTOR;
-impl InfoType<SQL_SQL92_ROW_VALUE_CONSTRUCTOR, V3> for Sql92RowValueConstructor {}
+impl InfoType<SQL_SQL92_ROW_VALUE_CONSTRUCTOR, SQL_OV_ODBC3> for Sql92RowValueConstructor {}
 unsafe impl Attr<SQL_SQL92_ROW_VALUE_CONSTRUCTOR> for Sql92RowValueConstructor {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -220,7 +221,7 @@ unsafe impl AttrGet<SQL_SQL92_ROW_VALUE_CONSTRUCTOR> for Sql92RowValueConstructo
 #[identifier(SQLUSMALLINT, 164)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_STRING_FUNCTIONS;
-impl InfoType<SQL_SQL92_STRING_FUNCTIONS, V3> for Sql92StringFunctions {}
+impl InfoType<SQL_SQL92_STRING_FUNCTIONS, SQL_OV_ODBC3> for Sql92StringFunctions {}
 unsafe impl Attr<SQL_SQL92_STRING_FUNCTIONS> for Sql92StringFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -231,7 +232,7 @@ unsafe impl AttrGet<SQL_SQL92_STRING_FUNCTIONS> for Sql92StringFunctions {}
 #[identifier(SQLUSMALLINT, 165)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_VALUE_EXPRESSIONS;
-impl InfoType<SQL_SQL92_VALUE_EXPRESSIONS, V3> for Sql92ValueExpressions {}
+impl InfoType<SQL_SQL92_VALUE_EXPRESSIONS, SQL_OV_ODBC3> for Sql92ValueExpressions {}
 unsafe impl Attr<SQL_SQL92_VALUE_EXPRESSIONS> for Sql92ValueExpressions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -242,7 +243,7 @@ unsafe impl AttrGet<SQL_SQL92_VALUE_EXPRESSIONS> for Sql92ValueExpressions {}
 #[identifier(SQLUSMALLINT, 166)]
 #[allow(non_camel_case_types)]
 pub struct SQL_STANDARD_CLI_CONFORMANCE;
-impl InfoType<SQL_STANDARD_CLI_CONFORMANCE, V3> for StandardCliConformance {}
+impl InfoType<SQL_STANDARD_CLI_CONFORMANCE, SQL_OV_ODBC3> for StandardCliConformance {}
 unsafe impl Attr<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -254,7 +255,7 @@ unsafe impl AttrGet<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 //#[identifier(SQLUSMALLINT, 0)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_INFO_FIRST;
-//impl InfoType<SQL_INFO_FIRST, V3> for {}
+//impl InfoType<SQL_INFO_FIRST, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_INFO_FIRST> for {
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
@@ -265,7 +266,7 @@ unsafe impl AttrGet<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 //#[identifier(SQLUSMALLINT, 12)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ODBC_SAG_CLI_CONFORMANCE;
-//impl InfoType<SQL_ODBC_SAG_CLI_CONFORMANCE, V3> for {}
+//impl InfoType<SQL_ODBC_SAG_CLI_CONFORMANCE, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_ODBC_SAG_CLI_CONFORMANCE> for {
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
@@ -276,7 +277,7 @@ unsafe impl AttrGet<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 //#[identifier(SQLUSMALLINT, SQL_UNION)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_UNION_STATEMENT;
-//impl InfoType<SQL_UNION_STATEMENT, V3> for {}
+//impl InfoType<SQL_UNION_STATEMENT, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_UNION_STATEMENT> for {
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
@@ -287,7 +288,7 @@ unsafe impl AttrGet<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 //#[identifier(SQLUSMALLINT, 174)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_SCHEMA_INFERENCE;
-//impl InfoType<SQL_SCHEMA_INFERENCE, V4> for {}
+//impl InfoType<SQL_SCHEMA_INFERENCE, SQL_OV_ODBC4> for {}
 //unsafe impl Attr<SQL_SCHEMA_INFERENCE> for {
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
@@ -298,7 +299,7 @@ unsafe impl AttrGet<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 #[identifier(SQLUSMALLINT, 175)]
 #[allow(non_camel_case_types)]
 pub struct SQL_BINARY_FUNCTIONS;
-impl InfoType<SQL_BINARY_FUNCTIONS, V4> for BinaryFunctions {}
+impl InfoType<SQL_BINARY_FUNCTIONS, SQL_OV_ODBC4> for BinaryFunctions {}
 unsafe impl Attr<SQL_BINARY_FUNCTIONS> for BinaryFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -309,7 +310,7 @@ unsafe impl AttrGet<SQL_BINARY_FUNCTIONS> for BinaryFunctions {}
 #[identifier(SQLUSMALLINT, 176)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ISO_STRING_FUNCTIONS;
-impl InfoType<SQL_ISO_STRING_FUNCTIONS, V4> for Sql92StringFunctions {}
+impl InfoType<SQL_ISO_STRING_FUNCTIONS, SQL_OV_ODBC4> for Sql92StringFunctions {}
 unsafe impl Attr<SQL_ISO_STRING_FUNCTIONS> for Sql92StringFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -320,7 +321,7 @@ unsafe impl AttrGet<SQL_ISO_STRING_FUNCTIONS> for Sql92StringFunctions {}
 #[identifier(SQLUSMALLINT, 177)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ISO_BINARY_FUNCTIONS;
-impl InfoType<SQL_ISO_BINARY_FUNCTIONS, V4> for IsoBinaryFunctions {}
+impl InfoType<SQL_ISO_BINARY_FUNCTIONS, SQL_OV_ODBC4> for IsoBinaryFunctions {}
 unsafe impl Attr<SQL_ISO_BINARY_FUNCTIONS> for IsoBinaryFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -331,7 +332,7 @@ unsafe impl AttrGet<SQL_ISO_BINARY_FUNCTIONS> for IsoBinaryFunctions {}
 #[identifier(SQLUSMALLINT, 178)]
 #[allow(non_camel_case_types)]
 pub struct SQL_LIMIT_ESCAPE_CLAUSE;
-impl InfoType<SQL_LIMIT_ESCAPE_CLAUSE, V4> for LimitEscapeClause {}
+impl InfoType<SQL_LIMIT_ESCAPE_CLAUSE, SQL_OV_ODBC4> for LimitEscapeClause {}
 unsafe impl Attr<SQL_LIMIT_ESCAPE_CLAUSE> for LimitEscapeClause {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -342,7 +343,7 @@ unsafe impl AttrGet<SQL_LIMIT_ESCAPE_CLAUSE> for LimitEscapeClause {}
 #[identifier(SQLUSMALLINT, 179)]
 #[allow(non_camel_case_types)]
 pub struct SQL_NATIVE_ESCAPE_CLAUSE;
-impl InfoType<SQL_NATIVE_ESCAPE_CLAUSE, V4> for [SQLCHAR] {}
+impl InfoType<SQL_NATIVE_ESCAPE_CLAUSE, SQL_OV_ODBC4> for [SQLCHAR] {}
 unsafe impl Attr<SQL_NATIVE_ESCAPE_CLAUSE> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -353,7 +354,7 @@ unsafe impl AttrGet<SQL_NATIVE_ESCAPE_CLAUSE> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 180)]
 #[allow(non_camel_case_types)]
 pub struct SQL_RETURN_ESCAPE_CLAUSE;
-impl InfoType<SQL_RETURN_ESCAPE_CLAUSE, V4> for ReturnEscapeClause {}
+impl InfoType<SQL_RETURN_ESCAPE_CLAUSE, SQL_OV_ODBC4> for ReturnEscapeClause {}
 unsafe impl Attr<SQL_RETURN_ESCAPE_CLAUSE> for ReturnEscapeClause {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -364,7 +365,7 @@ unsafe impl AttrGet<SQL_RETURN_ESCAPE_CLAUSE> for ReturnEscapeClause {}
 #[identifier(SQLUSMALLINT, 181)]
 #[allow(non_camel_case_types)]
 pub struct SQL_FORMAT_ESCAPE_CLAUSE;
-impl InfoType<SQL_FORMAT_ESCAPE_CLAUSE, V4> for FormatEscapeClause {}
+impl InfoType<SQL_FORMAT_ESCAPE_CLAUSE, SQL_OV_ODBC4> for FormatEscapeClause {}
 unsafe impl Attr<SQL_FORMAT_ESCAPE_CLAUSE> for FormatEscapeClause {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -409,7 +410,7 @@ pub use SQL_SQL92_VALUE_EXPRESSIONS as SQL_ISO_VALUE_EXPRESSIONS;
 #[identifier(SQLUSMALLINT, 116)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ACTIVE_ENVIRONMENTS;
-impl InfoType<SQL_ACTIVE_ENVIRONMENTS, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_ACTIVE_ENVIRONMENTS, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_ACTIVE_ENVIRONMENTS> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -420,7 +421,7 @@ unsafe impl AttrGet<SQL_ACTIVE_ENVIRONMENTS> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 10023)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ASYNC_DBC_FUNCTIONS;
-impl InfoType<SQL_ASYNC_DBC_FUNCTIONS, V3_8> for AsyncDbcFunctions {}
+impl InfoType<SQL_ASYNC_DBC_FUNCTIONS, SQL_OV_ODBC3_80> for AsyncDbcFunctions {}
 unsafe impl Attr<SQL_ASYNC_DBC_FUNCTIONS> for AsyncDbcFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -431,7 +432,7 @@ unsafe impl AttrGet<SQL_ASYNC_DBC_FUNCTIONS> for AsyncDbcFunctions {}
 #[identifier(SQLUSMALLINT, 10021)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ASYNC_MODE;
-impl InfoType<SQL_ASYNC_MODE, V3> for AsyncMode {}
+impl InfoType<SQL_ASYNC_MODE, SQL_OV_ODBC3> for AsyncMode {}
 unsafe impl Attr<SQL_ASYNC_MODE> for AsyncMode {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -442,7 +443,7 @@ unsafe impl AttrGet<SQL_ASYNC_MODE> for AsyncMode {}
 #[identifier(SQLUSMALLINT, 10025)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ASYNC_NOTIFICATION;
-impl InfoType<SQL_ASYNC_NOTIFICATION, V3_8> for AsyncNotification {}
+impl InfoType<SQL_ASYNC_NOTIFICATION, SQL_OV_ODBC3_80> for AsyncNotification {}
 unsafe impl Attr<SQL_ASYNC_NOTIFICATION> for AsyncNotification {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -453,7 +454,7 @@ unsafe impl AttrGet<SQL_ASYNC_NOTIFICATION> for AsyncNotification {}
 #[identifier(SQLUSMALLINT, 120)]
 #[allow(non_camel_case_types)]
 pub struct SQL_BATCH_ROW_COUNT;
-impl InfoType<SQL_BATCH_ROW_COUNT, V3> for BatchRowCount {}
+impl InfoType<SQL_BATCH_ROW_COUNT, SQL_OV_ODBC3> for BatchRowCount {}
 unsafe impl Attr<SQL_BATCH_ROW_COUNT> for BatchRowCount {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -464,7 +465,7 @@ unsafe impl AttrGet<SQL_BATCH_ROW_COUNT> for BatchRowCount {}
 #[identifier(SQLUSMALLINT, 121)]
 #[allow(non_camel_case_types)]
 pub struct SQL_BATCH_SUPPORT;
-impl InfoType<SQL_BATCH_SUPPORT, V3> for BatchSupport {}
+impl InfoType<SQL_BATCH_SUPPORT, SQL_OV_ODBC3> for BatchSupport {}
 unsafe impl Attr<SQL_BATCH_SUPPORT> for BatchSupport {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -475,7 +476,7 @@ unsafe impl AttrGet<SQL_BATCH_SUPPORT> for BatchSupport {}
 #[identifier(SQLUSMALLINT, 2)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DATA_SOURCE_NAME;
-impl InfoType<SQL_DATA_SOURCE_NAME, V3> for [SQLCHAR] {}
+impl InfoType<SQL_DATA_SOURCE_NAME, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_DATA_SOURCE_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -486,7 +487,7 @@ unsafe impl AttrGet<SQL_DATA_SOURCE_NAME> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 10024)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DRIVER_AWARE_POOLING_SUPPORTED;
-impl InfoType<SQL_DRIVER_AWARE_POOLING_SUPPORTED, V3_8> for DriverAwarePoolingSupported {}
+impl InfoType<SQL_DRIVER_AWARE_POOLING_SUPPORTED, SQL_OV_ODBC3_80> for DriverAwarePoolingSupported {}
 unsafe impl Attr<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSupported {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -498,7 +499,7 @@ unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSu
 //#[identifier(SQLUSMALLINT, 3)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DRIVER_HDBC;
-//impl InfoType<SQL_DRIVER_HDBC, V3> for {}
+//impl InfoType<SQL_DRIVER_HDBC, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_DRIVER_HDBC> for {
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
@@ -509,7 +510,7 @@ unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSu
 //#[identifier(SQLUSMALLINT, 135)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DRIVER_HDESC;
-//impl InfoType<SQL_DRIVER_HDESC, V3> for {}
+//impl InfoType<SQL_DRIVER_HDESC, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_DRIVER_HDESC> for {
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
@@ -520,7 +521,7 @@ unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSu
 //#[identifier(SQLUSMALLINT, 4)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DRIVER_HENV;
-//impl InfoType<SQL_DRIVER_HENV, V3> for {}
+//impl InfoType<SQL_DRIVER_HENV, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_DRIVER_HENV> for {
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
@@ -531,7 +532,7 @@ unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSu
 //#[identifier(SQLUSMALLINT, 76)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DRIVER_HLIB;
-//impl InfoType<SQL_DRIVER_HLIB, V3> for {}
+//impl InfoType<SQL_DRIVER_HLIB, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_DRIVER_HLIB> for {
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
@@ -542,7 +543,7 @@ unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSu
 //#[identifier(SQLUSMALLINT, 5)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DRIVER_HSTMT;
-//impl InfoType<SQL_DRIVER_HSTMT, V3> for {}
+//impl InfoType<SQL_DRIVER_HSTMT, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_DRIVER_HSTMT> for {
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
@@ -553,7 +554,7 @@ unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSu
 #[identifier(SQLUSMALLINT, 6)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DRIVER_NAME;
-impl InfoType<SQL_DRIVER_NAME, V3> for [SQLCHAR] {}
+impl InfoType<SQL_DRIVER_NAME, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_DRIVER_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -564,7 +565,7 @@ unsafe impl AttrGet<SQL_DRIVER_NAME> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 77)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DRIVER_ODBC_VER;
-impl InfoType<SQL_DRIVER_ODBC_VER, V3> for [SQLCHAR] {}
+impl InfoType<SQL_DRIVER_ODBC_VER, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_DRIVER_ODBC_VER> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -575,7 +576,7 @@ unsafe impl AttrGet<SQL_DRIVER_ODBC_VER> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 7)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DRIVER_VER;
-impl InfoType<SQL_DRIVER_VER, V3> for [SQLCHAR] {}
+impl InfoType<SQL_DRIVER_VER, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_DRIVER_VER> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -586,7 +587,7 @@ unsafe impl AttrGet<SQL_DRIVER_VER> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 144)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DYNAMIC_CURSOR_ATTRIBUTES1;
-impl InfoType<SQL_DYNAMIC_CURSOR_ATTRIBUTES1, V3> for CursorAttributes1 {}
+impl InfoType<SQL_DYNAMIC_CURSOR_ATTRIBUTES1, SQL_OV_ODBC3> for CursorAttributes1 {}
 unsafe impl Attr<SQL_DYNAMIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -597,7 +598,7 @@ unsafe impl AttrGet<SQL_DYNAMIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
 #[identifier(SQLUSMALLINT, 145)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DYNAMIC_CURSOR_ATTRIBUTES2;
-impl InfoType<SQL_DYNAMIC_CURSOR_ATTRIBUTES2, V3> for CursorAttributes2 {}
+impl InfoType<SQL_DYNAMIC_CURSOR_ATTRIBUTES2, SQL_OV_ODBC3> for CursorAttributes2 {}
 unsafe impl Attr<SQL_DYNAMIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -608,7 +609,7 @@ unsafe impl AttrGet<SQL_DYNAMIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
 #[identifier(SQLUSMALLINT, 146)]
 #[allow(non_camel_case_types)]
 pub struct SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1;
-impl InfoType<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1, V3> for CursorAttributes1 {}
+impl InfoType<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1, SQL_OV_ODBC3> for CursorAttributes1 {}
 unsafe impl Attr<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -619,7 +620,7 @@ unsafe impl AttrGet<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
 #[identifier(SQLUSMALLINT, 147)]
 #[allow(non_camel_case_types)]
 pub struct SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2;
-impl InfoType<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2, V3> for CursorAttributes2 {}
+impl InfoType<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2, SQL_OV_ODBC3> for CursorAttributes2 {}
 unsafe impl Attr<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -630,7 +631,7 @@ unsafe impl AttrGet<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
 #[identifier(SQLUSMALLINT, 84)]
 #[allow(non_camel_case_types)]
 pub struct SQL_FILE_USAGE;
-impl InfoType<SQL_FILE_USAGE, V3> for FileUsage {}
+impl InfoType<SQL_FILE_USAGE, SQL_OV_ODBC3> for FileUsage {}
 unsafe impl Attr<SQL_FILE_USAGE> for FileUsage {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -641,7 +642,7 @@ unsafe impl AttrGet<SQL_FILE_USAGE> for FileUsage {}
 #[identifier(SQLUSMALLINT, 81)]
 #[allow(non_camel_case_types)]
 pub struct SQL_GETDATA_EXTENSIONS;
-impl InfoType<SQL_GETDATA_EXTENSIONS, V3> for GetdataExtensions {}
+impl InfoType<SQL_GETDATA_EXTENSIONS, SQL_OV_ODBC3> for GetdataExtensions {}
 unsafe impl Attr<SQL_GETDATA_EXTENSIONS> for GetdataExtensions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -652,7 +653,7 @@ unsafe impl AttrGet<SQL_GETDATA_EXTENSIONS> for GetdataExtensions {}
 #[identifier(SQLUSMALLINT, 149)]
 #[allow(non_camel_case_types)]
 pub struct SQL_INFO_SCHEMA_VIEWS;
-impl InfoType<SQL_INFO_SCHEMA_VIEWS, V3> for InfoSchemaViews {}
+impl InfoType<SQL_INFO_SCHEMA_VIEWS, SQL_OV_ODBC3> for InfoSchemaViews {}
 unsafe impl Attr<SQL_INFO_SCHEMA_VIEWS> for InfoSchemaViews {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -663,7 +664,7 @@ unsafe impl AttrGet<SQL_INFO_SCHEMA_VIEWS> for InfoSchemaViews {}
 #[identifier(SQLUSMALLINT, 150)]
 #[allow(non_camel_case_types)]
 pub struct SQL_KEYSET_CURSOR_ATTRIBUTES1;
-impl InfoType<SQL_KEYSET_CURSOR_ATTRIBUTES1, V3> for CursorAttributes1 {}
+impl InfoType<SQL_KEYSET_CURSOR_ATTRIBUTES1, SQL_OV_ODBC3> for CursorAttributes1 {}
 unsafe impl Attr<SQL_KEYSET_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -674,7 +675,7 @@ unsafe impl AttrGet<SQL_KEYSET_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
 #[identifier(SQLUSMALLINT, 151)]
 #[allow(non_camel_case_types)]
 pub struct SQL_KEYSET_CURSOR_ATTRIBUTES2;
-impl InfoType<SQL_KEYSET_CURSOR_ATTRIBUTES2, V3> for CursorAttributes2 {}
+impl InfoType<SQL_KEYSET_CURSOR_ATTRIBUTES2, SQL_OV_ODBC3> for CursorAttributes2 {}
 unsafe impl Attr<SQL_KEYSET_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -685,7 +686,7 @@ unsafe impl AttrGet<SQL_KEYSET_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
 #[identifier(SQLUSMALLINT, 10022)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_ASYNC_CONCURRENT_STATEMENTS;
-impl InfoType<SQL_MAX_ASYNC_CONCURRENT_STATEMENTS, V3> for SQLUINTEGER {}
+impl InfoType<SQL_MAX_ASYNC_CONCURRENT_STATEMENTS, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl Attr<SQL_MAX_ASYNC_CONCURRENT_STATEMENTS> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -696,7 +697,7 @@ unsafe impl AttrGet<SQL_MAX_ASYNC_CONCURRENT_STATEMENTS> for SQLUINTEGER {}
 #[identifier(SQLUSMALLINT, 1)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_CONCURRENT_ACTIVITIES;
-impl InfoType<SQL_MAX_CONCURRENT_ACTIVITIES, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_CONCURRENT_ACTIVITIES, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_CONCURRENT_ACTIVITIES> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -707,7 +708,7 @@ unsafe impl AttrGet<SQL_MAX_CONCURRENT_ACTIVITIES> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 0)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_DRIVER_CONNECTIONS;
-impl InfoType<SQL_MAX_DRIVER_CONNECTIONS, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_DRIVER_CONNECTIONS, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_DRIVER_CONNECTIONS> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -718,7 +719,7 @@ unsafe impl AttrGet<SQL_MAX_DRIVER_CONNECTIONS> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 152)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ODBC_INTERFACE_CONFORMANCE;
-impl InfoType<SQL_ODBC_INTERFACE_CONFORMANCE, V3> for OdbcInterfaceConformance {}
+impl InfoType<SQL_ODBC_INTERFACE_CONFORMANCE, SQL_OV_ODBC3> for OdbcInterfaceConformance {}
 unsafe impl Attr<SQL_ODBC_INTERFACE_CONFORMANCE> for OdbcInterfaceConformance {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -729,7 +730,7 @@ unsafe impl AttrGet<SQL_ODBC_INTERFACE_CONFORMANCE> for OdbcInterfaceConformance
 #[identifier(SQLUSMALLINT, 10)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ODBC_VER;
-impl InfoType<SQL_ODBC_VER, V3> for [SQLCHAR] {}
+impl InfoType<SQL_ODBC_VER, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_ODBC_VER> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -740,7 +741,7 @@ unsafe impl AttrGet<SQL_ODBC_VER> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 153)]
 #[allow(non_camel_case_types)]
 pub struct SQL_PARAM_ARRAY_ROW_COUNTS;
-impl InfoType<SQL_PARAM_ARRAY_ROW_COUNTS, V3> for ParamArrayRowCounts {}
+impl InfoType<SQL_PARAM_ARRAY_ROW_COUNTS, SQL_OV_ODBC3> for ParamArrayRowCounts {}
 unsafe impl Attr<SQL_PARAM_ARRAY_ROW_COUNTS> for ParamArrayRowCounts {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -751,7 +752,7 @@ unsafe impl AttrGet<SQL_PARAM_ARRAY_ROW_COUNTS> for ParamArrayRowCounts {}
 #[identifier(SQLUSMALLINT, 154)]
 #[allow(non_camel_case_types)]
 pub struct SQL_PARAM_ARRAY_SELECTS;
-impl InfoType<SQL_PARAM_ARRAY_SELECTS, V3> for ParamArraySelects {}
+impl InfoType<SQL_PARAM_ARRAY_SELECTS, SQL_OV_ODBC3> for ParamArraySelects {}
 unsafe impl Attr<SQL_PARAM_ARRAY_SELECTS> for ParamArraySelects {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -762,7 +763,7 @@ unsafe impl AttrGet<SQL_PARAM_ARRAY_SELECTS> for ParamArraySelects {}
 #[identifier(SQLUSMALLINT, 11)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ROW_UPDATES;
-impl InfoType<SQL_ROW_UPDATES, V3> for [SQLCHAR] {}
+impl InfoType<SQL_ROW_UPDATES, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_ROW_UPDATES> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -773,7 +774,7 @@ unsafe impl AttrGet<SQL_ROW_UPDATES> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 14)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SEARCH_PATTERN_ESCAPE;
-impl InfoType<SQL_SEARCH_PATTERN_ESCAPE, V3> for [SQLCHAR] {}
+impl InfoType<SQL_SEARCH_PATTERN_ESCAPE, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_SEARCH_PATTERN_ESCAPE> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -784,7 +785,7 @@ unsafe impl AttrGet<SQL_SEARCH_PATTERN_ESCAPE> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 13)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SERVER_NAME;
-impl InfoType<SQL_SERVER_NAME, V3> for [SQLCHAR] {}
+impl InfoType<SQL_SERVER_NAME, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_SERVER_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -795,7 +796,7 @@ unsafe impl AttrGet<SQL_SERVER_NAME> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 167)]
 #[allow(non_camel_case_types)]
 pub struct SQL_STATIC_CURSOR_ATTRIBUTES1;
-impl InfoType<SQL_STATIC_CURSOR_ATTRIBUTES1, V3> for CursorAttributes1 {}
+impl InfoType<SQL_STATIC_CURSOR_ATTRIBUTES1, SQL_OV_ODBC3> for CursorAttributes1 {}
 unsafe impl Attr<SQL_STATIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -806,7 +807,7 @@ unsafe impl AttrGet<SQL_STATIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
 #[identifier(SQLUSMALLINT, 168)]
 #[allow(non_camel_case_types)]
 pub struct SQL_STATIC_CURSOR_ATTRIBUTES2;
-impl InfoType<SQL_STATIC_CURSOR_ATTRIBUTES2, V3> for CursorAttributes2 {}
+impl InfoType<SQL_STATIC_CURSOR_ATTRIBUTES2, SQL_OV_ODBC3> for CursorAttributes2 {}
 unsafe impl Attr<SQL_STATIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -821,7 +822,7 @@ unsafe impl AttrGet<SQL_STATIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
 #[identifier(SQLUSMALLINT, 16)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DATABASE_NAME;
-impl InfoType<SQL_DATABASE_NAME, V3> for [SQLCHAR] {}
+impl InfoType<SQL_DATABASE_NAME, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_DATABASE_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -832,7 +833,7 @@ unsafe impl AttrGet<SQL_DATABASE_NAME> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 17)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DBMS_NAME;
-impl InfoType<SQL_DBMS_NAME, V3> for [SQLCHAR] {}
+impl InfoType<SQL_DBMS_NAME, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_DBMS_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -843,7 +844,7 @@ unsafe impl AttrGet<SQL_DBMS_NAME> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 18)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DBMS_VER;
-impl InfoType<SQL_DBMS_VER, V3> for [SQLCHAR] {}
+impl InfoType<SQL_DBMS_VER, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_DBMS_VER> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -858,7 +859,7 @@ unsafe impl AttrGet<SQL_DBMS_VER> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 20)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ACCESSIBLE_PROCEDURES;
-impl InfoType<SQL_ACCESSIBLE_PROCEDURES, V3> for [SQLCHAR] {}
+impl InfoType<SQL_ACCESSIBLE_PROCEDURES, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_ACCESSIBLE_PROCEDURES> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -869,7 +870,7 @@ unsafe impl AttrGet<SQL_ACCESSIBLE_PROCEDURES> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 19)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ACCESSIBLE_TABLES;
-impl InfoType<SQL_ACCESSIBLE_TABLES, V3> for [SQLCHAR] {}
+impl InfoType<SQL_ACCESSIBLE_TABLES, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_ACCESSIBLE_TABLES> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -880,7 +881,7 @@ unsafe impl AttrGet<SQL_ACCESSIBLE_TABLES> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 82)]
 #[allow(non_camel_case_types)]
 pub struct SQL_BOOKMARK_PERSISTENCE;
-impl InfoType<SQL_BOOKMARK_PERSISTENCE, V3> for BookmarkPersistence {}
+impl InfoType<SQL_BOOKMARK_PERSISTENCE, SQL_OV_ODBC3> for BookmarkPersistence {}
 unsafe impl Attr<SQL_BOOKMARK_PERSISTENCE> for BookmarkPersistence {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -891,7 +892,7 @@ unsafe impl AttrGet<SQL_BOOKMARK_PERSISTENCE> for BookmarkPersistence {}
 #[identifier(SQLUSMALLINT, 42)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CATALOG_TERM;
-impl InfoType<SQL_CATALOG_TERM, V3> for [SQLCHAR] {}
+impl InfoType<SQL_CATALOG_TERM, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_CATALOG_TERM> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -902,7 +903,7 @@ unsafe impl AttrGet<SQL_CATALOG_TERM> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 10004)]
 #[allow(non_camel_case_types)]
 pub struct SQL_COLLATION_SEQ;
-impl InfoType<SQL_COLLATION_SEQ, V3> for [SQLCHAR] {}
+impl InfoType<SQL_COLLATION_SEQ, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_COLLATION_SEQ> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -913,7 +914,7 @@ unsafe impl AttrGet<SQL_COLLATION_SEQ> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 22)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONCAT_NULL_BEHAVIOR;
-impl InfoType<SQL_CONCAT_NULL_BEHAVIOR, V3> for ConcatNullBehavior {}
+impl InfoType<SQL_CONCAT_NULL_BEHAVIOR, SQL_OV_ODBC3> for ConcatNullBehavior {}
 unsafe impl Attr<SQL_CONCAT_NULL_BEHAVIOR> for ConcatNullBehavior {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -924,7 +925,7 @@ unsafe impl AttrGet<SQL_CONCAT_NULL_BEHAVIOR> for ConcatNullBehavior {}
 #[identifier(SQLUSMALLINT, 23)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CURSOR_COMMIT_BEHAVIOR;
-impl InfoType<SQL_CURSOR_COMMIT_BEHAVIOR, V3> for CursorBehavior {}
+impl InfoType<SQL_CURSOR_COMMIT_BEHAVIOR, SQL_OV_ODBC3> for CursorBehavior {}
 unsafe impl Attr<SQL_CURSOR_COMMIT_BEHAVIOR> for CursorBehavior {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -935,7 +936,7 @@ unsafe impl AttrGet<SQL_CURSOR_COMMIT_BEHAVIOR> for CursorBehavior {}
 #[identifier(SQLUSMALLINT, 24)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CURSOR_ROLLBACK_BEHAVIOR;
-impl InfoType<SQL_CURSOR_ROLLBACK_BEHAVIOR, V3> for CursorBehavior {}
+impl InfoType<SQL_CURSOR_ROLLBACK_BEHAVIOR, SQL_OV_ODBC3> for CursorBehavior {}
 unsafe impl Attr<SQL_CURSOR_ROLLBACK_BEHAVIOR> for CursorBehavior {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -946,7 +947,7 @@ unsafe impl AttrGet<SQL_CURSOR_ROLLBACK_BEHAVIOR> for CursorBehavior {}
 #[identifier(SQLUSMALLINT, 10001)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CURSOR_SENSITIVITY;
-impl InfoType<SQL_CURSOR_SENSITIVITY, V3> for CursorSensitivity {}
+impl InfoType<SQL_CURSOR_SENSITIVITY, SQL_OV_ODBC3> for CursorSensitivity {}
 unsafe impl Attr<SQL_CURSOR_SENSITIVITY> for CursorSensitivity {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -957,7 +958,7 @@ unsafe impl AttrGet<SQL_CURSOR_SENSITIVITY> for CursorSensitivity {}
 #[identifier(SQLUSMALLINT, 25)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DATA_SOURCE_READ_ONLY;
-impl InfoType<SQL_DATA_SOURCE_READ_ONLY, V3> for [SQLCHAR] {}
+impl InfoType<SQL_DATA_SOURCE_READ_ONLY, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_DATA_SOURCE_READ_ONLY> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -968,7 +969,7 @@ unsafe impl AttrGet<SQL_DATA_SOURCE_READ_ONLY> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 26)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DEFAULT_TXN_ISOLATION;
-impl InfoType<SQL_DEFAULT_TXN_ISOLATION, V3> for TxnIsolation {}
+impl InfoType<SQL_DEFAULT_TXN_ISOLATION, SQL_OV_ODBC3> for TxnIsolation {}
 unsafe impl Attr<SQL_DEFAULT_TXN_ISOLATION> for TxnIsolation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -979,7 +980,7 @@ unsafe impl AttrGet<SQL_DEFAULT_TXN_ISOLATION> for TxnIsolation {}
 #[identifier(SQLUSMALLINT, 10002)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DESCRIBE_PARAMETER;
-impl InfoType<SQL_DESCRIBE_PARAMETER, V3> for [SQLCHAR] {}
+impl InfoType<SQL_DESCRIBE_PARAMETER, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_DESCRIBE_PARAMETER> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -990,7 +991,7 @@ unsafe impl AttrGet<SQL_DESCRIBE_PARAMETER> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 36)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MULT_RESULT_SETS;
-impl InfoType<SQL_MULT_RESULT_SETS, V3> for [SQLCHAR] {}
+impl InfoType<SQL_MULT_RESULT_SETS, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_MULT_RESULT_SETS> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1001,7 +1002,7 @@ unsafe impl AttrGet<SQL_MULT_RESULT_SETS> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 37)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MULTIPLE_ACTIVE_TXN;
-impl InfoType<SQL_MULTIPLE_ACTIVE_TXN, V3> for [SQLCHAR] {}
+impl InfoType<SQL_MULTIPLE_ACTIVE_TXN, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_MULTIPLE_ACTIVE_TXN> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1012,7 +1013,7 @@ unsafe impl AttrGet<SQL_MULTIPLE_ACTIVE_TXN> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 111)]
 #[allow(non_camel_case_types)]
 pub struct SQL_NEED_LONG_DATA_LEN;
-impl InfoType<SQL_NEED_LONG_DATA_LEN, V3> for [SQLCHAR] {}
+impl InfoType<SQL_NEED_LONG_DATA_LEN, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_NEED_LONG_DATA_LEN> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1023,7 +1024,7 @@ unsafe impl AttrGet<SQL_NEED_LONG_DATA_LEN> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 85)]
 #[allow(non_camel_case_types)]
 pub struct SQL_NULL_COLLATION;
-impl InfoType<SQL_NULL_COLLATION, V3> for NullCollation {}
+impl InfoType<SQL_NULL_COLLATION, SQL_OV_ODBC3> for NullCollation {}
 unsafe impl Attr<SQL_NULL_COLLATION> for NullCollation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1034,7 +1035,7 @@ unsafe impl AttrGet<SQL_NULL_COLLATION> for NullCollation {}
 #[identifier(SQLUSMALLINT, 40)]
 #[allow(non_camel_case_types)]
 pub struct SQL_PROCEDURE_TERM;
-impl InfoType<SQL_PROCEDURE_TERM, V3> for [SQLCHAR] {}
+impl InfoType<SQL_PROCEDURE_TERM, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_PROCEDURE_TERM> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1045,7 +1046,7 @@ unsafe impl AttrGet<SQL_PROCEDURE_TERM> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 39)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SCHEMA_TERM;
-impl InfoType<SQL_SCHEMA_TERM, V3> for [SQLCHAR] {}
+impl InfoType<SQL_SCHEMA_TERM, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_SCHEMA_TERM> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1056,7 +1057,7 @@ unsafe impl AttrGet<SQL_SCHEMA_TERM> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 44)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SCROLL_OPTIONS;
-impl InfoType<SQL_SCROLL_OPTIONS, V3> for ScrollOptions {}
+impl InfoType<SQL_SCROLL_OPTIONS, SQL_OV_ODBC3> for ScrollOptions {}
 unsafe impl Attr<SQL_SCROLL_OPTIONS> for ScrollOptions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1067,7 +1068,7 @@ unsafe impl AttrGet<SQL_SCROLL_OPTIONS> for ScrollOptions {}
 #[identifier(SQLUSMALLINT, 45)]
 #[allow(non_camel_case_types)]
 pub struct SQL_TABLE_TERM;
-impl InfoType<SQL_TABLE_TERM, V3> for [SQLCHAR] {}
+impl InfoType<SQL_TABLE_TERM, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_TABLE_TERM> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1078,7 +1079,7 @@ unsafe impl AttrGet<SQL_TABLE_TERM> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 46)]
 #[allow(non_camel_case_types)]
 pub struct SQL_TXN_CAPABLE;
-impl InfoType<SQL_TXN_CAPABLE, V3> for TxnCapable {}
+impl InfoType<SQL_TXN_CAPABLE, SQL_OV_ODBC3> for TxnCapable {}
 unsafe impl Attr<SQL_TXN_CAPABLE> for TxnCapable {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1089,7 +1090,7 @@ unsafe impl AttrGet<SQL_TXN_CAPABLE> for TxnCapable {}
 #[identifier(SQLUSMALLINT, 72)]
 #[allow(non_camel_case_types)]
 pub struct SQL_TXN_ISOLATION_OPTION;
-impl InfoType<SQL_TXN_ISOLATION_OPTION, V3> for TxnIsolation {}
+impl InfoType<SQL_TXN_ISOLATION_OPTION, SQL_OV_ODBC3> for TxnIsolation {}
 unsafe impl Attr<SQL_TXN_ISOLATION_OPTION> for TxnIsolation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1100,7 +1101,7 @@ unsafe impl AttrGet<SQL_TXN_ISOLATION_OPTION> for TxnIsolation {}
 #[identifier(SQLUSMALLINT, 47)]
 #[allow(non_camel_case_types)]
 pub struct SQL_USER_NAME;
-impl InfoType<SQL_USER_NAME, V3> for [SQLCHAR] {}
+impl InfoType<SQL_USER_NAME, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_USER_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1115,7 +1116,7 @@ unsafe impl AttrGet<SQL_USER_NAME> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 169)]
 #[allow(non_camel_case_types)]
 pub struct SQL_AGGREGATE_FUNCTIONS;
-impl InfoType<SQL_AGGREGATE_FUNCTIONS, V3> for AggregateFunctions {}
+impl InfoType<SQL_AGGREGATE_FUNCTIONS, SQL_OV_ODBC3> for AggregateFunctions {}
 unsafe impl Attr<SQL_AGGREGATE_FUNCTIONS> for AggregateFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1126,7 +1127,7 @@ unsafe impl AttrGet<SQL_AGGREGATE_FUNCTIONS> for AggregateFunctions {}
 #[identifier(SQLUSMALLINT, 117)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ALTER_DOMAIN;
-impl InfoType<SQL_ALTER_DOMAIN, V3> for AlterDomain {}
+impl InfoType<SQL_ALTER_DOMAIN, SQL_OV_ODBC3> for AlterDomain {}
 unsafe impl Attr<SQL_ALTER_DOMAIN> for AlterDomain {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1137,7 +1138,7 @@ unsafe impl AttrGet<SQL_ALTER_DOMAIN> for AlterDomain {}
 #[identifier(SQLUSMALLINT, 86)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ALTER_TABLE;
-impl InfoType<SQL_ALTER_TABLE, V3> for AlterTable {}
+impl InfoType<SQL_ALTER_TABLE, SQL_OV_ODBC3> for AlterTable {}
 unsafe impl Attr<SQL_ALTER_TABLE> for AlterTable {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1148,7 +1149,7 @@ unsafe impl AttrGet<SQL_ALTER_TABLE> for AlterTable {}
 #[identifier(SQLUSMALLINT, 114)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CATALOG_LOCATION;
-impl InfoType<SQL_CATALOG_LOCATION, V3> for CatalogLocation {}
+impl InfoType<SQL_CATALOG_LOCATION, SQL_OV_ODBC3> for CatalogLocation {}
 unsafe impl Attr<SQL_CATALOG_LOCATION> for CatalogLocation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1159,7 +1160,7 @@ unsafe impl AttrGet<SQL_CATALOG_LOCATION> for CatalogLocation {}
 #[identifier(SQLUSMALLINT, 10003)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CATALOG_NAME;
-impl InfoType<SQL_CATALOG_NAME, V3> for [SQLCHAR] {}
+impl InfoType<SQL_CATALOG_NAME, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_CATALOG_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1170,7 +1171,7 @@ unsafe impl AttrGet<SQL_CATALOG_NAME> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 41)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CATALOG_NAME_SEPARATOR;
-impl InfoType<SQL_CATALOG_NAME_SEPARATOR, V3> for [SQLCHAR] {}
+impl InfoType<SQL_CATALOG_NAME_SEPARATOR, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_CATALOG_NAME_SEPARATOR> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1181,7 +1182,7 @@ unsafe impl AttrGet<SQL_CATALOG_NAME_SEPARATOR> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 92)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CATALOG_USAGE;
-impl InfoType<SQL_CATALOG_USAGE, V3> for CatalogUsage {}
+impl InfoType<SQL_CATALOG_USAGE, SQL_OV_ODBC3> for CatalogUsage {}
 unsafe impl Attr<SQL_CATALOG_USAGE> for CatalogUsage {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1192,7 +1193,7 @@ unsafe impl AttrGet<SQL_CATALOG_USAGE> for CatalogUsage {}
 #[identifier(SQLUSMALLINT, 87)]
 #[allow(non_camel_case_types)]
 pub struct SQL_COLUMN_ALIAS;
-impl InfoType<SQL_COLUMN_ALIAS, V3> for [SQLCHAR] {}
+impl InfoType<SQL_COLUMN_ALIAS, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_COLUMN_ALIAS> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1203,7 +1204,7 @@ unsafe impl AttrGet<SQL_COLUMN_ALIAS> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 74)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CORRELATION_NAME;
-impl InfoType<SQL_CORRELATION_NAME, V3> for CorrelationName {}
+impl InfoType<SQL_CORRELATION_NAME, SQL_OV_ODBC3> for CorrelationName {}
 unsafe impl Attr<SQL_CORRELATION_NAME> for CorrelationName {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1214,7 +1215,7 @@ unsafe impl AttrGet<SQL_CORRELATION_NAME> for CorrelationName {}
 #[identifier(SQLUSMALLINT, 127)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CREATE_ASSERTION;
-impl InfoType<SQL_CREATE_ASSERTION, V3> for CreateAssertion {}
+impl InfoType<SQL_CREATE_ASSERTION, SQL_OV_ODBC3> for CreateAssertion {}
 unsafe impl Attr<SQL_CREATE_ASSERTION> for CreateAssertion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1225,7 +1226,7 @@ unsafe impl AttrGet<SQL_CREATE_ASSERTION> for CreateAssertion {}
 #[identifier(SQLUSMALLINT, 128)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CREATE_CHARACTER_SET;
-impl InfoType<SQL_CREATE_CHARACTER_SET, V3> for CreateCharacterSet {}
+impl InfoType<SQL_CREATE_CHARACTER_SET, SQL_OV_ODBC3> for CreateCharacterSet {}
 unsafe impl Attr<SQL_CREATE_CHARACTER_SET> for CreateCharacterSet {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1236,7 +1237,7 @@ unsafe impl AttrGet<SQL_CREATE_CHARACTER_SET> for CreateCharacterSet {}
 #[identifier(SQLUSMALLINT, 129)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CREATE_COLLATION;
-impl InfoType<SQL_CREATE_COLLATION, V3> for CreateCollation {}
+impl InfoType<SQL_CREATE_COLLATION, SQL_OV_ODBC3> for CreateCollation {}
 unsafe impl Attr<SQL_CREATE_COLLATION> for CreateCollation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1247,7 +1248,7 @@ unsafe impl AttrGet<SQL_CREATE_COLLATION> for CreateCollation {}
 #[identifier(SQLUSMALLINT, 130)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CREATE_DOMAIN;
-impl InfoType<SQL_CREATE_DOMAIN, V3> for CreateDomain {}
+impl InfoType<SQL_CREATE_DOMAIN, SQL_OV_ODBC3> for CreateDomain {}
 unsafe impl Attr<SQL_CREATE_DOMAIN> for CreateDomain {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1258,7 +1259,7 @@ unsafe impl AttrGet<SQL_CREATE_DOMAIN> for CreateDomain {}
 #[identifier(SQLUSMALLINT, 131)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CREATE_SCHEMA;
-impl InfoType<SQL_CREATE_SCHEMA, V3> for CreateSchema {}
+impl InfoType<SQL_CREATE_SCHEMA, SQL_OV_ODBC3> for CreateSchema {}
 unsafe impl Attr<SQL_CREATE_SCHEMA> for CreateSchema {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1269,7 +1270,7 @@ unsafe impl AttrGet<SQL_CREATE_SCHEMA> for CreateSchema {}
 #[identifier(SQLUSMALLINT, 132)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CREATE_TABLE;
-impl InfoType<SQL_CREATE_TABLE, V3> for CreateTable {}
+impl InfoType<SQL_CREATE_TABLE, SQL_OV_ODBC3> for CreateTable {}
 unsafe impl Attr<SQL_CREATE_TABLE> for CreateTable {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1280,7 +1281,7 @@ unsafe impl AttrGet<SQL_CREATE_TABLE> for CreateTable {}
 #[identifier(SQLUSMALLINT, 133)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CREATE_TRANSLATION;
-impl InfoType<SQL_CREATE_TRANSLATION, V3> for CreateTranslation {}
+impl InfoType<SQL_CREATE_TRANSLATION, SQL_OV_ODBC3> for CreateTranslation {}
 unsafe impl Attr<SQL_CREATE_TRANSLATION> for CreateTranslation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1291,7 +1292,7 @@ unsafe impl AttrGet<SQL_CREATE_TRANSLATION> for CreateTranslation {}
 #[identifier(SQLUSMALLINT, 170)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DDL_INDEX;
-impl InfoType<SQL_DDL_INDEX, V3> for DdlIndex {}
+impl InfoType<SQL_DDL_INDEX, SQL_OV_ODBC3> for DdlIndex {}
 unsafe impl Attr<SQL_DDL_INDEX> for DdlIndex {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1302,7 +1303,7 @@ unsafe impl AttrGet<SQL_DDL_INDEX> for DdlIndex {}
 #[identifier(SQLUSMALLINT, 136)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DROP_ASSERTION;
-impl InfoType<SQL_DROP_ASSERTION, V3> for DropAssertion {}
+impl InfoType<SQL_DROP_ASSERTION, SQL_OV_ODBC3> for DropAssertion {}
 unsafe impl Attr<SQL_DROP_ASSERTION> for DropAssertion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1313,7 +1314,7 @@ unsafe impl AttrGet<SQL_DROP_ASSERTION> for DropAssertion {}
 #[identifier(SQLUSMALLINT, 137)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DROP_CHARACTER_SET;
-impl InfoType<SQL_DROP_CHARACTER_SET, V3> for DropCharacterSet {}
+impl InfoType<SQL_DROP_CHARACTER_SET, SQL_OV_ODBC3> for DropCharacterSet {}
 unsafe impl Attr<SQL_DROP_CHARACTER_SET> for DropCharacterSet {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1324,7 +1325,7 @@ unsafe impl AttrGet<SQL_DROP_CHARACTER_SET> for DropCharacterSet {}
 #[identifier(SQLUSMALLINT, 138)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DROP_COLLATION;
-impl InfoType<SQL_DROP_COLLATION, V3> for DropCollation {}
+impl InfoType<SQL_DROP_COLLATION, SQL_OV_ODBC3> for DropCollation {}
 unsafe impl Attr<SQL_DROP_COLLATION> for DropCollation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1335,7 +1336,7 @@ unsafe impl AttrGet<SQL_DROP_COLLATION> for DropCollation {}
 #[identifier(SQLUSMALLINT, 139)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DROP_DOMAIN;
-impl InfoType<SQL_DROP_DOMAIN, V3> for DropDomain {}
+impl InfoType<SQL_DROP_DOMAIN, SQL_OV_ODBC3> for DropDomain {}
 unsafe impl Attr<SQL_DROP_DOMAIN> for DropDomain {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1346,7 +1347,7 @@ unsafe impl AttrGet<SQL_DROP_DOMAIN> for DropDomain {}
 #[identifier(SQLUSMALLINT, 140)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DROP_SCHEMA;
-impl InfoType<SQL_DROP_SCHEMA, V3> for DropSchema {}
+impl InfoType<SQL_DROP_SCHEMA, SQL_OV_ODBC3> for DropSchema {}
 unsafe impl Attr<SQL_DROP_SCHEMA> for DropSchema {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1357,7 +1358,7 @@ unsafe impl AttrGet<SQL_DROP_SCHEMA> for DropSchema {}
 #[identifier(SQLUSMALLINT, 141)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DROP_TABLE;
-impl InfoType<SQL_DROP_TABLE, V3> for DropTable {}
+impl InfoType<SQL_DROP_TABLE, SQL_OV_ODBC3> for DropTable {}
 unsafe impl Attr<SQL_DROP_TABLE> for DropTable {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1368,7 +1369,7 @@ unsafe impl AttrGet<SQL_DROP_TABLE> for DropTable {}
 #[identifier(SQLUSMALLINT, 142)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DROP_TRANSLATION;
-impl InfoType<SQL_DROP_TRANSLATION, V3> for DropTranslation {}
+impl InfoType<SQL_DROP_TRANSLATION, SQL_OV_ODBC3> for DropTranslation {}
 unsafe impl Attr<SQL_DROP_TRANSLATION> for DropTranslation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1379,7 +1380,7 @@ unsafe impl AttrGet<SQL_DROP_TRANSLATION> for DropTranslation {}
 #[identifier(SQLUSMALLINT, 143)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DROP_VIEW;
-impl InfoType<SQL_DROP_VIEW, V3> for DropView {}
+impl InfoType<SQL_DROP_VIEW, SQL_OV_ODBC3> for DropView {}
 unsafe impl Attr<SQL_DROP_VIEW> for DropView {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1390,7 +1391,7 @@ unsafe impl AttrGet<SQL_DROP_VIEW> for DropView {}
 #[identifier(SQLUSMALLINT, 27)]
 #[allow(non_camel_case_types)]
 pub struct SQL_EXPRESSIONS_IN_ORDERBY;
-impl InfoType<SQL_EXPRESSIONS_IN_ORDERBY, V3> for [SQLCHAR] {}
+impl InfoType<SQL_EXPRESSIONS_IN_ORDERBY, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_EXPRESSIONS_IN_ORDERBY> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1401,7 +1402,7 @@ unsafe impl AttrGet<SQL_EXPRESSIONS_IN_ORDERBY> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 88)]
 #[allow(non_camel_case_types)]
 pub struct SQL_GROUP_BY;
-impl InfoType<SQL_GROUP_BY, V3> for GroupBy {}
+impl InfoType<SQL_GROUP_BY, SQL_OV_ODBC3> for GroupBy {}
 unsafe impl Attr<SQL_GROUP_BY> for GroupBy {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1412,7 +1413,7 @@ unsafe impl AttrGet<SQL_GROUP_BY> for GroupBy {}
 #[identifier(SQLUSMALLINT, 28)]
 #[allow(non_camel_case_types)]
 pub struct SQL_IDENTIFIER_CASE;
-impl InfoType<SQL_IDENTIFIER_CASE, V3> for IdentifierCase {}
+impl InfoType<SQL_IDENTIFIER_CASE, SQL_OV_ODBC3> for IdentifierCase {}
 unsafe impl Attr<SQL_IDENTIFIER_CASE> for IdentifierCase {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1423,7 +1424,7 @@ unsafe impl AttrGet<SQL_IDENTIFIER_CASE> for IdentifierCase {}
 #[identifier(SQLUSMALLINT, 29)]
 #[allow(non_camel_case_types)]
 pub struct SQL_IDENTIFIER_QUOTE_CHAR;
-impl InfoType<SQL_IDENTIFIER_QUOTE_CHAR, V3> for [SQLCHAR] {}
+impl InfoType<SQL_IDENTIFIER_QUOTE_CHAR, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_IDENTIFIER_QUOTE_CHAR> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1434,7 +1435,7 @@ unsafe impl AttrGet<SQL_IDENTIFIER_QUOTE_CHAR> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 148)]
 #[allow(non_camel_case_types)]
 pub struct SQL_INDEX_KEYWORDS;
-impl InfoType<SQL_INDEX_KEYWORDS, V3> for IndexKeywords {}
+impl InfoType<SQL_INDEX_KEYWORDS, SQL_OV_ODBC3> for IndexKeywords {}
 unsafe impl Attr<SQL_INDEX_KEYWORDS> for IndexKeywords {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1445,7 +1446,7 @@ unsafe impl AttrGet<SQL_INDEX_KEYWORDS> for IndexKeywords {}
 #[identifier(SQLUSMALLINT, 171)]
 #[allow(non_camel_case_types)]
 pub struct SQL_INSERT_STATEMENT;
-impl InfoType<SQL_INSERT_STATEMENT, V3> for InsertStatement {}
+impl InfoType<SQL_INSERT_STATEMENT, SQL_OV_ODBC3> for InsertStatement {}
 unsafe impl Attr<SQL_INSERT_STATEMENT> for InsertStatement {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1456,7 +1457,7 @@ unsafe impl AttrGet<SQL_INSERT_STATEMENT> for InsertStatement {}
 #[identifier(SQLUSMALLINT, 73)]
 #[allow(non_camel_case_types)]
 pub struct SQL_INTEGRITY;
-impl InfoType<SQL_INTEGRITY, V3> for [SQLCHAR] {}
+impl InfoType<SQL_INTEGRITY, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_INTEGRITY> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1467,7 +1468,7 @@ unsafe impl AttrGet<SQL_INTEGRITY> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 89)]
 #[allow(non_camel_case_types)]
 pub struct SQL_KEYWORDS;
-impl InfoType<SQL_KEYWORDS, V3> for [SQLCHAR] {}
+impl InfoType<SQL_KEYWORDS, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_KEYWORDS> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1478,7 +1479,7 @@ unsafe impl AttrGet<SQL_KEYWORDS> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 113)]
 #[allow(non_camel_case_types)]
 pub struct SQL_LIKE_ESCAPE_CLAUSE;
-impl InfoType<SQL_LIKE_ESCAPE_CLAUSE, V3> for [SQLCHAR] {}
+impl InfoType<SQL_LIKE_ESCAPE_CLAUSE, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_LIKE_ESCAPE_CLAUSE> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1489,7 +1490,7 @@ unsafe impl AttrGet<SQL_LIKE_ESCAPE_CLAUSE> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 75)]
 #[allow(non_camel_case_types)]
 pub struct SQL_NON_NULLABLE_COLUMNS;
-impl InfoType<SQL_NON_NULLABLE_COLUMNS, V3> for NonNullableColumns {}
+impl InfoType<SQL_NON_NULLABLE_COLUMNS, SQL_OV_ODBC3> for NonNullableColumns {}
 unsafe impl Attr<SQL_NON_NULLABLE_COLUMNS> for NonNullableColumns {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1500,7 +1501,7 @@ unsafe impl AttrGet<SQL_NON_NULLABLE_COLUMNS> for NonNullableColumns {}
 #[identifier(SQLUSMALLINT, 115)]
 #[allow(non_camel_case_types)]
 pub struct SQL_OJ_CAPABILITIES;
-impl InfoType<SQL_OJ_CAPABILITIES, V3> for OjCapabilities {}
+impl InfoType<SQL_OJ_CAPABILITIES, SQL_OV_ODBC3> for OjCapabilities {}
 unsafe impl Attr<SQL_OJ_CAPABILITIES> for OjCapabilities {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1511,7 +1512,7 @@ unsafe impl AttrGet<SQL_OJ_CAPABILITIES> for OjCapabilities {}
 #[identifier(SQLUSMALLINT, 90)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ORDER_BY_COLUMNS_IN_SELECT;
-impl InfoType<SQL_ORDER_BY_COLUMNS_IN_SELECT, V3> for [SQLCHAR] {}
+impl InfoType<SQL_ORDER_BY_COLUMNS_IN_SELECT, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_ORDER_BY_COLUMNS_IN_SELECT> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1522,7 +1523,7 @@ unsafe impl AttrGet<SQL_ORDER_BY_COLUMNS_IN_SELECT> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 38)]
 #[allow(non_camel_case_types)]
 pub struct SQL_OUTER_JOINS;
-impl InfoType<SQL_OUTER_JOINS, V3> for OuterJoins {}
+impl InfoType<SQL_OUTER_JOINS, SQL_OV_ODBC3> for OuterJoins {}
 unsafe impl Attr<SQL_OUTER_JOINS> for OuterJoins {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1533,7 +1534,7 @@ unsafe impl AttrGet<SQL_OUTER_JOINS> for OuterJoins {}
 #[identifier(SQLUSMALLINT, 21)]
 #[allow(non_camel_case_types)]
 pub struct SQL_PROCEDURES;
-impl InfoType<SQL_PROCEDURES, V3> for [SQLCHAR] {}
+impl InfoType<SQL_PROCEDURES, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_PROCEDURES> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1544,7 +1545,7 @@ unsafe impl AttrGet<SQL_PROCEDURES> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 93)]
 #[allow(non_camel_case_types)]
 pub struct SQL_QUOTED_IDENTIFIER_CASE;
-impl InfoType<SQL_QUOTED_IDENTIFIER_CASE, V3> for IdentifierCase {}
+impl InfoType<SQL_QUOTED_IDENTIFIER_CASE, SQL_OV_ODBC3> for IdentifierCase {}
 unsafe impl Attr<SQL_QUOTED_IDENTIFIER_CASE> for IdentifierCase {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1555,7 +1556,7 @@ unsafe impl AttrGet<SQL_QUOTED_IDENTIFIER_CASE> for IdentifierCase {}
 #[identifier(SQLUSMALLINT, 91)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SCHEMA_USAGE;
-impl InfoType<SQL_SCHEMA_USAGE, V3> for SchemaUsage {}
+impl InfoType<SQL_SCHEMA_USAGE, SQL_OV_ODBC3> for SchemaUsage {}
 unsafe impl Attr<SQL_SCHEMA_USAGE> for SchemaUsage {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1566,7 +1567,7 @@ unsafe impl AttrGet<SQL_SCHEMA_USAGE> for SchemaUsage {}
 #[identifier(SQLUSMALLINT, 94)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SPECIAL_CHARACTERS;
-impl InfoType<SQL_SPECIAL_CHARACTERS, V3> for [SQLCHAR] {}
+impl InfoType<SQL_SPECIAL_CHARACTERS, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_SPECIAL_CHARACTERS> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1577,7 +1578,7 @@ unsafe impl AttrGet<SQL_SPECIAL_CHARACTERS> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 118)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL_CONFORMANCE;
-impl InfoType<SQL_SQL_CONFORMANCE, V3> for SqlConformance {}
+impl InfoType<SQL_SQL_CONFORMANCE, SQL_OV_ODBC3> for SqlConformance {}
 unsafe impl Attr<SQL_SQL_CONFORMANCE> for SqlConformance {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1588,7 +1589,7 @@ unsafe impl AttrGet<SQL_SQL_CONFORMANCE> for SqlConformance {}
 #[identifier(SQLUSMALLINT, 95)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SUBQUERIES;
-impl InfoType<SQL_SUBQUERIES, V3> for Subqueries {}
+impl InfoType<SQL_SUBQUERIES, SQL_OV_ODBC3> for Subqueries {}
 unsafe impl Attr<SQL_SUBQUERIES> for Subqueries {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1599,7 +1600,7 @@ unsafe impl AttrGet<SQL_SUBQUERIES> for Subqueries {}
 #[identifier(SQLUSMALLINT, 96)]
 #[allow(non_camel_case_types)]
 pub struct SQL_UNION;
-impl InfoType<SQL_UNION, V3> for Union {}
+impl InfoType<SQL_UNION, SQL_OV_ODBC3> for Union {}
 unsafe impl Attr<SQL_UNION> for Union {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1614,7 +1615,7 @@ unsafe impl AttrGet<SQL_UNION> for Union {}
 #[identifier(SQLUSMALLINT, 112)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_BINARY_LITERAL_LEN;
-impl InfoType<SQL_MAX_BINARY_LITERAL_LEN, V3> for SQLUINTEGER {}
+impl InfoType<SQL_MAX_BINARY_LITERAL_LEN, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl Attr<SQL_MAX_BINARY_LITERAL_LEN> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1625,7 +1626,7 @@ unsafe impl AttrGet<SQL_MAX_BINARY_LITERAL_LEN> for SQLUINTEGER {}
 #[identifier(SQLUSMALLINT, 34)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_CATALOG_NAME_LEN;
-impl InfoType<SQL_MAX_CATALOG_NAME_LEN, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_CATALOG_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_CATALOG_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1636,7 +1637,7 @@ unsafe impl AttrGet<SQL_MAX_CATALOG_NAME_LEN> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 108)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_CHAR_LITERAL_LEN;
-impl InfoType<SQL_MAX_CHAR_LITERAL_LEN, V3> for SQLUINTEGER {}
+impl InfoType<SQL_MAX_CHAR_LITERAL_LEN, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl Attr<SQL_MAX_CHAR_LITERAL_LEN> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1647,7 +1648,7 @@ unsafe impl AttrGet<SQL_MAX_CHAR_LITERAL_LEN> for SQLUINTEGER {}
 #[identifier(SQLUSMALLINT, 30)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_COLUMN_NAME_LEN;
-impl InfoType<SQL_MAX_COLUMN_NAME_LEN, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_COLUMN_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_COLUMN_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1658,7 +1659,7 @@ unsafe impl AttrGet<SQL_MAX_COLUMN_NAME_LEN> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 97)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_COLUMNS_IN_GROUP_BY;
-impl InfoType<SQL_MAX_COLUMNS_IN_GROUP_BY, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_COLUMNS_IN_GROUP_BY, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_COLUMNS_IN_GROUP_BY> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1669,7 +1670,7 @@ unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_GROUP_BY> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 98)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_COLUMNS_IN_INDEX;
-impl InfoType<SQL_MAX_COLUMNS_IN_INDEX, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_COLUMNS_IN_INDEX, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_COLUMNS_IN_INDEX> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1680,7 +1681,7 @@ unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_INDEX> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 99)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_COLUMNS_IN_ORDER_BY;
-impl InfoType<SQL_MAX_COLUMNS_IN_ORDER_BY, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_COLUMNS_IN_ORDER_BY, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_COLUMNS_IN_ORDER_BY> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1691,7 +1692,7 @@ unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_ORDER_BY> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 100)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_COLUMNS_IN_SELECT;
-impl InfoType<SQL_MAX_COLUMNS_IN_SELECT, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_COLUMNS_IN_SELECT, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_COLUMNS_IN_SELECT> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1702,7 +1703,7 @@ unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_SELECT> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 101)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_COLUMNS_IN_TABLE;
-impl InfoType<SQL_MAX_COLUMNS_IN_TABLE, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_COLUMNS_IN_TABLE, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_COLUMNS_IN_TABLE> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1713,7 +1714,7 @@ unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_TABLE> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 31)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_CURSOR_NAME_LEN;
-impl InfoType<SQL_MAX_CURSOR_NAME_LEN, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_CURSOR_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_CURSOR_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1724,7 +1725,7 @@ unsafe impl AttrGet<SQL_MAX_CURSOR_NAME_LEN> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 10005)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_IDENTIFIER_LEN;
-impl InfoType<SQL_MAX_IDENTIFIER_LEN, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_IDENTIFIER_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_IDENTIFIER_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1735,7 +1736,7 @@ unsafe impl AttrGet<SQL_MAX_IDENTIFIER_LEN> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 102)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_INDEX_SIZE;
-impl InfoType<SQL_MAX_INDEX_SIZE, V3> for SQLUINTEGER {}
+impl InfoType<SQL_MAX_INDEX_SIZE, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl Attr<SQL_MAX_INDEX_SIZE> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1746,7 +1747,7 @@ unsafe impl AttrGet<SQL_MAX_INDEX_SIZE> for SQLUINTEGER {}
 #[identifier(SQLUSMALLINT, 33)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_PROCEDURE_NAME_LEN;
-impl InfoType<SQL_MAX_PROCEDURE_NAME_LEN, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_PROCEDURE_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_PROCEDURE_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1757,7 +1758,7 @@ unsafe impl AttrGet<SQL_MAX_PROCEDURE_NAME_LEN> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 104)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_ROW_SIZE;
-impl InfoType<SQL_MAX_ROW_SIZE, V3> for SQLUINTEGER {}
+impl InfoType<SQL_MAX_ROW_SIZE, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl Attr<SQL_MAX_ROW_SIZE> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1768,7 +1769,7 @@ unsafe impl AttrGet<SQL_MAX_ROW_SIZE> for SQLUINTEGER {}
 #[identifier(SQLUSMALLINT, 103)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_ROW_SIZE_INCLUDES_LONG;
-impl InfoType<SQL_MAX_ROW_SIZE_INCLUDES_LONG, V3> for [SQLCHAR] {}
+impl InfoType<SQL_MAX_ROW_SIZE_INCLUDES_LONG, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl Attr<SQL_MAX_ROW_SIZE_INCLUDES_LONG> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1779,7 +1780,7 @@ unsafe impl AttrGet<SQL_MAX_ROW_SIZE_INCLUDES_LONG> for [SQLCHAR] {}
 #[identifier(SQLUSMALLINT, 32)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_SCHEMA_NAME_LEN;
-impl InfoType<SQL_MAX_SCHEMA_NAME_LEN, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_SCHEMA_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_SCHEMA_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1790,7 +1791,7 @@ unsafe impl AttrGet<SQL_MAX_SCHEMA_NAME_LEN> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 105)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_STATEMENT_LEN;
-impl InfoType<SQL_MAX_STATEMENT_LEN, V3> for SQLUINTEGER {}
+impl InfoType<SQL_MAX_STATEMENT_LEN, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl Attr<SQL_MAX_STATEMENT_LEN> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1801,7 +1802,7 @@ unsafe impl AttrGet<SQL_MAX_STATEMENT_LEN> for SQLUINTEGER {}
 #[identifier(SQLUSMALLINT, 35)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_TABLE_NAME_LEN;
-impl InfoType<SQL_MAX_TABLE_NAME_LEN, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_TABLE_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_TABLE_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1812,7 +1813,7 @@ unsafe impl AttrGet<SQL_MAX_TABLE_NAME_LEN> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 106)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_TABLES_IN_SELECT;
-impl InfoType<SQL_MAX_TABLES_IN_SELECT, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_TABLES_IN_SELECT, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_TABLES_IN_SELECT> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1823,7 +1824,7 @@ unsafe impl AttrGet<SQL_MAX_TABLES_IN_SELECT> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 107)]
 #[allow(non_camel_case_types)]
 pub struct SQL_MAX_USER_NAME_LEN;
-impl InfoType<SQL_MAX_USER_NAME_LEN, V3> for SQLUSMALLINT {}
+impl InfoType<SQL_MAX_USER_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_USER_NAME_LEN> for SQLUSMALLINT {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1838,7 +1839,7 @@ unsafe impl AttrGet<SQL_MAX_USER_NAME_LEN> for SQLUSMALLINT {}
 #[identifier(SQLUSMALLINT, 48)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_FUNCTIONS;
-impl InfoType<SQL_CONVERT_FUNCTIONS, V3> for ConvertFunctions {}
+impl InfoType<SQL_CONVERT_FUNCTIONS, SQL_OV_ODBC3> for ConvertFunctions {}
 unsafe impl Attr<SQL_CONVERT_FUNCTIONS> for ConvertFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1849,7 +1850,7 @@ unsafe impl AttrGet<SQL_CONVERT_FUNCTIONS> for ConvertFunctions {}
 #[identifier(SQLUSMALLINT, 49)]
 #[allow(non_camel_case_types)]
 pub struct SQL_NUMERIC_FUNCTIONS;
-impl InfoType<SQL_NUMERIC_FUNCTIONS, V3> for NumericFunctions {}
+impl InfoType<SQL_NUMERIC_FUNCTIONS, SQL_OV_ODBC3> for NumericFunctions {}
 unsafe impl Attr<SQL_NUMERIC_FUNCTIONS> for NumericFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1860,7 +1861,7 @@ unsafe impl AttrGet<SQL_NUMERIC_FUNCTIONS> for NumericFunctions {}
 #[identifier(SQLUSMALLINT, 50)]
 #[allow(non_camel_case_types)]
 pub struct SQL_STRING_FUNCTIONS;
-impl InfoType<SQL_STRING_FUNCTIONS, V3> for StringFunctions {}
+impl InfoType<SQL_STRING_FUNCTIONS, SQL_OV_ODBC3> for StringFunctions {}
 unsafe impl Attr<SQL_STRING_FUNCTIONS> for StringFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1871,7 +1872,7 @@ unsafe impl AttrGet<SQL_STRING_FUNCTIONS> for StringFunctions {}
 #[identifier(SQLUSMALLINT, 51)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SYSTEM_FUNCTIONS;
-impl InfoType<SQL_SYSTEM_FUNCTIONS, V3> for SystemFunctions {}
+impl InfoType<SQL_SYSTEM_FUNCTIONS, SQL_OV_ODBC3> for SystemFunctions {}
 unsafe impl Attr<SQL_SYSTEM_FUNCTIONS> for SystemFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1882,7 +1883,7 @@ unsafe impl AttrGet<SQL_SYSTEM_FUNCTIONS> for SystemFunctions {}
 #[identifier(SQLUSMALLINT, 109)]
 #[allow(non_camel_case_types)]
 pub struct SQL_TIMEDATE_ADD_INTERVALS;
-impl InfoType<SQL_TIMEDATE_ADD_INTERVALS, V3> for TimedateIntervals {}
+impl InfoType<SQL_TIMEDATE_ADD_INTERVALS, SQL_OV_ODBC3> for TimedateIntervals {}
 unsafe impl Attr<SQL_TIMEDATE_ADD_INTERVALS> for TimedateIntervals {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1893,7 +1894,7 @@ unsafe impl AttrGet<SQL_TIMEDATE_ADD_INTERVALS> for TimedateIntervals {}
 #[identifier(SQLUSMALLINT, 110)]
 #[allow(non_camel_case_types)]
 pub struct SQL_TIMEDATE_DIFF_INTERVALS;
-impl InfoType<SQL_TIMEDATE_DIFF_INTERVALS, V3> for TimedateIntervals {}
+impl InfoType<SQL_TIMEDATE_DIFF_INTERVALS, SQL_OV_ODBC3> for TimedateIntervals {}
 unsafe impl Attr<SQL_TIMEDATE_DIFF_INTERVALS> for TimedateIntervals {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1904,7 +1905,7 @@ unsafe impl AttrGet<SQL_TIMEDATE_DIFF_INTERVALS> for TimedateIntervals {}
 #[identifier(SQLUSMALLINT, 52)]
 #[allow(non_camel_case_types)]
 pub struct SQL_TIMEDATE_FUNCTIONS;
-impl InfoType<SQL_TIMEDATE_FUNCTIONS, V3> for TimedateFunctions {}
+impl InfoType<SQL_TIMEDATE_FUNCTIONS, SQL_OV_ODBC3> for TimedateFunctions {}
 unsafe impl Attr<SQL_TIMEDATE_FUNCTIONS> for TimedateFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1919,7 +1920,7 @@ unsafe impl AttrGet<SQL_TIMEDATE_FUNCTIONS> for TimedateFunctions {}
 #[identifier(SQLUSMALLINT, 53)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_BIGINT;
-impl InfoType<SQL_CONVERT_BIGINT, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_BIGINT, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_BIGINT> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1930,7 +1931,7 @@ unsafe impl AttrGet<SQL_CONVERT_BIGINT> for Conversion {}
 #[identifier(SQLUSMALLINT, 54)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_BINARY;
-impl InfoType<SQL_CONVERT_BINARY, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_BINARY, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_BINARY> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1941,7 +1942,7 @@ unsafe impl AttrGet<SQL_CONVERT_BINARY> for Conversion {}
 #[identifier(SQLUSMALLINT, 55)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_BIT;
-impl InfoType<SQL_CONVERT_BIT, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_BIT, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_BIT> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1952,7 +1953,7 @@ unsafe impl AttrGet<SQL_CONVERT_BIT> for Conversion {}
 #[identifier(SQLUSMALLINT, 56)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_CHAR;
-impl InfoType<SQL_CONVERT_CHAR, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_CHAR, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_CHAR> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1963,7 +1964,7 @@ unsafe impl AttrGet<SQL_CONVERT_CHAR> for Conversion {}
 #[identifier(SQLUSMALLINT, 57)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_DATE;
-impl InfoType<SQL_CONVERT_DATE, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_DATE, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_DATE> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1974,7 +1975,7 @@ unsafe impl AttrGet<SQL_CONVERT_DATE> for Conversion {}
 #[identifier(SQLUSMALLINT, 58)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_DECIMAL;
-impl InfoType<SQL_CONVERT_DECIMAL, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_DECIMAL, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_DECIMAL> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1985,7 +1986,7 @@ unsafe impl AttrGet<SQL_CONVERT_DECIMAL> for Conversion {}
 #[identifier(SQLUSMALLINT, 59)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_DOUBLE;
-impl InfoType<SQL_CONVERT_DOUBLE, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_DOUBLE, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_DOUBLE> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -1996,7 +1997,7 @@ unsafe impl AttrGet<SQL_CONVERT_DOUBLE> for Conversion {}
 #[identifier(SQLUSMALLINT, 60)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_FLOAT;
-impl InfoType<SQL_CONVERT_FLOAT, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_FLOAT, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_FLOAT> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2007,7 +2008,7 @@ unsafe impl AttrGet<SQL_CONVERT_FLOAT> for Conversion {}
 #[identifier(SQLUSMALLINT, 61)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_INTEGER;
-impl InfoType<SQL_CONVERT_INTEGER, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_INTEGER, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_INTEGER> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2018,7 +2019,7 @@ unsafe impl AttrGet<SQL_CONVERT_INTEGER> for Conversion {}
 #[identifier(SQLUSMALLINT, 123)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_INTERVAL_DAY_TIME;
-impl InfoType<SQL_CONVERT_INTERVAL_DAY_TIME, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_INTERVAL_DAY_TIME, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_INTERVAL_DAY_TIME> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2029,7 +2030,7 @@ unsafe impl AttrGet<SQL_CONVERT_INTERVAL_DAY_TIME> for Conversion {}
 #[identifier(SQLUSMALLINT, 124)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_INTERVAL_YEAR_MONTH;
-impl InfoType<SQL_CONVERT_INTERVAL_YEAR_MONTH, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_INTERVAL_YEAR_MONTH, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_INTERVAL_YEAR_MONTH> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2040,7 +2041,7 @@ unsafe impl AttrGet<SQL_CONVERT_INTERVAL_YEAR_MONTH> for Conversion {}
 #[identifier(SQLUSMALLINT, 71)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_LONGVARBINARY;
-impl InfoType<SQL_CONVERT_LONGVARBINARY, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_LONGVARBINARY, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_LONGVARBINARY> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2051,7 +2052,7 @@ unsafe impl AttrGet<SQL_CONVERT_LONGVARBINARY> for Conversion {}
 #[identifier(SQLUSMALLINT, 62)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_LONGVARCHAR;
-impl InfoType<SQL_CONVERT_LONGVARCHAR, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_LONGVARCHAR, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_LONGVARCHAR> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2062,7 +2063,7 @@ unsafe impl AttrGet<SQL_CONVERT_LONGVARCHAR> for Conversion {}
 #[identifier(SQLUSMALLINT, 63)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_NUMERIC;
-impl InfoType<SQL_CONVERT_NUMERIC, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_NUMERIC, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_NUMERIC> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2073,7 +2074,7 @@ unsafe impl AttrGet<SQL_CONVERT_NUMERIC> for Conversion {}
 #[identifier(SQLUSMALLINT, 64)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_REAL;
-impl InfoType<SQL_CONVERT_REAL, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_REAL, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_REAL> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2084,7 +2085,7 @@ unsafe impl AttrGet<SQL_CONVERT_REAL> for Conversion {}
 #[identifier(SQLUSMALLINT, 65)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_SMALLINT;
-impl InfoType<SQL_CONVERT_SMALLINT, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_SMALLINT, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_SMALLINT> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2095,7 +2096,7 @@ unsafe impl AttrGet<SQL_CONVERT_SMALLINT> for Conversion {}
 #[identifier(SQLUSMALLINT, 66)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_TIME;
-impl InfoType<SQL_CONVERT_TIME, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_TIME, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_TIME> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2106,7 +2107,7 @@ unsafe impl AttrGet<SQL_CONVERT_TIME> for Conversion {}
 #[identifier(SQLUSMALLINT, 67)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_TIMESTAMP;
-impl InfoType<SQL_CONVERT_TIMESTAMP, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_TIMESTAMP, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_TIMESTAMP> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2117,7 +2118,7 @@ unsafe impl AttrGet<SQL_CONVERT_TIMESTAMP> for Conversion {}
 #[identifier(SQLUSMALLINT, 68)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_TINYINT;
-impl InfoType<SQL_CONVERT_TINYINT, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_TINYINT, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_TINYINT> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2128,7 +2129,7 @@ unsafe impl AttrGet<SQL_CONVERT_TINYINT> for Conversion {}
 #[identifier(SQLUSMALLINT, 69)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_VARBINARY;
-impl InfoType<SQL_CONVERT_VARBINARY, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_VARBINARY, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_VARBINARY> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2139,7 +2140,7 @@ unsafe impl AttrGet<SQL_CONVERT_VARBINARY> for Conversion {}
 #[identifier(SQLUSMALLINT, 70)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_VARCHAR;
-impl InfoType<SQL_CONVERT_VARCHAR, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_VARCHAR, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_VARCHAR> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
@@ -2150,7 +2151,7 @@ unsafe impl AttrGet<SQL_CONVERT_VARCHAR> for Conversion {}
 #[identifier(SQLUSMALLINT, 173)]
 #[allow(non_camel_case_types)]
 pub struct SQL_CONVERT_GUID;
-impl InfoType<SQL_CONVERT_GUID, V3> for Conversion {}
+impl InfoType<SQL_CONVERT_GUID, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_GUID> for Conversion {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;

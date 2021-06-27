@@ -17,7 +17,6 @@ use std::cell::UnsafeCell;
 use std::convert::TryFrom;
 use std::ffi::c_void;
 use std::fmt::Debug;
-use env::OdbcVersion;
 use std::mem::MaybeUninit;
 pub use {api::*, c_types::*, sql_types::*};
 pub use {
@@ -64,26 +63,6 @@ pub type SQLPOINTER = *mut c_void;
 // TODO: https://github.com/rust-lang/rust/issues/35121
 // Use uninhabited type ! when it is available in std
 pub enum Void {}
-
-pub trait Version {
-    const IDENTIFIER: OdbcVersion;
-}
-#[derive(Debug)]
-pub enum V3 {}
-impl Version for V3 {
-    const IDENTIFIER: OdbcVersion = env::SQL_OV_ODBC3;
-}
-#[derive(Debug)]
-pub enum V3_8 {
-}
-impl Version for V3_8 {
-    const IDENTIFIER: OdbcVersion = env::SQL_OV_ODBC3_80;
-}
-#[derive(Debug)]
-pub enum V4 {}
-impl Version for V4 {
-    const IDENTIFIER: OdbcVersion = env::SQL_OV_ODBC4;
-}
 
 const SQL_IS_POINTER: SQLSMALLINT = -4;
 const SQL_IS_UINTEGER: SQLSMALLINT = -5;

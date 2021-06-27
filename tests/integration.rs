@@ -1,4 +1,6 @@
-use rs_odbc::env::{CpMatch, SQL_ATTR_CP_MATCH, SQL_CP_RELAXED_MATCH};
+use rs_odbc::env::{
+    CpMatch, SQL_ATTR_CP_MATCH, SQL_CP_RELAXED_MATCH, SQL_OV_ODBC3, SQL_OV_ODBC3_80,
+};
 use rs_odbc::handle::{
     SQLHDBC, SQLHENV, SQLHSTMT, SQL_HANDLE_DBC, SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE,
 };
@@ -9,13 +11,12 @@ use rs_odbc::info::{
 use rs_odbc::stmt::{RefSQLHDESC, SQL_ATTR_APP_ROW_DESC};
 use rs_odbc::{
     sqlreturn::SQL_SUCCESS, SQLAllocHandle, SQLDisconnect, SQLDriverConnectA, SQLFreeHandle,
-    SQLGetEnvAttr, SQLGetInfoA, SQLGetStmtAttrA, SQLSetEnvAttr, SQLCHAR, SQL_DRIVER_COMPLETE, V3,
-    V3_8,
+    SQLGetEnvAttr, SQLGetInfoA, SQLGetStmtAttrA, SQLSetEnvAttr, SQLCHAR, SQL_DRIVER_COMPLETE,
 };
 use std::mem::MaybeUninit;
 
-fn get_env_handle() -> SQLHENV<V3_8> {
-    let mut env = MaybeUninit::<SQLHENV<_>>::zeroed();
+fn get_env_handle() -> SQLHENV<SQL_OV_ODBC3_80> {
+    let mut env = MaybeUninit::zeroed();
 
     let res = SQLAllocHandle(SQL_HANDLE_ENV, &mut SQL_NULL_HANDLE, &mut env);
     assert_eq!(SQL_SUCCESS, res);
@@ -23,8 +24,10 @@ fn get_env_handle() -> SQLHENV<V3_8> {
     unsafe { env.assume_init() }
 }
 
-fn connect_to_test_db<'env>(env: &'env mut SQLHENV<V3_8>) -> SQLHDBC<'env, V3_8> {
-    let mut conn = MaybeUninit::<SQLHDBC<_>>::zeroed();
+fn connect_to_test_db<'env>(
+    env: &'env mut SQLHENV<SQL_OV_ODBC3_80>,
+) -> SQLHDBC<'env, SQL_OV_ODBC3_80> {
+    let mut conn = MaybeUninit::zeroed();
 
     let res = SQLAllocHandle(SQL_HANDLE_DBC, env, &mut conn);
     assert_eq!(SQL_SUCCESS, res);
@@ -47,18 +50,18 @@ fn connect_to_test_db<'env>(env: &'env mut SQLHENV<V3_8>) -> SQLHDBC<'env, V3_8>
 
 #[test]
 fn alloc_env() {
-    let mut env = MaybeUninit::<SQLHENV<V3>>::zeroed();
+    let mut env = MaybeUninit::<SQLHENV<SQL_OV_ODBC3>>::zeroed();
     let res = SQLAllocHandle(SQL_HANDLE_ENV, &mut SQL_NULL_HANDLE, &mut env);
     assert_eq!(SQL_SUCCESS, res);
 }
 
 #[test]
 fn set_get_env_attr() {
-    let mut env = MaybeUninit::<SQLHENV<V3_8>>::zeroed();
+    let mut env = MaybeUninit::zeroed();
     let res = SQLAllocHandle(SQL_HANDLE_ENV, &mut SQL_NULL_HANDLE, &mut env);
     assert_eq!(SQL_SUCCESS, res);
 
-    let mut env = unsafe { env.assume_init() };
+    let mut env: SQLHENV<SQL_OV_ODBC3_80> = unsafe { env.assume_init() };
     let res = SQLSetEnvAttr(&mut env, SQL_ATTR_CP_MATCH, SQL_CP_RELAXED_MATCH);
     assert_eq!(SQL_SUCCESS, res);
 
@@ -72,17 +75,17 @@ fn set_get_env_attr() {
 
 #[test]
 fn db_connect() {
-    let mut env = MaybeUninit::<SQLHENV<V3_8>>::zeroed();
-    let mut conn = MaybeUninit::<SQLHDBC<_>>::zeroed();
+    let mut env = MaybeUninit::zeroed();
+    let mut conn = MaybeUninit::zeroed();
 
     let res = SQLAllocHandle(SQL_HANDLE_ENV, &mut SQL_NULL_HANDLE, &mut env);
     assert_eq!(SQL_SUCCESS, res);
 
-    let mut env = unsafe { env.assume_init() };
+    let mut env: SQLHENV<SQL_OV_ODBC3_80> = unsafe { env.assume_init() };
     let res = SQLAllocHandle(SQL_HANDLE_DBC, &mut env, &mut conn);
     assert_eq!(SQL_SUCCESS, res);
 
-    let mut conn = unsafe { conn.assume_init() };
+    let mut conn: SQLHDBC<_> = unsafe { conn.assume_init() };
 
     let conn_string = "DSN=MariaDB;Database=rs_odbc_test;";
     let mut outstr: [MaybeUninit<_>; 1024] = unsafe { MaybeUninit::zeroed().assume_init() };
@@ -120,7 +123,7 @@ fn get_handle() {
     let mut env = get_env_handle();
     let mut conn = connect_to_test_db(&mut env);
     let mut stmt = MaybeUninit::<SQLHSTMT<_>>::zeroed();
-    let mut desc = MaybeUninit::<RefSQLHDESC<V3_8, _>>::zeroed();
+    let mut desc = MaybeUninit::<RefSQLHDESC<SQL_OV_ODBC3_80, _>>::zeroed();
 
     let res = SQLAllocHandle(SQL_HANDLE_STMT, &conn, &mut stmt);
     assert_eq!(SQL_SUCCESS, res);

@@ -1,7 +1,8 @@
+use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::handle::{Handle, SQLHSTMT};
 use crate::{
-    sqlreturn::SQLRETURN, AsMutSQLPOINTER, Attr, AttrLen, AttrGet, Ident, OdbcDefined, True,
-    Version, Void, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLWCHAR, V3, V3_8, V4,
+    sqlreturn::SQLRETURN, AsMutSQLPOINTER, Attr, AttrGet, AttrLen, Ident, OdbcDefined, True, Void,
+    SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
@@ -112,10 +113,10 @@ unsafe impl<C> AttrLen<OdbcDefined, True, SQLSMALLINT> for MaybeUninit<SQLSTATE<
 }
 
 // Implement DiagField for all versions of diag field attributes
-//impl<D: Ident, T: Ident> DiagField<D, V3_8> for T where T: DiagField<D, V3> {}
-//impl<D: Ident, T: Ident> DiagField<D, V4> for T where T: DiagField<D, V3_8> {}
-//impl<D: Ident> DiagField<D, V3_8> for [SQLCHAR] where [SQLCHAR]: DiagField<D, V3> {}
-//impl<D: Ident> DiagField<D, V4> for [SQLCHAR] where [SQLCHAR]: DiagField<D, V3_8> {}
+//impl<D: Ident, T: Ident> DiagField<D, SQL_OV_ODBC3_80> for T where T: DiagField<D, SQL_OV_ODBC3> {}
+//impl<D: Ident, T: Ident> DiagField<D, SQL_OV_ODBC4> for T where T: DiagField<D, SQL_OV_ODBC3_80> {}
+//impl<D: Ident> DiagField<D, SQL_OV_ODBC3_80> for [SQLCHAR] where [SQLCHAR]: DiagField<D, SQL_OV_ODBC3> {}
+//impl<D: Ident> DiagField<D, SQL_OV_ODBC4> for [SQLCHAR] where [SQLCHAR]: DiagField<D, SQL_OV_ODBC3_80> {}
 
 // Implement DiagField for unicode character diag field attributes
 impl<H: Handle, D: Ident> DiagField<H, D> for [SQLWCHAR] where
@@ -158,7 +159,7 @@ unsafe impl Attr<SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_, V3>, SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {}
+impl DiagField<SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3>, SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {}
 unsafe impl AttrGet<SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {}
 
 #[derive(Ident)]
@@ -169,7 +170,7 @@ unsafe impl Attr<SQL_DIAG_DYNAMIC_FUNCTION> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_, V3>, SQL_DIAG_DYNAMIC_FUNCTION> for [SQLCHAR] {}
+impl DiagField<SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3>, SQL_DIAG_DYNAMIC_FUNCTION> for [SQLCHAR] {}
 unsafe impl AttrGet<SQL_DIAG_DYNAMIC_FUNCTION> for [SQLCHAR] {}
 
 #[derive(Ident)]
@@ -180,7 +181,7 @@ unsafe impl Attr<SQL_DIAG_DYNAMIC_FUNCTION_CODE> for DiagDynamicFunctionCode {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_, V3>, SQL_DIAG_DYNAMIC_FUNCTION_CODE>
+impl DiagField<SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3>, SQL_DIAG_DYNAMIC_FUNCTION_CODE>
     for DiagDynamicFunctionCode
 {
 }
@@ -216,7 +217,7 @@ unsafe impl Attr<SQL_DIAG_ROW_COUNT> for SQLLEN {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_, V3>, SQL_DIAG_ROW_COUNT> for SQLLEN {}
+impl DiagField<SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3>, SQL_DIAG_ROW_COUNT> for SQLLEN {}
 unsafe impl AttrGet<SQL_DIAG_ROW_COUNT> for SQLLEN {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -242,7 +243,7 @@ unsafe impl Attr<SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_, V3>, SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {}
+impl DiagField<SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3>, SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {}
 unsafe impl AttrGet<SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {}
 
 #[derive(Ident)]
@@ -286,7 +287,7 @@ unsafe impl Attr<SQL_DIAG_ROW_NUMBER> for DiagRowNumber {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_, V3>, SQL_DIAG_ROW_NUMBER> for DiagRowNumber {}
+impl DiagField<SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3>, SQL_DIAG_ROW_NUMBER> for DiagRowNumber {}
 unsafe impl AttrGet<SQL_DIAG_ROW_NUMBER> for DiagRowNumber {}
 
 #[derive(Ident)]

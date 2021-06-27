@@ -1,38 +1,41 @@
+use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::{
-    Attr, AttrLen, AttrGet, Ident, OdbcDefined, True, Version, SQLCHAR, SQLLEN, SQLSMALLINT,
-    SQLWCHAR, V3, V3_8, V4,
+    Attr, AttrGet, AttrLen, Ident, OdbcDefined, True, SQLCHAR, SQLLEN, SQLSMALLINT, SQLWCHAR,
 };
 use rs_odbc_derive::Ident;
 use std::mem::MaybeUninit;
 
-pub trait ColAttr<A: Ident, V: Version>:
+pub trait ColAttr<A: Ident, V: OdbcVersion>:
     Attr<A> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>
 {
 }
 
 // Implement ColAttr for all versions of column attributes
-impl<A: Ident, T: Ident> ColAttr<A, V3_8> for T where T: ColAttr<A, V3> {}
-impl<A: Ident, T: Ident> ColAttr<A, V4> for T where T: ColAttr<A, V3_8> {}
-impl<A: Ident> ColAttr<A, V3_8> for [SQLCHAR] where [SQLCHAR]: ColAttr<A, V3> {}
-impl<A: Ident> ColAttr<A, V4> for [SQLCHAR] where [SQLCHAR]: ColAttr<A, V3_8> {}
+impl<A: Ident, T: Ident> ColAttr<A, SQL_OV_ODBC3_80> for T where T: ColAttr<A, SQL_OV_ODBC3> {}
+impl<A: Ident, T: Ident> ColAttr<A, SQL_OV_ODBC4> for T where T: ColAttr<A, SQL_OV_ODBC3_80> {}
+impl<A: Ident> ColAttr<A, SQL_OV_ODBC3_80> for [SQLCHAR] where [SQLCHAR]: ColAttr<A, SQL_OV_ODBC3> {}
+impl<A: Ident> ColAttr<A, SQL_OV_ODBC4> for [SQLCHAR] where [SQLCHAR]: ColAttr<A, SQL_OV_ODBC3_80> {}
 
 // Implement ColAttr for unicode character column attributes
-impl<V: Version, A: Ident> ColAttr<A, V> for [SQLWCHAR] where [SQLCHAR]: ColAttr<A, V, NonBinary = True> {}
+impl<V: OdbcVersion, A: Ident> ColAttr<A, V> for [SQLWCHAR] where
+    [SQLCHAR]: ColAttr<A, V, NonBinary = True>
+{
+}
 
 // Implement ColAttr for uninitialized column attributes
-impl<V: Version, A: Ident, T: Ident> ColAttr<A, V> for MaybeUninit<T>
+impl<V: OdbcVersion, A: Ident, T: Ident> ColAttr<A, V> for MaybeUninit<T>
 where
     T: ColAttr<A, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<V: Version, A: Ident> ColAttr<A, V> for [MaybeUninit<SQLCHAR>]
+impl<V: OdbcVersion, A: Ident> ColAttr<A, V> for [MaybeUninit<SQLCHAR>]
 where
     [SQLCHAR]: ColAttr<A, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<V: Version, A: Ident> ColAttr<A, V> for [MaybeUninit<SQLWCHAR>]
+impl<V: OdbcVersion, A: Ident> ColAttr<A, V> for [MaybeUninit<SQLWCHAR>]
 where
     [SQLWCHAR]: ColAttr<A, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
@@ -40,8 +43,8 @@ where
 }
 
 // Implement ColAttr for references to character column attributes (used by AttrSet)
-impl<V: Version, A: Ident> ColAttr<A, V> for &[SQLCHAR] where [SQLCHAR]: ColAttr<A, V> {}
-impl<V: Version, A: Ident> ColAttr<A, V> for &[SQLWCHAR] where [SQLWCHAR]: ColAttr<A, V> {}
+impl<V: OdbcVersion, A: Ident> ColAttr<A, V> for &[SQLCHAR] where [SQLCHAR]: ColAttr<A, V> {}
+impl<V: OdbcVersion, A: Ident> ColAttr<A, V> for &[SQLWCHAR] where [SQLWCHAR]: ColAttr<A, V> {}
 
 //=====================================================================================//
 //-------------------------------------Attributes--------------------------------------//
