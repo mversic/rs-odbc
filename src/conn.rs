@@ -115,7 +115,7 @@ unsafe impl Attr<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {
 }
 impl ConnAttr<SQL_ATTR_LOGIN_TIMEOUT, SQL_OV_ODBC3> for SQLUINTEGER {
     #[cfg(feature = "odbc_debug")]
-    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3>) {
         ConnectionHandle.assert_not_connected();
     }
 }
@@ -132,7 +132,7 @@ unsafe impl Attr<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {
 }
 impl ConnAttr<SQL_ATTR_PACKET_SIZE, SQL_OV_ODBC3> for SQLUINTEGER {
     #[cfg(feature = "odbc_debug")]
-    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3>) {
         ConnectionHandle.assert_not_connected();
     }
 }
@@ -173,7 +173,7 @@ unsafe impl Attr<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {
 }
 impl ConnAttr<SQL_ATTR_TRANSLATE_LIB, SQL_OV_ODBC3> for [SQLCHAR] {
     #[cfg(feature = "odbc_debug")]
-    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3>) {
         ConnectionHandle.assert_connected();
     }
 }
@@ -217,7 +217,7 @@ unsafe impl Attr<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {
 }
 impl ConnAttr<SQL_ATTR_CONNECTION_DEAD, SQL_OV_ODBC3_80> for ConnectionDead {
     #[cfg(feature = "odbc_debug")]
-    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3_80>) {
         ConnectionHandle.assert_connected();
     }
 }
@@ -233,7 +233,7 @@ unsafe impl Attr<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {
 }
 impl ConnAttr<SQL_ATTR_TXN_ISOLATION, SQL_OV_ODBC3> for TxnIsolation {
     #[cfg(feature = "odbc_debug")]
-    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3>) {
         ConnectionHandle.assert_connected();
     }
 }
@@ -250,7 +250,7 @@ unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 //}
 //impl ConnAttr<SQL_ATTR_TRANSLATE_OPTION, SQL_OV_ODBC3> for SQLUINTEGER {
 //    #[cfg(feature = "odbc_debug")]
-//    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+//    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3>) {
 //        ConnectionHandle.assert_connected();
 //    }
 //}
@@ -263,7 +263,7 @@ unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 //pub struct SQL_ATTR_DBC_INFO_TOKEN;
 //impl ConnAttr<SQL_ATTR_DBC_INFO_TOKEN, SQL_OV_ODBC3_80> for SQLPOINTER {
 //    #[cfg(feature = "odbc_debug")]
-//    fn check_attr(&self, ConnectionHandle: &SQLHDBC) {
+//    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3_80>) {
 //        assert_connected(ConnectionHandle);
 //    }
 //}

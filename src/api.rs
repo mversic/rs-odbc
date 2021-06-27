@@ -68,7 +68,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLBindCol<'buf, V: OdbcVersion, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'buf, V, TT>>(
+pub fn SQLBindCol<'buf, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'buf, V, TT>, V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<'_, '_, 'buf, V>,
     ColumnNumber: SQLUSMALLINT,
     TargetType: TT,
@@ -110,9 +110,9 @@ pub fn SQLBindCol<'buf, V: OdbcVersion, TT: Ident<Type = SQLSMALLINT>, B: Deferr
 #[allow(non_snake_case, unused_variables)]
 pub fn SQLBindParameter<
     'buf,
-    V: OdbcVersion,
     TT: Ident<Type = SQLSMALLINT>,
     B: DeferredBuf<'buf, V, TT>,
+    V: OdbcVersion,
 >(
     StatementHandle: &SQLHSTMT<'_, '_, 'buf, V>,
     ParameterNumber: SQLUSMALLINT,
@@ -291,7 +291,7 @@ pub fn SQLCloseCursor<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETUR
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLColAttributeA<V: OdbcVersion, A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
+pub fn SQLColAttributeA<A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>, V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     ColumnNumber: SQLUSMALLINT,
     FieldIdentifier: A,
@@ -337,7 +337,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLColAttributeW<V: OdbcVersion, A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
+pub fn SQLColAttributeW<A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>, V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     ColumnNumber: SQLUSMALLINT,
     FieldIdentifier: A,
@@ -628,9 +628,9 @@ pub fn SQLConnectW<V: OdbcVersion>(
 #[allow(non_snake_case)]
 // TODO: Not sure if application and implementation descriptors can be interchangeably copied
 // TODO: Do they have to have the same version?
-pub fn SQLCopyDesc<V: OdbcVersion, DT1, DT2>(
-    SourceDescHandle: &SQLHDESC<V, DT1>,
-    TargetDescHandle: &SQLHDESC<V, DT2>,
+pub fn SQLCopyDesc<DT1, DT2, V: OdbcVersion>(
+    SourceDescHandle: &SQLHDESC<DT1, V>,
+    TargetDescHandle: &SQLHDESC<DT2, V>,
 ) -> SQLRETURN
 where
     DT1: for<'buf> DescType<'buf>,
@@ -1214,7 +1214,7 @@ pub fn SQLFreeStmt<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>, Option: FreeSt
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetConnectAttrA<V: OdbcVersion, A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>>(
+pub fn SQLGetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>, V: OdbcVersion>(
     ConnectionHandle: &SQLHDBC<V>,
     Attribute: A,
     ValuePtr: Option<&mut T>,
@@ -1251,7 +1251,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetConnectAttrW<V: OdbcVersion, A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>>(
+pub fn SQLGetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>, V: OdbcVersion>(
     ConnectionHandle: &SQLHDBC<V>,
     Attribute: A,
     ValuePtr: Option<&mut T>,
@@ -1339,7 +1339,7 @@ pub fn SQLGetCursorNameW<V: OdbcVersion>(
 #[inline]
 #[allow(non_snake_case, unused_variables)]
 // TODO: This function must be unsafe if SQL_ARD_TYPE and SQL_APD_TYPE are allowed to be used
-pub fn SQLGetData<V: OdbcVersion, TT: Ident<Type = SQLSMALLINT>, B: CData<V, TT>>(
+pub fn SQLGetData<TT: Ident<Type = SQLSMALLINT>, B: CData<V, TT>, V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     Col_or_Param_Num: SQLUSMALLINT,
     TargetType: TT,
@@ -1370,8 +1370,8 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetDescFieldA<V: OdbcVersion, DT, A: Ident<Type = SQLSMALLINT>, T: DescField<DT, A>>(
-    DescriptorHandle: &mut SQLHDESC<V, DT>,
+pub fn SQLGetDescFieldA<DT, A: Ident<Type = SQLSMALLINT>, T: DescField<DT, A>, V: OdbcVersion>(
+    DescriptorHandle: &mut SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     FieldIdentifier: A,
     ValuePtr: Option<&mut T>,
@@ -1409,8 +1409,8 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetDescFieldW<V: OdbcVersion, DT, A: Ident<Type = SQLSMALLINT>, T: DescField<DT, A>>(
-    DescriptorHandle: &mut SQLHDESC<V, DT>,
+pub fn SQLGetDescFieldW<DT, A: Ident<Type = SQLSMALLINT>, T: DescField<DT, A>, V: OdbcVersion>(
+    DescriptorHandle: &mut SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     FieldIdentifier: A,
     ValuePtr: Option<&mut T>,
@@ -1448,8 +1448,8 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetDescRecA<V: OdbcVersion, DT>(
-    DescriptorHandle: &SQLHDESC<V, DT>,
+pub fn SQLGetDescRecA<DT, V: OdbcVersion>(
+    DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     Name: Option<&mut [MaybeUninit<SQLCHAR>]>,
     StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
@@ -1490,8 +1490,8 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetDescRecW<V: OdbcVersion, DT>(
-    DescriptorHandle: &SQLHDESC<V, DT>,
+pub fn SQLGetDescRecW<DT, V: OdbcVersion>(
+    DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     Name: Option<&mut [MaybeUninit<SQLWCHAR>]>,
     StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
@@ -1692,7 +1692,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetEnvAttr<V: OdbcVersion, A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>>(
+pub fn SQLGetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>, V: OdbcVersion>(
     EnvironmentHandle: &SQLHENV<V>,
     Attribute: A,
     ValuePtr: Option<&mut T>,
@@ -1747,7 +1747,7 @@ pub fn SQLGetFunctions<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetInfoA<V: OdbcVersion, I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>>(
+pub fn SQLGetInfoA<I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>, V: OdbcVersion>(
     ConnectionHandle: &SQLHDBC<V>,
     InfoType: I,
     InfoValuePtr: Option<&mut T>,
@@ -1780,7 +1780,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetInfoW<V: OdbcVersion, I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>>(
+pub fn SQLGetInfoW<I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>, V: OdbcVersion>(
     ConnectionHandle: &SQLHDBC<V>,
     InfoType: I,
     InfoValuePtr: Option<&mut T>,
@@ -1816,9 +1816,9 @@ where
 pub fn SQLGetStmtAttrA<
     'stmt,
     'buf,
-    V: OdbcVersion,
     A: Ident<Type = SQLINTEGER>,
     T: StmtAttr<'stmt, 'buf, A, V>,
+    V: OdbcVersion,
 >(
     StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
     Attribute: A,
@@ -1859,9 +1859,9 @@ where
 pub fn SQLGetStmtAttrW<
     'stmt,
     'buf,
-    V: OdbcVersion,
     A: Ident<Type = SQLINTEGER>,
     T: StmtAttr<'stmt, 'buf, A, V>,
+    V: OdbcVersion,
 >(
     StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
     Attribute: A,
@@ -2285,7 +2285,7 @@ pub fn SQLProceduresW<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub unsafe fn SQLPutData<V: OdbcVersion, TT: Ident, B: CData<V, TT>>(
+pub unsafe fn SQLPutData<TT: Ident, B: CData<V, TT>, V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     DataPtr: Option<&B>,
 ) -> SQLRETURN
@@ -2323,7 +2323,7 @@ pub fn SQLRowCount<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetConnectAttrA<V: OdbcVersion, A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>>(
+pub fn SQLSetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>, V: OdbcVersion>(
     ConnectionHandle: &SQLHDBC<V>,
     Attribute: A,
     ValuePtr: T,
@@ -2351,7 +2351,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetConnectAttrW<V: OdbcVersion, A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>>(
+pub fn SQLSetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>, V: OdbcVersion>(
     ConnectionHandle: &SQLHDBC<V>,
     Attribute: A,
     ValuePtr: T,
@@ -2417,8 +2417,8 @@ pub fn SQLSetCursorNameW<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetDescFieldA<V: OdbcVersion, DT, A: Ident<Type = SQLSMALLINT>, T: WriteDescField<DT, A>>(
-    DescriptorHandle: &SQLHDESC<V, DT>,
+pub fn SQLSetDescFieldA<DT, A: Ident<Type = SQLSMALLINT>, T: WriteDescField<DT, A>, V: OdbcVersion>(
+    DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     FieldIdentifier: A,
     ValuePtr: Option<T>,
@@ -2455,8 +2455,8 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetDescFieldW<V: OdbcVersion, DT, A: Ident<Type = SQLSMALLINT>, T: WriteDescField<DT, A>>(
-    DescriptorHandle: &SQLHDESC<V, DT>,
+pub fn SQLSetDescFieldW<DT, A: Ident<Type = SQLSMALLINT>, T: WriteDescField<DT, A>, V: OdbcVersion>(
+    DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     FieldIdentifier: A,
     ValuePtr: Option<T>,
@@ -2494,8 +2494,8 @@ where
 #[inline]
 #[allow(non_snake_case)]
 // TODO: Must not accept IRD
-pub fn SQLSetDescRec<'buf, V: OdbcVersion, DT, PTR>(
-    DescriptorHandle: &SQLHDESC<V, DT>,
+pub fn SQLSetDescRec<'buf, DT, PTR, V: OdbcVersion>(
+    DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     Type: SqlType,
     SubType: Option<DatetimeIntervalCode>,
@@ -2536,7 +2536,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetEnvAttr<V: OdbcVersion, A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>>(
+pub fn SQLSetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>, V: OdbcVersion>(
     // Reference to SQLHENV is mutable to make it impossible to have a connection
     // handle allocated on the environment handle when calling this function
     EnvironmentHandle: &mut SQLHENV<V>,
@@ -2589,9 +2589,9 @@ pub unsafe fn SQLSetPos<V: OdbcVersion>(
 pub fn SQLSetStmtAttrA<
     'stmt,
     'buf,
-    V: OdbcVersion,
     A: Ident<Type = SQLINTEGER>,
     T: StmtAttr<'stmt, 'buf, A, V>,
+    V: OdbcVersion,
 >(
     StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, V>,
     Attribute: A,
@@ -2627,9 +2627,9 @@ where
 pub fn SQLSetStmtAttrW<
     'stmt,
     'buf,
-    V: OdbcVersion,
     A: Ident<Type = SQLINTEGER>,
     T: StmtAttr<'stmt, 'buf, A, V>,
+    V: OdbcVersion,
 >(
     StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, V>,
     Attribute: A,

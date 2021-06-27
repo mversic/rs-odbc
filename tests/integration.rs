@@ -123,7 +123,7 @@ fn get_handle() {
     let mut env = get_env_handle();
     let mut conn = connect_to_test_db(&mut env);
     let mut stmt = MaybeUninit::<SQLHSTMT<_>>::zeroed();
-    let mut desc = MaybeUninit::<RefSQLHDESC<SQL_OV_ODBC3_80, _>>::zeroed();
+    let mut desc = MaybeUninit::<RefSQLHDESC<_, _>>::zeroed();
 
     let res = SQLAllocHandle(SQL_HANDLE_STMT, &conn, &mut stmt);
     assert_eq!(SQL_SUCCESS, res);

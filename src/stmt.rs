@@ -71,15 +71,55 @@ pub trait StmtAttr<'stmt, 'buf, A: Ident, V: OdbcVersion>:
     }
 }
 
+fn get_ard<'stmt, 'buf, V: OdbcVersion>(
+    desc: &mut MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, V>>,
+    StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
+) -> SQLRETURN {
+    if let Some(explicit_ard) = StatementHandle.explicit_ard.get() {
+        *desc = MaybeUninit::new(RefSQLHDESC(explicit_ard));
+    } else {
+        *desc = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ard));
+    }
+
+    SQL_SUCCESS
+}
+fn get_apd<'stmt, 'buf, V: OdbcVersion>(
+    desc: &mut MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, V>>,
+    StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
+) -> SQLRETURN {
+    if let Some(explicit_apd) = StatementHandle.explicit_apd.get() {
+        *desc = MaybeUninit::new(RefSQLHDESC(explicit_apd));
+    } else {
+        *desc = MaybeUninit::new(RefSQLHDESC(&StatementHandle.apd));
+    }
+
+    SQL_SUCCESS
+}
+fn get_ird<'stmt, 'buf, V: OdbcVersion>(
+    desc: &mut MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<RowDesc>, V>>,
+    StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
+) -> SQLRETURN {
+    *desc = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ird));
+    SQL_SUCCESS
+}
+
+fn get_ipd<'stmt, 'buf, V: OdbcVersion>(
+    desc: &mut MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<ParamDesc>, V>>,
+    StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
+) -> SQLRETURN {
+    *desc = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ipd));
+    SQL_SUCCESS
+}
+
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy)]
-pub struct RefSQLHDESC<'stmt, V: OdbcVersion, T>(&'stmt SQLHDESC<'stmt, V, T>);
-impl<'stmt, V: OdbcVersion, T> Ident for RefSQLHDESC<'stmt, V, T> {
+pub struct RefSQLHDESC<'stmt, T, V: OdbcVersion>(&'stmt SQLHDESC<'stmt, T, V>);
+impl<'stmt, T, V: OdbcVersion> Ident for RefSQLHDESC<'stmt, T, V> {
     type Type = <Option<&'stmt SQLHDESC<'stmt, V, T>> as Ident>::Type;
-    const IDENTIFIER: Self::Type = <Option<&SQLHDESC<V, T>>>::IDENTIFIER;
+    const IDENTIFIER: Self::Type = <Option<&SQLHDESC<T, V>>>::IDENTIFIER;
 }
-unsafe impl<'buf, V: OdbcVersion, T: crate::handle::DescType<'buf>> AsMutSQLPOINTER
-    for MaybeUninit<RefSQLHDESC<'_, V, T>>
+unsafe impl<'buf, T: crate::handle::DescType<'buf>, V: OdbcVersion> AsMutSQLPOINTER
+    for MaybeUninit<RefSQLHDESC<'_, T, V>>
 {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
         if cfg!(feature = "odbc_debug") {
@@ -91,8 +131,8 @@ unsafe impl<'buf, V: OdbcVersion, T: crate::handle::DescType<'buf>> AsMutSQLPOIN
         }
     }
 }
-impl<'stmt, V: OdbcVersion, T> Deref for RefSQLHDESC<'stmt, V, T> {
-    type Target = SQLHDESC<'stmt, V, T>;
+impl<'stmt, T, V: OdbcVersion> Deref for RefSQLHDESC<'stmt, T, V> {
+    type Target = SQLHDESC<'stmt, T, V>;
 
     fn deref(&self) -> &Self::Target {
         self.0
@@ -119,37 +159,38 @@ impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC4> for [SQLCHAR]
 }
 
 // Implement StmtAttr for unicode character statement attributes
-impl<'stmt, 'buf, V: OdbcVersion, A: Ident> StmtAttr<'stmt, 'buf, A, V> for [SQLWCHAR] where
+impl<'stmt, 'buf, A: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V> for [SQLWCHAR] where
     [SQLCHAR]: StmtAttr<'stmt, 'buf, A, V, NonBinary = True>
 {
 }
 
 // Implement StmtAttr for uninitialized statement attributes
-impl<'stmt, 'buf, V: OdbcVersion, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A, V> for MaybeUninit<T>
+impl<'stmt, 'buf, A: Ident, T: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V> for MaybeUninit<T>
 where
     T: StmtAttr<'stmt, 'buf, A, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }
-impl<'stmt, 'buf, V: OdbcVersion, A: Ident> StmtAttr<'stmt, 'buf, A, V> for [MaybeUninit<SQLCHAR>]
+impl<'stmt, 'buf, A: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V> for [MaybeUninit<SQLCHAR>]
 where
     [SQLCHAR]: StmtAttr<'stmt, 'buf, A, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }
-impl<'stmt, 'buf, V: OdbcVersion, A: Ident> StmtAttr<'stmt, 'buf, A, V> for [MaybeUninit<SQLWCHAR>]
+impl<'stmt, 'buf, A: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V>
+    for [MaybeUninit<SQLWCHAR>]
 where
     [SQLWCHAR]: StmtAttr<'stmt, 'buf, A, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }
 
-// Implement StmtAttr for references to character connection attributes (used by AttrSet)
-impl<'stmt, 'buf, V: OdbcVersion, A: Ident> StmtAttr<'stmt, 'buf, A, V> for &[SQLCHAR] where
+// Implement StmtAttr for references to character statement attributes (used by AttrSet)
+impl<'stmt, 'buf, A: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V> for &[SQLCHAR] where
     [SQLCHAR]: StmtAttr<'stmt, 'buf, A, V>
 {
 }
-impl<'stmt, 'buf, V: OdbcVersion, A: Ident> StmtAttr<'stmt, 'buf, A, V> for &[SQLWCHAR] where
+impl<'stmt, 'buf, A: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V> for &[SQLWCHAR] where
     [SQLWCHAR]: StmtAttr<'stmt, 'buf, A, V>
 {
 }
@@ -387,154 +428,203 @@ impl StmtAttr<'_, '_, SQL_ATTR_USE_BOOKMARKS, SQL_OV_ODBC3> for UseBookmarks {}
 #[identifier(SQLINTEGER, 10010)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_APP_ROW_DESC;
-unsafe impl<V: OdbcVersion> Attr<SQL_ATTR_APP_ROW_DESC> for Option<&SQLHDESC<'_, V, AppDesc<'_>>> {
+unsafe impl<V: OdbcVersion> Attr<SQL_ATTR_APP_ROW_DESC> for Option<&SQLHDESC<'_, AppDesc<'_>, V>> {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
 unsafe impl<'stmt, 'buf, V: OdbcVersion> Attr<SQL_ATTR_APP_ROW_DESC>
-    for MaybeUninit<RefSQLHDESC<'stmt, V, AppDesc<'buf>>>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, V>>
 {
-    type DefinedBy = <Option<&'stmt SQLHDESC<'stmt, V, AppDesc<'buf>>> as Attr<
+    type DefinedBy = <Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>, V>> as Attr<
         SQL_ATTR_APP_ROW_DESC,
     >>::DefinedBy;
-    type NonBinary = <Option<&'stmt SQLHDESC<'stmt, V, AppDesc<'buf>>> as Attr<
+    type NonBinary = <Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>, V>> as Attr<
         SQL_ATTR_APP_ROW_DESC,
     >>::NonBinary;
 }
-impl<'stmt, 'buf, V: OdbcVersion> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC3>
-    for MaybeUninit<RefSQLHDESC<'stmt, V, AppDesc<'buf>>>
+
+impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC3>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, SQL_OV_ODBC3>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf>,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
-        if let Some(explicit_ard) = StatementHandle.explicit_ard.get() {
-            *self = MaybeUninit::new(RefSQLHDESC(explicit_ard));
-        } else {
-            *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ard));
-        }
-
-        SQL_SUCCESS
+        get_ard(self, StatementHandle)
     }
 
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf>,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
-        if let Some(explicit_ard) = StatementHandle.explicit_ard.get() {
-            *self = MaybeUninit::new(RefSQLHDESC(explicit_ard));
-        } else {
-            *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ard));
-        }
-
-        SQL_SUCCESS
+        get_ard(self, StatementHandle)
     }
 }
-impl<'stmt, 'buf, V: OdbcVersion> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC3_80>
-    for MaybeUninit<RefSQLHDESC<'stmt, V, AppDesc<'buf>>>
-{
-    // FIXME: Use previous implementation
-}
-impl<'stmt, 'buf, V: OdbcVersion> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC4>
-    for MaybeUninit<RefSQLHDESC<'stmt, V, AppDesc<'buf>>>
-{
-    // FIXME: Use previous implementation
-}
-
-impl<'stmt, 'buf, V: OdbcVersion> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC3>
-    for Option<&'stmt SQLHDESC<'_, V, AppDesc<'buf>>>
+impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC3_80>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, SQL_OV_ODBC3_80>>
 {
     #[cfg(feature = "odbc_debug")]
-    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf>) {
+    fn readA(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_ard(self, StatementHandle)
+    }
+
+    #[cfg(feature = "odbc_debug")]
+    fn readW(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_ard(self, StatementHandle)
+    }
+}
+impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC4>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, SQL_OV_ODBC4>>
+{
+    #[cfg(feature = "odbc_debug")]
+    fn readA(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_ard(self, StatementHandle)
+    }
+
+    #[cfg(feature = "odbc_debug")]
+    fn readW(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_ard(self, StatementHandle)
+    }
+}
+
+impl<'stmt, 'buf, V: OdbcVersion> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, V>
+    for Option<&'stmt SQLHDESC<'_, AppDesc<'buf>, V>>
+{
+    #[cfg(feature = "odbc_debug")]
+    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, V>) {
         StatementHandle.explicit_ard.set(*self);
     }
 }
 unsafe impl<V: OdbcVersion> AttrGet<SQL_ATTR_APP_ROW_DESC>
-    for MaybeUninit<RefSQLHDESC<'_, V, AppDesc<'_>>>
+    for MaybeUninit<RefSQLHDESC<'_, AppDesc<'_>, V>>
 {
 }
-unsafe impl<V: OdbcVersion> AttrSet<SQL_ATTR_APP_ROW_DESC> for Option<&SQLHDESC<'_, V, AppDesc<'_>>> {}
+unsafe impl<V: OdbcVersion> AttrSet<SQL_ATTR_APP_ROW_DESC>
+    for Option<&SQLHDESC<'_, AppDesc<'_>, V>>
+{
+}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 10011)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_APP_PARAM_DESC;
-unsafe impl<V: OdbcVersion> Attr<SQL_ATTR_APP_PARAM_DESC> for Option<&SQLHDESC<'_, V, AppDesc<'_>>> {
+unsafe impl<V: OdbcVersion> Attr<SQL_ATTR_APP_PARAM_DESC>
+    for Option<&SQLHDESC<'_, AppDesc<'_>, V>>
+{
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
 unsafe impl<'stmt, 'buf, V: OdbcVersion> Attr<SQL_ATTR_APP_PARAM_DESC>
-    for MaybeUninit<RefSQLHDESC<'stmt, V, AppDesc<'buf>>>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, V>>
 {
-    type DefinedBy = <Option<&'stmt SQLHDESC<'stmt, V, AppDesc<'buf>>> as Attr<
+    type DefinedBy = <Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>, V>> as Attr<
         SQL_ATTR_APP_PARAM_DESC,
     >>::DefinedBy;
-    type NonBinary = <Option<&'stmt SQLHDESC<'stmt, V, AppDesc<'buf>>> as Attr<
+    type NonBinary = <Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>, V>> as Attr<
         SQL_ATTR_APP_PARAM_DESC,
     >>::NonBinary;
 }
-impl<'stmt, 'buf, V: OdbcVersion> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC3>
-    for MaybeUninit<RefSQLHDESC<'stmt, V, AppDesc<'buf>>>
+impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC3>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, SQL_OV_ODBC3>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf>,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
-        if let Some(explicit_apd) = StatementHandle.explicit_apd.get() {
-            *self = MaybeUninit::new(RefSQLHDESC(explicit_apd));
-        } else {
-            *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.apd));
-        }
-
-        SQL_SUCCESS
+        get_apd(self, StatementHandle)
     }
 
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf>,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
-        if let Some(explicit_apd) = StatementHandle.explicit_apd.get() {
-            *self = MaybeUninit::new(RefSQLHDESC(explicit_apd));
-        } else {
-            *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.apd));
-        }
-
-        SQL_SUCCESS
+        get_apd(self, StatementHandle)
     }
 }
-impl<'stmt, 'buf, V: OdbcVersion> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC3_80>
-    for MaybeUninit<RefSQLHDESC<'stmt, V, AppDesc<'buf>>>
-{
-    // FIXME: Use previous implementation
-}
-impl<'stmt, 'buf, V: OdbcVersion> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC4>
-    for MaybeUninit<RefSQLHDESC<'stmt, V, AppDesc<'buf>>>
-{
-    // FIXME: Use previous implementation
-}
-
-impl<'stmt, 'buf, V: OdbcVersion> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC3>
-    for Option<&'stmt SQLHDESC<'_, V, AppDesc<'buf>>>
+impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC3_80>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, SQL_OV_ODBC3_80>>
 {
     #[cfg(feature = "odbc_debug")]
-    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf>) {
+    fn readA(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_apd(self, StatementHandle)
+    }
+
+    #[cfg(feature = "odbc_debug")]
+    fn readW(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_apd(self, StatementHandle)
+    }
+}
+impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC4>
+    for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, SQL_OV_ODBC4>>
+{
+    #[cfg(feature = "odbc_debug")]
+    fn readA(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_apd(self, StatementHandle)
+    }
+
+    #[cfg(feature = "odbc_debug")]
+    fn readW(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_apd(self, StatementHandle)
+    }
+}
+
+impl<'stmt, 'buf, V: OdbcVersion> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, V>
+    for Option<&'stmt SQLHDESC<'_, AppDesc<'buf>, V>>
+{
+    #[cfg(feature = "odbc_debug")]
+    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, V>) {
         StatementHandle.explicit_apd.set(*self);
     }
 }
 
 unsafe impl<V: OdbcVersion> AttrGet<SQL_ATTR_APP_PARAM_DESC>
-    for MaybeUninit<RefSQLHDESC<'_, V, AppDesc<'_>>>
+    for MaybeUninit<RefSQLHDESC<'_, AppDesc<'_>, V>>
 {
 }
-unsafe impl<V: OdbcVersion> AttrSet<SQL_ATTR_APP_PARAM_DESC> for Option<&SQLHDESC<'_, V, AppDesc<'_>>> {}
+unsafe impl<V: OdbcVersion> AttrSet<SQL_ATTR_APP_PARAM_DESC>
+    for Option<&SQLHDESC<'_, AppDesc<'_>, V>>
+{
+}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 10012)]
@@ -542,36 +632,75 @@ unsafe impl<V: OdbcVersion> AttrSet<SQL_ATTR_APP_PARAM_DESC> for Option<&SQLHDES
 // This is read-only attribute
 pub struct SQL_ATTR_IMP_ROW_DESC;
 unsafe impl<V: OdbcVersion> Attr<SQL_ATTR_IMP_ROW_DESC>
-    for MaybeUninit<RefSQLHDESC<'_, V, ImplDesc<RowDesc>>>
+    for MaybeUninit<RefSQLHDESC<'_, ImplDesc<RowDesc>, V>>
 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<'stmt, V: OdbcVersion> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC3>
-    for MaybeUninit<RefSQLHDESC<'stmt, V, ImplDesc<RowDesc>>>
+impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC3>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<RowDesc>, SQL_OV_ODBC3>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT,
+        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
-        *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ird));
-        SQL_SUCCESS
+        get_ird(self, StatementHandle)
     }
 
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT,
+        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
-        *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ird));
-        SQL_SUCCESS
+        get_ird(self, StatementHandle)
     }
 }
+impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC3_80>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<RowDesc>, SQL_OV_ODBC3_80>>
+{
+    #[cfg(feature = "odbc_debug")]
+    fn readA(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3_80>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_ird(self, StatementHandle)
+    }
+    #[cfg(feature = "odbc_debug")]
+    fn readW(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3_80>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_ird(self, StatementHandle)
+    }
+}
+impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC4>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<RowDesc>, SQL_OV_ODBC4>>
+{
+    #[cfg(feature = "odbc_debug")]
+    fn readA(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC4>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_ird(self, StatementHandle)
+    }
+    #[cfg(feature = "odbc_debug")]
+    fn readW(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC4>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_ird(self, StatementHandle)
+    }
+}
+
 unsafe impl<V: OdbcVersion> AttrGet<SQL_ATTR_IMP_ROW_DESC>
-    for MaybeUninit<RefSQLHDESC<'_, V, ImplDesc<RowDesc>>>
+    for MaybeUninit<RefSQLHDESC<'_, ImplDesc<RowDesc>, V>>
 {
 }
 
@@ -581,36 +710,77 @@ unsafe impl<V: OdbcVersion> AttrGet<SQL_ATTR_IMP_ROW_DESC>
 // This is read-only attribute
 pub struct SQL_ATTR_IMP_PARAM_DESC;
 unsafe impl<V: OdbcVersion> Attr<SQL_ATTR_IMP_PARAM_DESC>
-    for MaybeUninit<RefSQLHDESC<'_, V, ImplDesc<ParamDesc>>>
+    for MaybeUninit<RefSQLHDESC<'_, ImplDesc<ParamDesc>, V>>
 {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<'stmt, V: OdbcVersion> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC3>
-    for MaybeUninit<RefSQLHDESC<'stmt, V, ImplDesc<ParamDesc>>>
+impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC3>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<ParamDesc>, SQL_OV_ODBC3>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT,
+        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
-        *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ipd));
-        SQL_SUCCESS
+        get_ipd(self, StatementHandle)
     }
 
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT,
+        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
-        *self = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ipd));
-        SQL_SUCCESS
+        get_ipd(self, StatementHandle)
     }
 }
+impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC3_80>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<ParamDesc>, SQL_OV_ODBC3_80>>
+{
+    #[cfg(feature = "odbc_debug")]
+    fn readA(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3_80>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_ipd(self, StatementHandle)
+    }
+
+    #[cfg(feature = "odbc_debug")]
+    fn readW(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3_80>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_ipd(self, StatementHandle)
+    }
+}
+impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC4>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<ParamDesc>, SQL_OV_ODBC4>>
+{
+    #[cfg(feature = "odbc_debug")]
+    fn readA(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC4>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_ipd(self, StatementHandle)
+    }
+
+    #[cfg(feature = "odbc_debug")]
+    fn readW(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC4>,
+        _: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN {
+        get_ipd(self, StatementHandle)
+    }
+}
+
 unsafe impl<V: OdbcVersion> AttrGet<SQL_ATTR_IMP_PARAM_DESC>
-    for MaybeUninit<RefSQLHDESC<'_, V, ImplDesc<ParamDesc>>>
+    for MaybeUninit<RefSQLHDESC<'_, ImplDesc<ParamDesc>, V>>
 {
 }
 
