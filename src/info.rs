@@ -111,45 +111,45 @@ unsafe impl AttrGet<SQL_CREATE_VIEW> for CreateView {}
 #[identifier(SQLUSMALLINT, 155)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_DATETIME_FUNCTIONS;
-impl InfoType<SQL_SQL92_DATETIME_FUNCTIONS, SQL_OV_ODBC3> for Sql92DatetimeFunctions {}
-unsafe impl Attr<SQL_SQL92_DATETIME_FUNCTIONS> for Sql92DatetimeFunctions {
+impl InfoType<SQL_SQL92_DATETIME_FUNCTIONS, SQL_OV_ODBC3> for DatetimeFunctions {}
+unsafe impl Attr<SQL_SQL92_DATETIME_FUNCTIONS> for DatetimeFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrGet<SQL_SQL92_DATETIME_FUNCTIONS> for Sql92DatetimeFunctions {}
+unsafe impl AttrGet<SQL_SQL92_DATETIME_FUNCTIONS> for DatetimeFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 156)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_FOREIGN_KEY_DELETE_RULE;
-impl InfoType<SQL_SQL92_FOREIGN_KEY_DELETE_RULE, SQL_OV_ODBC3> for Sql92ForeignKeyDeleteRule {}
-unsafe impl Attr<SQL_SQL92_FOREIGN_KEY_DELETE_RULE> for Sql92ForeignKeyDeleteRule {
+impl InfoType<SQL_SQL92_FOREIGN_KEY_DELETE_RULE, SQL_OV_ODBC3> for ForeignKeyDeleteRule {}
+unsafe impl Attr<SQL_SQL92_FOREIGN_KEY_DELETE_RULE> for ForeignKeyDeleteRule {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrGet<SQL_SQL92_FOREIGN_KEY_DELETE_RULE> for Sql92ForeignKeyDeleteRule {}
+unsafe impl AttrGet<SQL_SQL92_FOREIGN_KEY_DELETE_RULE> for ForeignKeyDeleteRule {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 157)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_FOREIGN_KEY_UPDATE_RULE;
-impl InfoType<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE, SQL_OV_ODBC3> for Sql92ForeignKeyUpdateRule {}
-unsafe impl Attr<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE> for Sql92ForeignKeyUpdateRule {
+impl InfoType<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE, SQL_OV_ODBC3> for ForeignKeyUpdateRule {}
+unsafe impl Attr<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE> for ForeignKeyUpdateRule {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrGet<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE> for Sql92ForeignKeyUpdateRule {}
+unsafe impl AttrGet<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE> for ForeignKeyUpdateRule {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 158)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_GRANT;
-impl InfoType<SQL_SQL92_GRANT, SQL_OV_ODBC3> for Sql92Grant {}
-unsafe impl Attr<SQL_SQL92_GRANT> for Sql92Grant {
+impl InfoType<SQL_SQL92_GRANT, SQL_OV_ODBC3> for Grant {}
+unsafe impl Attr<SQL_SQL92_GRANT> for Grant {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrGet<SQL_SQL92_GRANT> for Sql92Grant {}
+unsafe impl AttrGet<SQL_SQL92_GRANT> for Grant {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 119)]
@@ -166,78 +166,78 @@ unsafe impl AttrGet<SQL_DATETIME_LITERALS> for DatetimeLiterals {}
 #[identifier(SQLUSMALLINT, 159)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_NUMERIC_VALUE_FUNCTIONS;
-impl InfoType<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS, SQL_OV_ODBC3> for Sql92NumericValueFunctions {}
-unsafe impl Attr<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS> for Sql92NumericValueFunctions {
+impl InfoType<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS, SQL_OV_ODBC3> for NumericValueFunctions {}
+unsafe impl Attr<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS> for NumericValueFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrGet<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS> for Sql92NumericValueFunctions {}
+unsafe impl AttrGet<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS> for NumericValueFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 160)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_PREDICATES;
-impl InfoType<SQL_SQL92_PREDICATES, SQL_OV_ODBC3> for Sql92Predicates {}
-unsafe impl Attr<SQL_SQL92_PREDICATES> for Sql92Predicates {
+impl InfoType<SQL_SQL92_PREDICATES, SQL_OV_ODBC3> for Predicates {}
+unsafe impl Attr<SQL_SQL92_PREDICATES> for Predicates {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrGet<SQL_SQL92_PREDICATES> for Sql92Predicates {}
+unsafe impl AttrGet<SQL_SQL92_PREDICATES> for Predicates {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 161)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_RELATIONAL_JOIN_OPERATORS;
-impl InfoType<SQL_SQL92_RELATIONAL_JOIN_OPERATORS, SQL_OV_ODBC3> for Sql92RelationalJoinOperators {}
-unsafe impl Attr<SQL_SQL92_RELATIONAL_JOIN_OPERATORS> for Sql92RelationalJoinOperators {
+impl InfoType<SQL_SQL92_RELATIONAL_JOIN_OPERATORS, SQL_OV_ODBC3> for RelationalJoinOperators {}
+unsafe impl Attr<SQL_SQL92_RELATIONAL_JOIN_OPERATORS> for RelationalJoinOperators {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrGet<SQL_SQL92_RELATIONAL_JOIN_OPERATORS> for Sql92RelationalJoinOperators {}
+unsafe impl AttrGet<SQL_SQL92_RELATIONAL_JOIN_OPERATORS> for RelationalJoinOperators {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 162)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_REVOKE;
-impl InfoType<SQL_SQL92_REVOKE, SQL_OV_ODBC3> for Sql92Revoke {}
-unsafe impl Attr<SQL_SQL92_REVOKE> for Sql92Revoke {
+impl InfoType<SQL_SQL92_REVOKE, SQL_OV_ODBC3> for Revoke {}
+unsafe impl Attr<SQL_SQL92_REVOKE> for Revoke {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrGet<SQL_SQL92_REVOKE> for Sql92Revoke {}
+unsafe impl AttrGet<SQL_SQL92_REVOKE> for Revoke {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 163)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_ROW_VALUE_CONSTRUCTOR;
-impl InfoType<SQL_SQL92_ROW_VALUE_CONSTRUCTOR, SQL_OV_ODBC3> for Sql92RowValueConstructor {}
-unsafe impl Attr<SQL_SQL92_ROW_VALUE_CONSTRUCTOR> for Sql92RowValueConstructor {
+impl InfoType<SQL_SQL92_ROW_VALUE_CONSTRUCTOR, SQL_OV_ODBC3> for RowValueConstructor {}
+unsafe impl Attr<SQL_SQL92_ROW_VALUE_CONSTRUCTOR> for RowValueConstructor {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrGet<SQL_SQL92_ROW_VALUE_CONSTRUCTOR> for Sql92RowValueConstructor {}
+unsafe impl AttrGet<SQL_SQL92_ROW_VALUE_CONSTRUCTOR> for RowValueConstructor {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 164)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_STRING_FUNCTIONS;
-impl InfoType<SQL_SQL92_STRING_FUNCTIONS, SQL_OV_ODBC3> for Sql92StringFunctions {}
-unsafe impl Attr<SQL_SQL92_STRING_FUNCTIONS> for Sql92StringFunctions {
+impl InfoType<SQL_SQL92_STRING_FUNCTIONS, SQL_OV_ODBC3> for StringScalarFunctions {}
+unsafe impl Attr<SQL_SQL92_STRING_FUNCTIONS> for StringScalarFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrGet<SQL_SQL92_STRING_FUNCTIONS> for Sql92StringFunctions {}
+unsafe impl AttrGet<SQL_SQL92_STRING_FUNCTIONS> for StringScalarFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 165)]
 #[allow(non_camel_case_types)]
 pub struct SQL_SQL92_VALUE_EXPRESSIONS;
-impl InfoType<SQL_SQL92_VALUE_EXPRESSIONS, SQL_OV_ODBC3> for Sql92ValueExpressions {}
-unsafe impl Attr<SQL_SQL92_VALUE_EXPRESSIONS> for Sql92ValueExpressions {
+impl InfoType<SQL_SQL92_VALUE_EXPRESSIONS, SQL_OV_ODBC3> for ValueExpressions {}
+unsafe impl Attr<SQL_SQL92_VALUE_EXPRESSIONS> for ValueExpressions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrGet<SQL_SQL92_VALUE_EXPRESSIONS> for Sql92ValueExpressions {}
+unsafe impl AttrGet<SQL_SQL92_VALUE_EXPRESSIONS> for ValueExpressions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 166)]
@@ -310,12 +310,12 @@ unsafe impl AttrGet<SQL_BINARY_FUNCTIONS> for BinaryFunctions {}
 #[identifier(SQLUSMALLINT, 176)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ISO_STRING_FUNCTIONS;
-impl InfoType<SQL_ISO_STRING_FUNCTIONS, SQL_OV_ODBC4> for Sql92StringFunctions {}
-unsafe impl Attr<SQL_ISO_STRING_FUNCTIONS> for Sql92StringFunctions {
+impl InfoType<SQL_ISO_STRING_FUNCTIONS, SQL_OV_ODBC4> for StringScalarFunctions {}
+unsafe impl Attr<SQL_ISO_STRING_FUNCTIONS> for StringScalarFunctions {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-unsafe impl AttrGet<SQL_ISO_STRING_FUNCTIONS> for Sql92StringFunctions {}
+unsafe impl AttrGet<SQL_ISO_STRING_FUNCTIONS> for StringScalarFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 177)]
@@ -372,35 +372,115 @@ unsafe impl Attr<SQL_FORMAT_ESCAPE_CLAUSE> for FormatEscapeClause {
 }
 unsafe impl AttrGet<SQL_FORMAT_ESCAPE_CLAUSE> for FormatEscapeClause {}
 
-#[cfg(feature = "v4")]
-pub use SQL_SQL92_DATETIME_FUNCTIONS as SQL_ISO_DATETIME_FUNCTIONS;
+#[derive(Ident)]
+#[identifier(SQLUSMALLINT, 155)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ISO_DATETIME_FUNCTIONS;
+impl InfoType<SQL_ISO_DATETIME_FUNCTIONS, SQL_OV_ODBC4> for DatetimeFunctions {}
+unsafe impl Attr<SQL_ISO_DATETIME_FUNCTIONS> for DatetimeFunctions {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+unsafe impl AttrGet<SQL_ISO_DATETIME_FUNCTIONS> for DatetimeFunctions {}
 
-#[cfg(feature = "v4")]
-pub use SQL_SQL92_FOREIGN_KEY_DELETE_RULE as SQL_ISO_FOREIGN_KEY_DELETE_RULE;
+#[derive(Ident)]
+#[identifier(SQLUSMALLINT, 156)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ISO_FOREIGN_KEY_DELETE_RULE;
+impl InfoType<SQL_ISO_FOREIGN_KEY_DELETE_RULE, SQL_OV_ODBC4> for ForeignKeyDeleteRule {}
+unsafe impl Attr<SQL_ISO_FOREIGN_KEY_DELETE_RULE> for ForeignKeyDeleteRule {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+unsafe impl AttrGet<SQL_ISO_FOREIGN_KEY_DELETE_RULE> for ForeignKeyDeleteRule {}
 
-#[cfg(feature = "v4")]
-pub use SQL_SQL92_FOREIGN_KEY_UPDATE_RULE as SQL_ISO_FOREIGN_KEY_UPDATE_RULE;
+#[derive(Ident)]
+#[identifier(SQLUSMALLINT, 157)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ISO_FOREIGN_KEY_UPDATE_RULE;
+impl InfoType<SQL_ISO_FOREIGN_KEY_UPDATE_RULE, SQL_OV_ODBC4> for ForeignKeyUpdateRule {}
+unsafe impl Attr<SQL_ISO_FOREIGN_KEY_UPDATE_RULE> for ForeignKeyUpdateRule {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+unsafe impl AttrGet<SQL_ISO_FOREIGN_KEY_UPDATE_RULE> for ForeignKeyUpdateRule {}
 
-#[cfg(feature = "v4")]
-pub use SQL_SQL92_GRANT as SQL_ISO_GRANT;
+#[derive(Ident)]
+#[identifier(SQLUSMALLINT, 158)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ISO_GRANT;
+impl InfoType<SQL_ISO_GRANT, SQL_OV_ODBC4> for Grant {}
+unsafe impl Attr<SQL_ISO_GRANT> for Grant {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+unsafe impl AttrGet<SQL_ISO_GRANT> for Grant {}
 
-#[cfg(feature = "v4")]
-pub use SQL_SQL92_NUMERIC_VALUE_FUNCTIONS as SQL_ISO_NUMERIC_VALUE_FUNCTIONS;
+#[derive(Ident)]
+#[identifier(SQLUSMALLINT, 159)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ISO_NUMERIC_VALUE_FUNCTIONS;
+impl InfoType<SQL_ISO_NUMERIC_VALUE_FUNCTIONS, SQL_OV_ODBC4> for NumericValueFunctions {}
+unsafe impl Attr<SQL_ISO_NUMERIC_VALUE_FUNCTIONS> for NumericValueFunctions {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+unsafe impl AttrGet<SQL_ISO_NUMERIC_VALUE_FUNCTIONS> for NumericValueFunctions {}
 
-#[cfg(feature = "v4")]
-pub use SQL_SQL92_PREDICATES as SQL_ISO_PREDICATES;
+#[derive(Ident)]
+#[identifier(SQLUSMALLINT, 160)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ISO_PREDICATES;
+impl InfoType<SQL_ISO_PREDICATES, SQL_OV_ODBC4> for Predicates {}
+unsafe impl Attr<SQL_ISO_PREDICATES> for Predicates {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+unsafe impl AttrGet<SQL_ISO_PREDICATES> for Predicates {}
 
-#[cfg(feature = "v4")]
-pub use SQL_SQL92_RELATIONAL_JOIN_OPERATORS as SQL_ISO_RELATIONAL_JOIN_OPERATORS;
+#[derive(Ident)]
+#[identifier(SQLUSMALLINT, 161)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ISO_RELATIONAL_JOIN_OPERATORS;
+impl InfoType<SQL_ISO_RELATIONAL_JOIN_OPERATORS, SQL_OV_ODBC4> for RelationalJoinOperators {}
+unsafe impl Attr<SQL_ISO_RELATIONAL_JOIN_OPERATORS> for RelationalJoinOperators {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+unsafe impl AttrGet<SQL_ISO_RELATIONAL_JOIN_OPERATORS> for RelationalJoinOperators {}
 
-#[cfg(feature = "v4")]
-pub use SQL_SQL92_REVOKE as SQL_ISO_REVOKE;
+#[derive(Ident)]
+#[identifier(SQLUSMALLINT, 162)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ISO_REVOKE;
+impl InfoType<SQL_ISO_REVOKE, SQL_OV_ODBC4> for Revoke {}
+unsafe impl Attr<SQL_ISO_REVOKE> for Revoke {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+unsafe impl AttrGet<SQL_ISO_REVOKE> for Revoke {}
 
-#[cfg(feature = "v4")]
-pub use SQL_SQL92_ROW_VALUE_CONSTRUCTOR as SQL_ISO_ROW_VALUE_CONSTRUCTOR;
+#[derive(Ident)]
+#[identifier(SQLUSMALLINT, 163)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ISO_ROW_VALUE_CONSTRUCTOR;
+impl InfoType<SQL_ISO_ROW_VALUE_CONSTRUCTOR, SQL_OV_ODBC4> for RowValueConstructor {}
+unsafe impl Attr<SQL_ISO_ROW_VALUE_CONSTRUCTOR> for RowValueConstructor {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+unsafe impl AttrGet<SQL_ISO_ROW_VALUE_CONSTRUCTOR> for RowValueConstructor {}
 
-#[cfg(feature = "v4")]
-pub use SQL_SQL92_VALUE_EXPRESSIONS as SQL_ISO_VALUE_EXPRESSIONS;
+#[derive(Ident)]
+#[identifier(SQLUSMALLINT, 165)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ISO_VALUE_EXPRESSIONS;
+impl InfoType<SQL_ISO_VALUE_EXPRESSIONS, SQL_OV_ODBC4> for ValueExpressions {}
+unsafe impl Attr<SQL_ISO_VALUE_EXPRESSIONS> for ValueExpressions {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+unsafe impl AttrGet<SQL_ISO_VALUE_EXPRESSIONS> for ValueExpressions {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////// Driver Information ///////////////////////////////////
@@ -2567,7 +2647,6 @@ pub const SQL_CVT_LONGVARBINARY: Conversion = Conversion(0x00040000);
 pub const SQL_CVT_INTERVAL_YEAR_MONTH: Conversion = Conversion(0x00080000);
 pub const SQL_CVT_INTERVAL_DAY_TIME: Conversion = Conversion(0x00100000);
 
-#[cfg(feature = "v3_5")]
 pub const SQL_CVT_GUID: Conversion = Conversion(0x01000000);
 
 #[odbc_bitmask(SQLUINTEGER)]
@@ -2755,10 +2834,10 @@ pub const SQL_FN_TD_CURRENT_TIMESTAMP: TimedateFunctions = TimedateFunctions(0x0
 pub const SQL_FN_TD_EXTRACT: TimedateFunctions = TimedateFunctions(0x00100000);
 
 #[odbc_bitmask(SQLUINTEGER)]
-pub struct Sql92DatetimeFunctions;
-pub const SQL_SDF_CURRENT_DATE: Sql92DatetimeFunctions = Sql92DatetimeFunctions(0x00000001);
-pub const SQL_SDF_CURRENT_TIME: Sql92DatetimeFunctions = Sql92DatetimeFunctions(0x00000002);
-pub const SQL_SDF_CURRENT_TIMESTAMP: Sql92DatetimeFunctions = Sql92DatetimeFunctions(0x00000004);
+pub struct DatetimeFunctions;
+pub const SQL_SDF_CURRENT_DATE: DatetimeFunctions = DatetimeFunctions(0x00000001);
+pub const SQL_SDF_CURRENT_TIME: DatetimeFunctions = DatetimeFunctions(0x00000002);
+pub const SQL_SDF_CURRENT_TIMESTAMP: DatetimeFunctions = DatetimeFunctions(0x00000004);
 
 #[odbc_bitmask(SQLUINTEGER)]
 pub struct DatetimeLiterals;
@@ -2780,133 +2859,133 @@ pub const SQL_DL_SQL92_INTERVAL_HOUR_TO_SECOND: DatetimeLiterals = DatetimeLiter
 pub const SQL_DL_SQL92_INTERVAL_MINUTE_TO_SECOND: DatetimeLiterals = DatetimeLiterals(0x00008000);
 
 #[odbc_bitmask(SQLUINTEGER)]
-pub struct Sql92ForeignKeyDeleteRule;
-pub const SQL_SFKD_CASCADE: Sql92ForeignKeyDeleteRule = Sql92ForeignKeyDeleteRule(0x00000001);
-pub const SQL_SFKD_NO_ACTION: Sql92ForeignKeyDeleteRule = Sql92ForeignKeyDeleteRule(0x00000002);
-pub const SQL_SFKD_SET_DEFAULT: Sql92ForeignKeyDeleteRule = Sql92ForeignKeyDeleteRule(0x00000004);
-pub const SQL_SFKD_SET_NULL: Sql92ForeignKeyDeleteRule = Sql92ForeignKeyDeleteRule(0x00000008);
+pub struct ForeignKeyDeleteRule;
+pub const SQL_SFKD_CASCADE: ForeignKeyDeleteRule = ForeignKeyDeleteRule(0x00000001);
+pub const SQL_SFKD_NO_ACTION: ForeignKeyDeleteRule = ForeignKeyDeleteRule(0x00000002);
+pub const SQL_SFKD_SET_DEFAULT: ForeignKeyDeleteRule = ForeignKeyDeleteRule(0x00000004);
+pub const SQL_SFKD_SET_NULL: ForeignKeyDeleteRule = ForeignKeyDeleteRule(0x00000008);
 
 #[odbc_bitmask(SQLUINTEGER)]
-pub struct Sql92ForeignKeyUpdateRule;
-pub const SQL_SFKU_CASCADE: Sql92ForeignKeyUpdateRule = Sql92ForeignKeyUpdateRule(0x00000001);
-pub const SQL_SFKU_NO_ACTION: Sql92ForeignKeyUpdateRule = Sql92ForeignKeyUpdateRule(0x00000002);
-pub const SQL_SFKU_SET_DEFAULT: Sql92ForeignKeyUpdateRule = Sql92ForeignKeyUpdateRule(0x00000004);
-pub const SQL_SFKU_SET_NULL: Sql92ForeignKeyUpdateRule = Sql92ForeignKeyUpdateRule(0x00000008);
+pub struct ForeignKeyUpdateRule;
+pub const SQL_SFKU_CASCADE: ForeignKeyUpdateRule = ForeignKeyUpdateRule(0x00000001);
+pub const SQL_SFKU_NO_ACTION: ForeignKeyUpdateRule = ForeignKeyUpdateRule(0x00000002);
+pub const SQL_SFKU_SET_DEFAULT: ForeignKeyUpdateRule = ForeignKeyUpdateRule(0x00000004);
+pub const SQL_SFKU_SET_NULL: ForeignKeyUpdateRule = ForeignKeyUpdateRule(0x00000008);
 
 #[odbc_bitmask(SQLUINTEGER)]
-pub struct Sql92Grant;
-pub const SQL_SG_USAGE_ON_DOMAIN: Sql92Grant = Sql92Grant(0x00000001);
-pub const SQL_SG_USAGE_ON_CHARACTER_SET: Sql92Grant = Sql92Grant(0x00000002);
-pub const SQL_SG_USAGE_ON_COLLATION: Sql92Grant = Sql92Grant(0x00000004);
-pub const SQL_SG_USAGE_ON_TRANSLATION: Sql92Grant = Sql92Grant(0x00000008);
-pub const SQL_SG_WITH_GRANT_OPTION: Sql92Grant = Sql92Grant(0x00000010);
-pub const SQL_SG_DELETE_TABLE: Sql92Grant = Sql92Grant(0x00000020);
-pub const SQL_SG_INSERT_TABLE: Sql92Grant = Sql92Grant(0x00000040);
-pub const SQL_SG_INSERT_COLUMN: Sql92Grant = Sql92Grant(0x00000080);
-pub const SQL_SG_REFERENCES_TABLE: Sql92Grant = Sql92Grant(0x00000100);
-pub const SQL_SG_REFERENCES_COLUMN: Sql92Grant = Sql92Grant(0x00000200);
-pub const SQL_SG_SELECT_TABLE: Sql92Grant = Sql92Grant(0x00000400);
-pub const SQL_SG_UPDATE_TABLE: Sql92Grant = Sql92Grant(0x00000800);
-pub const SQL_SG_UPDATE_COLUMN: Sql92Grant = Sql92Grant(0x00001000);
+pub struct Grant;
+pub const SQL_SG_USAGE_ON_DOMAIN: Grant = Grant(0x00000001);
+pub const SQL_SG_USAGE_ON_CHARACTER_SET: Grant = Grant(0x00000002);
+pub const SQL_SG_USAGE_ON_COLLATION: Grant = Grant(0x00000004);
+pub const SQL_SG_USAGE_ON_TRANSLATION: Grant = Grant(0x00000008);
+pub const SQL_SG_WITH_GRANT_OPTION: Grant = Grant(0x00000010);
+pub const SQL_SG_DELETE_TABLE: Grant = Grant(0x00000020);
+pub const SQL_SG_INSERT_TABLE: Grant = Grant(0x00000040);
+pub const SQL_SG_INSERT_COLUMN: Grant = Grant(0x00000080);
+pub const SQL_SG_REFERENCES_TABLE: Grant = Grant(0x00000100);
+pub const SQL_SG_REFERENCES_COLUMN: Grant = Grant(0x00000200);
+pub const SQL_SG_SELECT_TABLE: Grant = Grant(0x00000400);
+pub const SQL_SG_UPDATE_TABLE: Grant = Grant(0x00000800);
+pub const SQL_SG_UPDATE_COLUMN: Grant = Grant(0x00001000);
 
 #[odbc_bitmask(SQLUINTEGER)]
-pub struct Sql92NumericValueFunctions;
-pub const SQL_SNVF_BIT_LENGTH: Sql92NumericValueFunctions = Sql92NumericValueFunctions(0x00000001);
-pub const SQL_SNVF_CHAR_LENGTH: Sql92NumericValueFunctions = Sql92NumericValueFunctions(0x00000002);
-pub const SQL_SNVF_CHARACTER_LENGTH: Sql92NumericValueFunctions =
-    Sql92NumericValueFunctions(0x00000004);
-pub const SQL_SNVF_EXTRACT: Sql92NumericValueFunctions = Sql92NumericValueFunctions(0x00000008);
-pub const SQL_SNVF_OCTET_LENGTH: Sql92NumericValueFunctions =
-    Sql92NumericValueFunctions(0x00000010);
-pub const SQL_SNVF_POSITION: Sql92NumericValueFunctions = Sql92NumericValueFunctions(0x00000020);
+pub struct NumericValueFunctions;
+pub const SQL_SNVF_BIT_LENGTH: NumericValueFunctions = NumericValueFunctions(0x00000001);
+pub const SQL_SNVF_CHAR_LENGTH: NumericValueFunctions = NumericValueFunctions(0x00000002);
+pub const SQL_SNVF_CHARACTER_LENGTH: NumericValueFunctions =
+    NumericValueFunctions(0x00000004);
+pub const SQL_SNVF_EXTRACT: NumericValueFunctions = NumericValueFunctions(0x00000008);
+pub const SQL_SNVF_OCTET_LENGTH: NumericValueFunctions =
+    NumericValueFunctions(0x00000010);
+pub const SQL_SNVF_POSITION: NumericValueFunctions = NumericValueFunctions(0x00000020);
 
 #[odbc_bitmask(SQLUINTEGER)]
-pub struct Sql92Predicates;
-pub const SQL_SP_EXISTS: Sql92Predicates = Sql92Predicates(0x00000001);
-pub const SQL_SP_ISNOTNULL: Sql92Predicates = Sql92Predicates(0x00000002);
-pub const SQL_SP_ISNULL: Sql92Predicates = Sql92Predicates(0x00000004);
-pub const SQL_SP_MATCH_FULL: Sql92Predicates = Sql92Predicates(0x00000008);
-pub const SQL_SP_MATCH_PARTIAL: Sql92Predicates = Sql92Predicates(0x00000010);
-pub const SQL_SP_MATCH_UNIQUE_FULL: Sql92Predicates = Sql92Predicates(0x00000020);
-pub const SQL_SP_MATCH_UNIQUE_PARTIAL: Sql92Predicates = Sql92Predicates(0x00000040);
-pub const SQL_SP_OVERLAPS: Sql92Predicates = Sql92Predicates(0x00000080);
-pub const SQL_SP_UNIQUE: Sql92Predicates = Sql92Predicates(0x00000100);
-pub const SQL_SP_LIKE: Sql92Predicates = Sql92Predicates(0x00000200);
-pub const SQL_SP_IN: Sql92Predicates = Sql92Predicates(0x00000400);
-pub const SQL_SP_BETWEEN: Sql92Predicates = Sql92Predicates(0x00000800);
-pub const SQL_SP_COMPARISON: Sql92Predicates = Sql92Predicates(0x00001000);
-pub const SQL_SP_QUANTIFIED_COMPARISON: Sql92Predicates = Sql92Predicates(0x00002000);
+pub struct Predicates;
+pub const SQL_SP_EXISTS: Predicates = Predicates(0x00000001);
+pub const SQL_SP_ISNOTNULL: Predicates = Predicates(0x00000002);
+pub const SQL_SP_ISNULL: Predicates = Predicates(0x00000004);
+pub const SQL_SP_MATCH_FULL: Predicates = Predicates(0x00000008);
+pub const SQL_SP_MATCH_PARTIAL: Predicates = Predicates(0x00000010);
+pub const SQL_SP_MATCH_UNIQUE_FULL: Predicates = Predicates(0x00000020);
+pub const SQL_SP_MATCH_UNIQUE_PARTIAL: Predicates = Predicates(0x00000040);
+pub const SQL_SP_OVERLAPS: Predicates = Predicates(0x00000080);
+pub const SQL_SP_UNIQUE: Predicates = Predicates(0x00000100);
+pub const SQL_SP_LIKE: Predicates = Predicates(0x00000200);
+pub const SQL_SP_IN: Predicates = Predicates(0x00000400);
+pub const SQL_SP_BETWEEN: Predicates = Predicates(0x00000800);
+pub const SQL_SP_COMPARISON: Predicates = Predicates(0x00001000);
+pub const SQL_SP_QUANTIFIED_COMPARISON: Predicates = Predicates(0x00002000);
 
 #[odbc_bitmask(SQLUINTEGER)]
-pub struct Sql92RelationalJoinOperators;
-pub const SQL_SRJO_CORRESPONDING_CLAUSE: Sql92RelationalJoinOperators =
-    Sql92RelationalJoinOperators(0x00000001);
-pub const SQL_SRJO_CROSS_JOIN: Sql92RelationalJoinOperators =
-    Sql92RelationalJoinOperators(0x00000002);
-pub const SQL_SRJO_EXCEPT_JOIN: Sql92RelationalJoinOperators =
-    Sql92RelationalJoinOperators(0x00000004);
-pub const SQL_SRJO_FULL_OUTER_JOIN: Sql92RelationalJoinOperators =
-    Sql92RelationalJoinOperators(0x00000008);
-pub const SQL_SRJO_INNER_JOIN: Sql92RelationalJoinOperators =
-    Sql92RelationalJoinOperators(0x00000010);
-pub const SQL_SRJO_INTERSECT_JOIN: Sql92RelationalJoinOperators =
-    Sql92RelationalJoinOperators(0x00000020);
-pub const SQL_SRJO_LEFT_OUTER_JOIN: Sql92RelationalJoinOperators =
-    Sql92RelationalJoinOperators(0x00000040);
-pub const SQL_SRJO_NATURAL_JOIN: Sql92RelationalJoinOperators =
-    Sql92RelationalJoinOperators(0x00000080);
-pub const SQL_SRJO_RIGHT_OUTER_JOIN: Sql92RelationalJoinOperators =
-    Sql92RelationalJoinOperators(0x00000100);
-pub const SQL_SRJO_UNION_JOIN: Sql92RelationalJoinOperators =
-    Sql92RelationalJoinOperators(0x00000200);
+pub struct RelationalJoinOperators;
+pub const SQL_SRJO_CORRESPONDING_CLAUSE: RelationalJoinOperators =
+    RelationalJoinOperators(0x00000001);
+pub const SQL_SRJO_CROSS_JOIN: RelationalJoinOperators =
+    RelationalJoinOperators(0x00000002);
+pub const SQL_SRJO_EXCEPT_JOIN: RelationalJoinOperators =
+    RelationalJoinOperators(0x00000004);
+pub const SQL_SRJO_FULL_OUTER_JOIN: RelationalJoinOperators =
+    RelationalJoinOperators(0x00000008);
+pub const SQL_SRJO_INNER_JOIN: RelationalJoinOperators =
+    RelationalJoinOperators(0x00000010);
+pub const SQL_SRJO_INTERSECT_JOIN: RelationalJoinOperators =
+    RelationalJoinOperators(0x00000020);
+pub const SQL_SRJO_LEFT_OUTER_JOIN: RelationalJoinOperators =
+    RelationalJoinOperators(0x00000040);
+pub const SQL_SRJO_NATURAL_JOIN: RelationalJoinOperators =
+    RelationalJoinOperators(0x00000080);
+pub const SQL_SRJO_RIGHT_OUTER_JOIN: RelationalJoinOperators =
+    RelationalJoinOperators(0x00000100);
+pub const SQL_SRJO_UNION_JOIN: RelationalJoinOperators =
+    RelationalJoinOperators(0x00000200);
 
 #[odbc_bitmask(SQLUINTEGER)]
-pub struct Sql92Revoke;
-pub const SQL_SR_USAGE_ON_DOMAIN: Sql92Revoke = Sql92Revoke(0x00000001);
-pub const SQL_SR_USAGE_ON_CHARACTER_SET: Sql92Revoke = Sql92Revoke(0x00000002);
-pub const SQL_SR_USAGE_ON_COLLATION: Sql92Revoke = Sql92Revoke(0x00000004);
-pub const SQL_SR_USAGE_ON_TRANSLATION: Sql92Revoke = Sql92Revoke(0x00000008);
-pub const SQL_SR_GRANT_OPTION_FOR: Sql92Revoke = Sql92Revoke(0x00000010);
-pub const SQL_SR_CASCADE: Sql92Revoke = Sql92Revoke(0x00000020);
-pub const SQL_SR_RESTRICT: Sql92Revoke = Sql92Revoke(0x00000040);
-pub const SQL_SR_DELETE_TABLE: Sql92Revoke = Sql92Revoke(0x00000080);
-pub const SQL_SR_INSERT_TABLE: Sql92Revoke = Sql92Revoke(0x00000100);
-pub const SQL_SR_INSERT_COLUMN: Sql92Revoke = Sql92Revoke(0x00000200);
-pub const SQL_SR_REFERENCES_TABLE: Sql92Revoke = Sql92Revoke(0x00000400);
-pub const SQL_SR_REFERENCES_COLUMN: Sql92Revoke = Sql92Revoke(0x00000800);
-pub const SQL_SR_SELECT_TABLE: Sql92Revoke = Sql92Revoke(0x00001000);
-pub const SQL_SR_UPDATE_TABLE: Sql92Revoke = Sql92Revoke(0x00002000);
-pub const SQL_SR_UPDATE_COLUMN: Sql92Revoke = Sql92Revoke(0x00004000);
+pub struct Revoke;
+pub const SQL_SR_USAGE_ON_DOMAIN: Revoke = Revoke(0x00000001);
+pub const SQL_SR_USAGE_ON_CHARACTER_SET: Revoke = Revoke(0x00000002);
+pub const SQL_SR_USAGE_ON_COLLATION: Revoke = Revoke(0x00000004);
+pub const SQL_SR_USAGE_ON_TRANSLATION: Revoke = Revoke(0x00000008);
+pub const SQL_SR_GRANT_OPTION_FOR: Revoke = Revoke(0x00000010);
+pub const SQL_SR_CASCADE: Revoke = Revoke(0x00000020);
+pub const SQL_SR_RESTRICT: Revoke = Revoke(0x00000040);
+pub const SQL_SR_DELETE_TABLE: Revoke = Revoke(0x00000080);
+pub const SQL_SR_INSERT_TABLE: Revoke = Revoke(0x00000100);
+pub const SQL_SR_INSERT_COLUMN: Revoke = Revoke(0x00000200);
+pub const SQL_SR_REFERENCES_TABLE: Revoke = Revoke(0x00000400);
+pub const SQL_SR_REFERENCES_COLUMN: Revoke = Revoke(0x00000800);
+pub const SQL_SR_SELECT_TABLE: Revoke = Revoke(0x00001000);
+pub const SQL_SR_UPDATE_TABLE: Revoke = Revoke(0x00002000);
+pub const SQL_SR_UPDATE_COLUMN: Revoke = Revoke(0x00004000);
 
 #[odbc_bitmask(SQLUINTEGER)]
-pub struct Sql92RowValueConstructor;
-pub const SQL_SRVC_VALUE_EXPRESSION: Sql92RowValueConstructor =
-    Sql92RowValueConstructor(0x00000001);
-pub const SQL_SRVC_NULL: Sql92RowValueConstructor = Sql92RowValueConstructor(0x00000002);
-pub const SQL_SRVC_DEFAULT: Sql92RowValueConstructor = Sql92RowValueConstructor(0x00000004);
-pub const SQL_SRVC_ROW_SUBQUERY: Sql92RowValueConstructor = Sql92RowValueConstructor(0x00000008);
+pub struct RowValueConstructor;
+pub const SQL_SRVC_VALUE_EXPRESSION: RowValueConstructor =
+    RowValueConstructor(0x00000001);
+pub const SQL_SRVC_NULL: RowValueConstructor = RowValueConstructor(0x00000002);
+pub const SQL_SRVC_DEFAULT: RowValueConstructor = RowValueConstructor(0x00000004);
+pub const SQL_SRVC_ROW_SUBQUERY: RowValueConstructor = RowValueConstructor(0x00000008);
 
 #[odbc_bitmask(SQLUINTEGER)]
-pub struct Sql92StringFunctions;
-pub const SQL_SSF_CONVERT: Sql92StringFunctions = Sql92StringFunctions(0x00000001);
-pub const SQL_SSF_LOWER: Sql92StringFunctions = Sql92StringFunctions(0x00000002);
-pub const SQL_SSF_UPPER: Sql92StringFunctions = Sql92StringFunctions(0x00000004);
-pub const SQL_SSF_SUBSTRING: Sql92StringFunctions = Sql92StringFunctions(0x00000008);
-pub const SQL_SSF_TRANSLATE: Sql92StringFunctions = Sql92StringFunctions(0x00000010);
-pub const SQL_SSF_TRIM_BOTH: Sql92StringFunctions = Sql92StringFunctions(0x00000020);
-pub const SQL_SSF_TRIM_LEADING: Sql92StringFunctions = Sql92StringFunctions(0x00000040);
-pub const SQL_SSF_TRIM_TRAILING: Sql92StringFunctions = Sql92StringFunctions(0x00000080);
-pub const SQL_SSF_OVERLAY: Sql92StringFunctions = Sql92StringFunctions(0x00000100);
-pub const SQL_SSF_LENGTH: Sql92StringFunctions = Sql92StringFunctions(0x00000200);
-pub const SQL_SSF_POSITION: Sql92StringFunctions = Sql92StringFunctions(0x00000400);
-pub const SQL_SSF_CONCAT: Sql92StringFunctions = Sql92StringFunctions(0x00000800);
+pub struct StringScalarFunctions;
+pub const SQL_SSF_CONVERT: StringScalarFunctions = StringScalarFunctions(0x00000001);
+pub const SQL_SSF_LOWER: StringScalarFunctions = StringScalarFunctions(0x00000002);
+pub const SQL_SSF_UPPER: StringScalarFunctions = StringScalarFunctions(0x00000004);
+pub const SQL_SSF_SUBSTRING: StringScalarFunctions = StringScalarFunctions(0x00000008);
+pub const SQL_SSF_TRANSLATE: StringScalarFunctions = StringScalarFunctions(0x00000010);
+pub const SQL_SSF_TRIM_BOTH: StringScalarFunctions = StringScalarFunctions(0x00000020);
+pub const SQL_SSF_TRIM_LEADING: StringScalarFunctions = StringScalarFunctions(0x00000040);
+pub const SQL_SSF_TRIM_TRAILING: StringScalarFunctions = StringScalarFunctions(0x00000080);
+pub const SQL_SSF_OVERLAY: StringScalarFunctions = StringScalarFunctions(0x00000100);
+pub const SQL_SSF_LENGTH: StringScalarFunctions = StringScalarFunctions(0x00000200);
+pub const SQL_SSF_POSITION: StringScalarFunctions = StringScalarFunctions(0x00000400);
+pub const SQL_SSF_CONCAT: StringScalarFunctions = StringScalarFunctions(0x00000800);
 
 #[odbc_bitmask(SQLUINTEGER)]
-pub struct Sql92ValueExpressions;
-pub const SQL_SVE_CASE: Sql92ValueExpressions = Sql92ValueExpressions(0x00000001);
-pub const SQL_SVE_CAST: Sql92ValueExpressions = Sql92ValueExpressions(0x00000002);
-pub const SQL_SVE_COALESCE: Sql92ValueExpressions = Sql92ValueExpressions(0x00000004);
-pub const SQL_SVE_NULLIF: Sql92ValueExpressions = Sql92ValueExpressions(0x00000008);
+pub struct ValueExpressions;
+pub const SQL_SVE_CASE: ValueExpressions = ValueExpressions(0x00000001);
+pub const SQL_SVE_CAST: ValueExpressions = ValueExpressions(0x00000002);
+pub const SQL_SVE_COALESCE: ValueExpressions = ValueExpressions(0x00000004);
+pub const SQL_SVE_NULLIF: ValueExpressions = ValueExpressions(0x00000008);
 
 #[odbc_bitmask(SQLUINTEGER)]
 pub struct StandardCliConformance;

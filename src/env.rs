@@ -5,7 +5,7 @@ use crate::{
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
 
-pub trait EnvAttr<A: Ident, V>:
+pub trait EnvAttr<A: Ident, V: OdbcVersion>:
     Attr<A, DefinedBy = OdbcDefined> + AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>
 {
 }
@@ -17,17 +17,17 @@ impl<A: Ident> EnvAttr<A, SQL_OV_ODBC3_80> for [SQLCHAR] where [SQLCHAR]: EnvAtt
 impl<A: Ident> EnvAttr<A, SQL_OV_ODBC4> for [SQLCHAR] where [SQLCHAR]: EnvAttr<A, SQL_OV_ODBC3_80> {}
 
 // Implement EnvAttr for unicode character environment attributes
-impl<V, A: Ident> EnvAttr<A, V> for [SQLWCHAR] where [SQLCHAR]: EnvAttr<A, V, NonBinary = True> {}
+impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for [SQLWCHAR] where [SQLCHAR]: EnvAttr<A, V, NonBinary = True> {}
 
 // Implement EnvAttr for uninitialized environment attributes
-impl<V, A: Ident, T: Ident> EnvAttr<A, V> for MaybeUninit<T> where T: EnvAttr<A, V> {}
-impl<V, A: Ident> EnvAttr<A, V> for [MaybeUninit<SQLCHAR>]
+impl<A: Ident, T: Ident, V: OdbcVersion> EnvAttr<A, V> for MaybeUninit<T> where T: EnvAttr<A, V> {}
+impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for [MaybeUninit<SQLCHAR>]
 where
     [SQLCHAR]: EnvAttr<A, V>,
     Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
 {
 }
-impl<V, A: Ident> EnvAttr<A, V> for [MaybeUninit<SQLWCHAR>]
+impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for [MaybeUninit<SQLWCHAR>]
 where
     [SQLWCHAR]: EnvAttr<A, V>,
     Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
@@ -35,8 +35,8 @@ where
 }
 
 // Implement EnvAttr for references to character environment attributes (used by AttrSet)
-impl<V, A: Ident> EnvAttr<A, V> for &[SQLCHAR] where [SQLCHAR]: EnvAttr<A, V> {}
-impl<V, A: Ident> EnvAttr<A, V> for &[SQLWCHAR] where [SQLWCHAR]: EnvAttr<A, V> {}
+impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for &[SQLCHAR] where [SQLCHAR]: EnvAttr<A, V> {}
+impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for &[SQLWCHAR] where [SQLWCHAR]: EnvAttr<A, V> {}
 
 //=====================================================================================//
 //-------------------------------------Attributes--------------------------------------//

@@ -1,4 +1,4 @@
-use crate::env::{SQL_OV_ODBC3_80, SQL_OV_ODBC4};
+use crate::env::{SQL_OV_ODBC3_80, SQL_OV_ODBC4, OdbcVersion};
 use crate::sql_types::*;
 use crate::Ident;
 use crate::{
@@ -17,12 +17,12 @@ pub trait CDataLen {
     fn len(&self) -> SQLLEN;
 }
 
-pub trait CData<V, TT: Ident>: CDataLen {}
+pub trait CData<TT: Ident, V: OdbcVersion>: CDataLen {}
 
 // TODO: Do I need to disambiguate between BindCol and BindParameters deferred buffers
 /// Care must be taken because references to DeferredBuf might be written to. This usually
 /// means that DeferredBuf should only be implemented on &UnsafeCell<T> or &[UnsafeCell<T>].
-pub unsafe trait DeferredBuf<'buf, V, TT: Ident>: CDataLen + IntoSQLPOINTER {}
+pub unsafe trait DeferredBuf<'buf, TT: Ident, V: OdbcVersion>: CDataLen + IntoSQLPOINTER {}
 
 #[repr(transparent)]
 pub struct StrLenOrInd(pub(crate) SQLLEN);
@@ -51,9 +51,9 @@ pub const SQL_DEFAULT_PARAM: StrLenOrInd = StrLenOrInd(-5);
 
 const SQL_UNSIGNED_OFFSET: SQLSMALLINT = -22;
 const SQL_SIGNED_OFFSET: SQLSMALLINT = -20;
-const SQL_C_SHORT: SQLSMALLINT = SQL_SMALLINT.identifier();
-const SQL_C_LONG: SQLSMALLINT = SQL_INTEGER.identifier();
-const SQL_C_TINYINT: SQLSMALLINT = SQL_TINYINT.identifier();
+const SQL_C_SHORT: SQLSMALLINT = SqlTypeV3::identifier(&SQL_SMALLINT);
+const SQL_C_LONG: SQLSMALLINT = SqlTypeV3::identifier(&SQL_INTEGER);
+const SQL_C_TINYINT: SQLSMALLINT = SqlTypeV3::identifier(&SQL_TINYINT);
 
 // TODO: This value is discouraged from being used
 //#[derive(Ident)]
@@ -65,17 +65,17 @@ const SQL_C_TINYINT: SQLSMALLINT = SQL_TINYINT.identifier();
 pub struct SQL_C_CHAR;
 impl Ident for SQL_C_CHAR {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_CHAR.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_CHAR);
 }
-impl<V> CData<V, SQL_C_CHAR> for [SQLCHAR] {}
+impl<V: OdbcVersion> CData<SQL_C_CHAR, V> for [SQLCHAR] {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_WCHAR;
 impl Ident for SQL_C_WCHAR {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_WCHAR.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_WCHAR);
 }
-impl<V> CData<V, SQL_C_WCHAR> for [SQLWCHAR] {}
+impl<V: OdbcVersion> CData<SQL_C_WCHAR, V> for [SQLWCHAR] {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_SSHORT;
@@ -83,7 +83,7 @@ impl Ident for SQL_C_SSHORT {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_C_SHORT + SQL_SIGNED_OFFSET;
 }
-impl<V> CData<V, SQL_C_SSHORT> for SQLSMALLINT {}
+impl<V: OdbcVersion> CData<SQL_C_SSHORT, V> for SQLSMALLINT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_USHORT;
@@ -91,7 +91,7 @@ impl Ident for SQL_C_USHORT {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_C_SHORT + SQL_UNSIGNED_OFFSET;
 }
-impl<V> CData<V, SQL_C_USHORT> for SQLUSMALLINT {}
+impl<V: OdbcVersion> CData<SQL_C_USHORT, V> for SQLUSMALLINT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_SLONG;
@@ -99,7 +99,7 @@ impl Ident for SQL_C_SLONG {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_C_LONG + SQL_SIGNED_OFFSET;
 }
-impl<V> CData<V, SQL_C_SLONG> for SQLINTEGER {}
+impl<V: OdbcVersion> CData<SQL_C_SLONG, V> for SQLINTEGER {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_ULONG;
@@ -107,31 +107,31 @@ impl Ident for SQL_C_ULONG {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_C_LONG + SQL_UNSIGNED_OFFSET;
 }
-impl<V> CData<V, SQL_C_ULONG> for SQLUINTEGER {}
+impl<V: OdbcVersion> CData<SQL_C_ULONG, V> for SQLUINTEGER {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_FLOAT;
 impl Ident for SQL_C_FLOAT {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_REAL.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_REAL);
 }
-impl<V> CData<V, SQL_C_FLOAT> for SQLREAL {}
+impl<V: OdbcVersion> CData<SQL_C_FLOAT, V> for SQLREAL {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_DOUBLE;
 impl Ident for SQL_C_DOUBLE {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_DOUBLE.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_DOUBLE);
 }
-impl<V> CData<V, SQL_C_DOUBLE> for SQLDOUBLE {}
+impl<V: OdbcVersion> CData<SQL_C_DOUBLE, V> for SQLDOUBLE {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_BIT;
 impl Ident for SQL_C_BIT {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_BIT.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_BIT);
 }
-impl<V> CData<V, SQL_C_BIT> for SQLCHAR {}
+impl<V: OdbcVersion> CData<SQL_C_BIT, V> for SQLCHAR {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_STINYINT;
@@ -139,7 +139,7 @@ impl Ident for SQL_C_STINYINT {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_C_TINYINT + SQL_SIGNED_OFFSET;
 }
-impl<V> CData<V, SQL_C_STINYINT> for SQLSCHAR {}
+impl<V: OdbcVersion> CData<SQL_C_STINYINT, V> for SQLSCHAR {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_UTINYINT;
@@ -147,31 +147,31 @@ impl Ident for SQL_C_UTINYINT {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SQL_C_TINYINT + SQL_UNSIGNED_OFFSET;
 }
-impl<V> CData<V, SQL_C_UTINYINT> for SQLCHAR {}
+impl<V: OdbcVersion> CData<SQL_C_UTINYINT, V> for SQLCHAR {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_SBIGINT;
 impl Ident for SQL_C_SBIGINT {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_BIGINT.identifier() + SQL_SIGNED_OFFSET;
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_BIGINT);
 }
-impl<V> CData<V, SQL_C_SBIGINT> for SQLBIGINT {}
+impl<V: OdbcVersion> CData<SQL_C_SBIGINT, V> for SQLBIGINT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_UBIGINT;
 impl Ident for SQL_C_UBIGINT {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_BIGINT.identifier() + SQL_UNSIGNED_OFFSET;
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_BIGINT);
 }
-impl<V> CData<V, SQL_C_UBIGINT> for SQLUBIGINT {}
+impl<V: OdbcVersion> CData<SQL_C_UBIGINT, V> for SQLUBIGINT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_BINARY;
 impl Ident for SQL_C_BINARY {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_BINARY.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_BINARY);
 }
-impl<V> CData<V, SQL_C_BINARY> for [SQLCHAR] {}
+impl<V: OdbcVersion> CData<SQL_C_BINARY, V> for [SQLCHAR] {}
 
 // TODO: Weird?
 pub use SQL_C_BINARY as SQL_C_VARBOOKMARK;
@@ -180,162 +180,162 @@ pub use SQL_C_BINARY as SQL_C_VARBOOKMARK;
 pub struct SQL_C_NUMERIC;
 impl Ident for SQL_C_NUMERIC {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_NUMERIC.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_NUMERIC);
 }
-impl<V> CData<V, SQL_C_NUMERIC> for SQL_NUMERIC_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_NUMERIC, V> for SQL_NUMERIC_STRUCT {}
 
 // TODO: This is 3.5
 #[allow(non_camel_case_types)]
 pub struct SQL_C_GUID;
 impl Ident for SQL_C_GUID {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_GUID.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3_8::identifier(&SQL_GUID);
 }
-impl CData<SQL_OV_ODBC3_80, SQL_C_GUID> for SQLGUID {}
+impl CData<SQL_C_GUID, SQL_OV_ODBC3_80> for SQLGUID {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_DATE;
 impl Ident for SQL_C_TYPE_DATE {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_TYPE_DATE.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_TYPE_DATE);
 }
-impl<V> CData<V, SQL_C_TYPE_DATE> for SQL_DATE_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_TYPE_DATE, V> for SQL_DATE_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIME;
 impl Ident for SQL_C_TYPE_TIME {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_TYPE_TIME.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_TYPE_TIME);
 }
-impl<V> CData<V, SQL_C_TYPE_TIME> for SQL_TIME_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_TYPE_TIME, V> for SQL_TIME_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIMESTAMP;
 impl Ident for SQL_C_TYPE_TIMESTAMP {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_TYPE_TIMESTAMP.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_TYPE_TIMESTAMP);
 }
-impl<V> CData<V, SQL_C_TYPE_TIMESTAMP> for SQL_TIMESTAMP_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_TYPE_TIMESTAMP, V> for SQL_TIMESTAMP_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIME_WITH_TIMEZONE;
 impl Ident for SQL_C_TYPE_TIME_WITH_TIMEZONE {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIME_WITH_TIMEZONE.identifier();
+    const IDENTIFIER: SQLSMALLINT = SqlTypeV4::identifier(&SQL_TYPE_TIME_WITH_TIMEZONE);
 }
-impl CData<SQL_OV_ODBC4, SQL_C_TYPE_TIME_WITH_TIMEZONE> for SQL_TIME_WITH_TIMEZONE_STRUCT {}
+impl CData<SQL_C_TYPE_TIME_WITH_TIMEZONE, SQL_OV_ODBC4> for SQL_TIME_WITH_TIMEZONE_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE;
 impl Ident for SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: SQLSMALLINT = SQL_TYPE_TIMESTAMP_WITH_TIMEZONE.identifier();
+    const IDENTIFIER: SQLSMALLINT = SqlTypeV4::identifier(&SQL_TYPE_TIMESTAMP_WITH_TIMEZONE);
 }
-impl CData<SQL_OV_ODBC4, SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE> for SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT {}
+impl CData<SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE, SQL_OV_ODBC4> for SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_YEAR;
 impl Ident for SQL_C_INTERVAL_YEAR {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_INTERVAL_YEAR.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_INTERVAL_YEAR);
 }
-impl<V> CData<V, SQL_C_INTERVAL_YEAR> for SQL_INTERVAL_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_INTERVAL_YEAR, V> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_MONTH;
 impl Ident for SQL_C_INTERVAL_MONTH {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_INTERVAL_MONTH.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_INTERVAL_MONTH);
 }
-impl<V> CData<V, SQL_C_INTERVAL_MONTH> for SQL_INTERVAL_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_INTERVAL_MONTH, V> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_DAY;
 impl Ident for SQL_C_INTERVAL_DAY {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_INTERVAL_DAY.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_INTERVAL_DAY);
 }
-impl<V> CData<V, SQL_C_INTERVAL_DAY> for SQL_INTERVAL_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_INTERVAL_DAY, V> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_HOUR;
 impl Ident for SQL_C_INTERVAL_HOUR {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_INTERVAL_HOUR.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_INTERVAL_HOUR);
 }
-impl<V> CData<V, SQL_C_INTERVAL_HOUR> for SQL_INTERVAL_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_INTERVAL_HOUR, V> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_MINUTE;
 impl Ident for SQL_C_INTERVAL_MINUTE {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_INTERVAL_MINUTE.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_INTERVAL_MINUTE);
 }
-impl<V> CData<V, SQL_C_INTERVAL_MINUTE> for SQL_INTERVAL_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_INTERVAL_MINUTE, V> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_SECOND;
 impl Ident for SQL_C_INTERVAL_SECOND {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_INTERVAL_SECOND.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_INTERVAL_SECOND);
 }
-impl<V> CData<V, SQL_C_INTERVAL_SECOND> for SQL_INTERVAL_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_INTERVAL_SECOND, V> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_YEAR_TO_MONTH;
 impl Ident for SQL_C_INTERVAL_YEAR_TO_MONTH {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_INTERVAL_YEAR_TO_MONTH.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_INTERVAL_YEAR_TO_MONTH);
 }
-impl<V> CData<V, SQL_C_INTERVAL_YEAR_TO_MONTH> for SQL_INTERVAL_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_INTERVAL_YEAR_TO_MONTH, V> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_DAY_TO_HOUR;
 impl Ident for SQL_C_INTERVAL_DAY_TO_HOUR {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_INTERVAL_DAY_TO_HOUR.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_INTERVAL_DAY_TO_HOUR);
 }
-impl<V> CData<V, SQL_C_INTERVAL_DAY_TO_HOUR> for SQL_INTERVAL_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_INTERVAL_DAY_TO_HOUR, V> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_DAY_TO_MINUTE;
 impl Ident for SQL_C_INTERVAL_DAY_TO_MINUTE {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_INTERVAL_DAY_TO_MINUTE.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_INTERVAL_DAY_TO_MINUTE);
 }
-impl<V> CData<V, SQL_C_INTERVAL_DAY_TO_MINUTE> for SQL_INTERVAL_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_INTERVAL_DAY_TO_MINUTE, V> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_DAY_TO_SECOND;
 impl Ident for SQL_C_INTERVAL_DAY_TO_SECOND {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_INTERVAL_DAY_TO_SECOND.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_INTERVAL_DAY_TO_SECOND);
 }
-impl<V> CData<V, SQL_C_INTERVAL_DAY_TO_SECOND> for SQL_INTERVAL_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_INTERVAL_DAY_TO_SECOND, V> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_HOUR_TO_MINUTE;
 impl Ident for SQL_C_INTERVAL_HOUR_TO_MINUTE {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_INTERVAL_HOUR_TO_MINUTE.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_INTERVAL_HOUR_TO_MINUTE);
 }
-impl<V> CData<V, SQL_C_INTERVAL_HOUR_TO_MINUTE> for SQL_INTERVAL_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_INTERVAL_HOUR_TO_MINUTE, V> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_HOUR_TO_SECOND;
 impl Ident for SQL_C_INTERVAL_HOUR_TO_SECOND {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_INTERVAL_HOUR_TO_SECOND.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_INTERVAL_HOUR_TO_SECOND);
 }
-impl<V> CData<V, SQL_C_INTERVAL_HOUR_TO_SECOND> for SQL_INTERVAL_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_INTERVAL_HOUR_TO_SECOND, V> for SQL_INTERVAL_STRUCT {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_MINUTE_TO_SECOND;
 impl Ident for SQL_C_INTERVAL_MINUTE_TO_SECOND {
     type Type = SQLSMALLINT;
-    const IDENTIFIER: Self::Type = SQL_INTERVAL_MINUTE_TO_SECOND.identifier();
+    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_INTERVAL_MINUTE_TO_SECOND);
 }
-impl<V> CData<V, SQL_C_INTERVAL_MINUTE_TO_SECOND> for SQL_INTERVAL_STRUCT {}
+impl<V: OdbcVersion> CData<SQL_C_INTERVAL_MINUTE_TO_SECOND, V> for SQL_INTERVAL_STRUCT {}
 
 // TODO: Test if these types are required or user can achieve the same goal via some other way
 // If SQL_ARD_TYPE and SQL_APD_TYPE are allowed, SQLGetData would have to be unsafe
@@ -346,14 +346,14 @@ impl<V> CData<V, SQL_C_INTERVAL_MINUTE_TO_SECOND> for SQL_INTERVAL_STRUCT {}
 //pub struct SQL_ARD_TYPE;
 //impl Ident for SQL_ARD_TYPE {
 //    type Type = SQLSMALLINT;
-//    const IDENTIFIER: Self::Type = SQL_ARD_TYPE.identifier();
+//    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_ARD_TYPE);
 //}
 //
 //#[allow(non_camel_case_types)]
 //pub struct SQL_APD_TYPE;
 //impl Ident for SQL_APD_TYPE {
 //    type Type = SQLSMALLINT;
-//    const IDENTIFIER: Self::Type = SQL_APD_TYPE.identifier();
+//    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_APD_TYPE);
 //}
 
 // =================================================================================== //
@@ -597,19 +597,19 @@ unsafe impl<T: ScalarCType> AsMutSQLPOINTER for MaybeUninit<T> {
     }
 }
 
-impl<V, TT: Ident, T> CData<V, TT> for [MaybeUninit<T>] where [T]: CData<V, TT> {}
-impl<V, TT: Ident, T: ScalarCType> CData<V, TT> for MaybeUninit<T> where T: CData<V, TT> {}
+impl<TT: Ident, T, V: OdbcVersion> CData<TT, V> for [MaybeUninit<T>] where [T]: CData<TT, V> {}
+impl<TT: Ident, T: ScalarCType, V: OdbcVersion> CData<TT, V> for MaybeUninit<T> where T: CData<TT, V> {}
 
-unsafe impl<'buf, V, TT: Ident, T> DeferredBuf<'buf, V, TT> for &'buf [UnsafeCell<T>] where
-    [T]: CData<V, TT>
+unsafe impl<'buf, TT: Ident, T, V: OdbcVersion> DeferredBuf<'buf, TT, V> for &'buf [UnsafeCell<T>] where
+    [T]: CData<TT, V>
 {
 }
-unsafe impl<'buf, V, TT: Ident, T: ScalarCType> DeferredBuf<'buf, V, TT> for &'buf UnsafeCell<T> where
-    T: CData<V, TT>
+unsafe impl<'buf, TT: Ident, T: ScalarCType, V: OdbcVersion> DeferredBuf<'buf, TT, V> for &'buf UnsafeCell<T> where
+    T: CData<TT, V>
 {
 }
 
-unsafe impl<'buf, V, TT: Ident> DeferredBuf<'buf, V, TT> for NonNull<c_void> {}
+unsafe impl<'buf, TT: Ident, V: OdbcVersion> DeferredBuf<'buf, TT, V> for NonNull<c_void> {}
 
 //impl<T> ParameterDir<SQL_PARAM_INPUT> for [T] where [T]: DeferredBuf {}
 //impl<T> ParameterDir<SQL_PARAM_OUTPUT> for [MaybeUninit<T>] where [T]: DeferredBuf {}

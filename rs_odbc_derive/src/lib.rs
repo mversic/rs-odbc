@@ -141,7 +141,7 @@ fn odbc_derive(ast: &mut syn::DeriveInput, inner_type: &Ident) -> TokenStream2 {
 
         unsafe impl crate::IntoSQLPOINTER for #type_name {
             fn into_SQLPOINTER(self) -> crate::SQLPOINTER {
-                self.identifier() as _
+                Self::identifier(&self) as _
             }
         }
 
@@ -149,7 +149,7 @@ fn odbc_derive(ast: &mut syn::DeriveInput, inner_type: &Ident) -> TokenStream2 {
             #[inline]
             fn assert_zeroed(&self) {
                 // TODO: Check implementation on types in lib.rs
-                assert_eq!(0, self.identifier());
+                assert_eq!(0, Self::identifier(&self));
             }
         }
 
@@ -172,14 +172,14 @@ pub fn odbc_bitmask(args: TokenStream, input: TokenStream) -> TokenStream {
             type Output = crate::#inner_type;
 
             fn bitand(self, other: #type_name) -> Self::Output {
-                self.identifier() & other.identifier()
+                Self::identifier(&self) & Self::identifier(&other)
             }
         }
         impl std::ops::BitAnd<crate::#inner_type> for #type_name {
             type Output = crate::#inner_type;
 
             fn bitand(self, other: crate::#inner_type) -> Self::Output {
-                self.identifier() & other
+                Self::identifier(&self) & other
             }
         }
         impl std::ops::BitAnd<#type_name> for crate::#inner_type {

@@ -377,13 +377,13 @@ impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
     }
 
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<'buf, V, TT>>(
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<'buf, TT, V>>(
         &self,
         TargetValuePtr: Option<B>,
     ) {
     }
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<'buf, V, TT>>(
+    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<'buf, TT, V>>(
         &self,
         TargetValuePtr: Option<B>,
     ) {
@@ -396,7 +396,7 @@ impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
     }
 
     #[cfg(feature = "odbc_debug")]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<'buf, V, TT>>(
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<'buf, TT, V>>(
         &self,
         TargetValuePtr: Option<B>,
     ) {
@@ -409,7 +409,7 @@ impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
         }
     }
     #[cfg(feature = "odbc_debug")]
-    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<'buf, V, TT>>(
+    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<'buf, TT, V>>(
         &self,
         TargetValuePtr: Option<B>,
     ) {

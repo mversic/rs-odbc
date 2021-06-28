@@ -71,6 +71,7 @@ pub trait StmtAttr<'stmt, 'buf, A: Ident, V: OdbcVersion>:
     }
 }
 
+#[cfg(feature = "odbc_debug")]
 fn get_ard<'stmt, 'buf, V: OdbcVersion>(
     desc: &mut MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, V>>,
     StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
@@ -83,6 +84,8 @@ fn get_ard<'stmt, 'buf, V: OdbcVersion>(
 
     SQL_SUCCESS
 }
+
+#[cfg(feature = "odbc_debug")]
 fn get_apd<'stmt, 'buf, V: OdbcVersion>(
     desc: &mut MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, V>>,
     StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
@@ -95,17 +98,20 @@ fn get_apd<'stmt, 'buf, V: OdbcVersion>(
 
     SQL_SUCCESS
 }
-fn get_ird<'stmt, 'buf, V: OdbcVersion>(
+
+#[cfg(feature = "odbc_debug")]
+fn get_ird<'stmt, V: OdbcVersion>(
     desc: &mut MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<RowDesc>, V>>,
-    StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
+    StatementHandle: &'stmt SQLHSTMT<V>,
 ) -> SQLRETURN {
     *desc = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ird));
     SQL_SUCCESS
 }
 
-fn get_ipd<'stmt, 'buf, V: OdbcVersion>(
+#[cfg(feature = "odbc_debug")]
+fn get_ipd<'stmt, V: OdbcVersion>(
     desc: &mut MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<ParamDesc>, V>>,
-    StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
+    StatementHandle: &'stmt SQLHSTMT<V>,
 ) -> SQLRETURN {
     *desc = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ipd));
     SQL_SUCCESS
@@ -115,7 +121,7 @@ fn get_ipd<'stmt, 'buf, V: OdbcVersion>(
 #[derive(Debug, Clone, Copy)]
 pub struct RefSQLHDESC<'stmt, T, V: OdbcVersion>(&'stmt SQLHDESC<'stmt, T, V>);
 impl<'stmt, T, V: OdbcVersion> Ident for RefSQLHDESC<'stmt, T, V> {
-    type Type = <Option<&'stmt SQLHDESC<'stmt, V, T>> as Ident>::Type;
+    type Type = <Option<&'stmt SQLHDESC<'stmt, T, V>> as Ident>::Type;
     const IDENTIFIER: Self::Type = <Option<&SQLHDESC<T, V>>>::IDENTIFIER;
 }
 unsafe impl<'buf, T: crate::handle::DescType<'buf>, V: OdbcVersion> AsMutSQLPOINTER

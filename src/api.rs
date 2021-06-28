@@ -17,12 +17,11 @@ use crate::{
     sql_types::SqlType,
     sqlreturn::{SQLRETURN, SQL_SUCCEEDED, SQL_SUCCESS},
     stmt::StmtAttr,
-    AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLPOINTER, AttrGet,
-    AttrSet, BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion,
-    FreeStmtOption, FunctionId, IOType, Ident, IdentifierType, IntoSQLPOINTER, LockType,
-    NullAllowed, Operation, Reserved, Scope, StrLenOrInd, UnicodeType, Unique, RETCODE,
-    SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT,
-    SQLWCHAR,
+    AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLPOINTER, AttrGet, AttrSet,
+    BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion, FreeStmtOption,
+    FunctionId, IOType, Ident, IdentifierType, IntoSQLPOINTER, LockType, NullAllowed, Operation,
+    Reserved, Scope, StrLenOrInd, UnicodeType, Unique, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN,
+    SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
 
 /// Allocates an environment, connection, statement, or descriptor handle.
@@ -68,7 +67,12 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLBindCol<'buf, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'buf, V, TT>, V: OdbcVersion>(
+pub fn SQLBindCol<
+    'buf,
+    TT: Ident<Type = SQLSMALLINT>,
+    B: DeferredBuf<'buf, TT, V>,
+    V: OdbcVersion,
+>(
     StatementHandle: &SQLHSTMT<'_, '_, 'buf, V>,
     ColumnNumber: SQLUSMALLINT,
     TargetType: TT,
@@ -111,15 +115,16 @@ pub fn SQLBindCol<'buf, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<'buf, V, T
 pub fn SQLBindParameter<
     'buf,
     TT: Ident<Type = SQLSMALLINT>,
-    B: DeferredBuf<'buf, V, TT>,
+    // TODO: Check which type is used for ParameterType
+    ST: SqlType<V>,
+    B: DeferredBuf<'buf, TT, V>,
     V: OdbcVersion,
 >(
     StatementHandle: &SQLHSTMT<'_, '_, 'buf, V>,
     ParameterNumber: SQLUSMALLINT,
     InputOutputType: IOType,
     ValueType: TT,
-    // TODO: Check which type is used for ParameterType
-    ParameterType: SqlType,
+    ParameterType: ST,
     ColumnSize: SQLULEN,
     DecimalDigits: SQLSMALLINT,
     ParameterValuePtr: Option<B>,
@@ -1202,7 +1207,10 @@ pub fn SQLFreeHandle<H: Handle>(HandleType: H::Ident, Handle: H) -> SQLRETURN {
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLFreeStmt<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>, Option: FreeStmtOption) -> SQLRETURN {
+pub fn SQLFreeStmt<V: OdbcVersion>(
+    StatementHandle: &SQLHSTMT<V>,
+    Option: FreeStmtOption,
+) -> SQLRETURN {
     unsafe { extern_api::SQLFreeStmt(StatementHandle.as_SQLHANDLE(), Option as SQLUSMALLINT) }
 }
 
@@ -1339,7 +1347,7 @@ pub fn SQLGetCursorNameW<V: OdbcVersion>(
 #[inline]
 #[allow(non_snake_case, unused_variables)]
 // TODO: This function must be unsafe if SQL_ARD_TYPE and SQL_APD_TYPE are allowed to be used
-pub fn SQLGetData<TT: Ident<Type = SQLSMALLINT>, B: CData<V, TT>, V: OdbcVersion>(
+pub fn SQLGetData<TT: Ident<Type = SQLSMALLINT>, B: CData<TT, V>, V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     Col_or_Param_Num: SQLUSMALLINT,
     TargetType: TT,
@@ -1448,12 +1456,12 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetDescRecA<DT, V: OdbcVersion>(
+pub fn SQLGetDescRecA<DT, ST: SqlType<V>, V: OdbcVersion>(
     DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     Name: Option<&mut [MaybeUninit<SQLCHAR>]>,
     StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-    TypePtr: &mut MaybeUninit<SqlType>,
+    TypePtr: &mut MaybeUninit<ST>,
     SubTypePtr: &mut MaybeUninit<DatetimeIntervalCode>,
     LengthPtr: &mut MaybeUninit<SQLLEN>,
     PrecisionPtr: &mut MaybeUninit<SQLSMALLINT>,
@@ -1490,12 +1498,12 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetDescRecW<DT, V: OdbcVersion>(
+pub fn SQLGetDescRecW<DT, ST: SqlType<V>, V: OdbcVersion>(
     DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     Name: Option<&mut [MaybeUninit<SQLWCHAR>]>,
     StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-    TypePtr: &mut MaybeUninit<SqlType>,
+    TypePtr: &mut MaybeUninit<ST>,
     SubTypePtr: &mut MaybeUninit<DatetimeIntervalCode>,
     LengthPtr: &mut MaybeUninit<SQLLEN>,
     PrecisionPtr: &mut MaybeUninit<SQLSMALLINT>,
@@ -1899,7 +1907,10 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetTypeInfoA<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>, DataType: SqlType) -> SQLRETURN {
+pub fn SQLGetTypeInfoA<V: OdbcVersion, ST: SqlType<V>>(
+    StatementHandle: &SQLHSTMT<V>,
+    DataType: ST,
+) -> SQLRETURN {
     unsafe { extern_api::SQLGetTypeInfoA(StatementHandle.as_SQLHANDLE(), DataType.identifier()) }
 }
 
@@ -1911,7 +1922,10 @@ pub fn SQLGetTypeInfoA<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>, DataType: 
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetTypeInfoW<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>, DataType: SqlType) -> SQLRETURN {
+pub fn SQLGetTypeInfoW<V: OdbcVersion, ST: SqlType<V>>(
+    StatementHandle: &SQLHSTMT<V>,
+    DataType: ST,
+) -> SQLRETURN {
     unsafe { extern_api::SQLGetTypeInfoW(StatementHandle.as_SQLHANDLE(), DataType.identifier()) }
 }
 
@@ -2285,7 +2299,7 @@ pub fn SQLProceduresW<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub unsafe fn SQLPutData<TT: Ident, B: CData<V, TT>, V: OdbcVersion>(
+pub unsafe fn SQLPutData<TT: Ident, B: CData<TT, V>, V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     DataPtr: Option<&B>,
 ) -> SQLRETURN
@@ -2417,7 +2431,12 @@ pub fn SQLSetCursorNameW<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetDescFieldA<DT, A: Ident<Type = SQLSMALLINT>, T: WriteDescField<DT, A>, V: OdbcVersion>(
+pub fn SQLSetDescFieldA<
+    DT,
+    A: Ident<Type = SQLSMALLINT>,
+    T: WriteDescField<DT, A>,
+    V: OdbcVersion,
+>(
     DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     FieldIdentifier: A,
@@ -2455,7 +2474,12 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetDescFieldW<DT, A: Ident<Type = SQLSMALLINT>, T: WriteDescField<DT, A>, V: OdbcVersion>(
+pub fn SQLSetDescFieldW<
+    DT,
+    A: Ident<Type = SQLSMALLINT>,
+    T: WriteDescField<DT, A>,
+    V: OdbcVersion,
+>(
     DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     FieldIdentifier: A,
@@ -2494,10 +2518,10 @@ where
 #[inline]
 #[allow(non_snake_case)]
 // TODO: Must not accept IRD
-pub fn SQLSetDescRec<'buf, DT, PTR, V: OdbcVersion>(
+pub fn SQLSetDescRec<'buf, DT, ST: SqlType<V>, PTR, V: OdbcVersion>(
     DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
-    Type: SqlType,
+    Type: ST,
     SubType: Option<DatetimeIntervalCode>,
     Length: SQLLEN,
     Precision: SQLSMALLINT,
