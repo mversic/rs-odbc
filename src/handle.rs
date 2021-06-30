@@ -224,25 +224,7 @@ unsafe impl<C: ConnState, V: OdbcVersion> AsSQLHANDLE for SQLHDBC<'_, C, V> {
         self.handle
     }
 }
-pub trait ConnState {
-    // TODO: If drop impl specialization is allowed this fn will not be required
-    // Related to https://github.com/rust-lang/rust/issues/20400
-    // TODO: This is publicly visible and shouldn't be
-    fn disconnect<V: OdbcVersion>(handle: &mut SQLHDBC<Self, V>)
-    where
-        Self: Sized,
-    {
-        let sql_return = unsafe { extern_api::SQLDisconnect(handle.as_SQLHANDLE()) };
-
-        if sql_return != SQL_SUCCESS && !panicking() {
-            panic!(
-                "{}: SQLDisconnect returned {:?}",
-                type_name::<Self>(),
-                sql_return
-            )
-        }
-    }
-}
+pub trait ConnState: private::ConnState {}
 impl<C: ConnState, V: OdbcVersion> Drop for SQLHDBC<'_, C, V> {
     fn drop(&mut self) {
         C::disconnect(self);
@@ -269,9 +251,7 @@ pub enum C3 {}
 /// Connected
 #[derive(Debug)]
 pub enum C4 {}
-impl ConnState for C2 {
-    fn disconnect<V: OdbcVersion>(_: &mut SQLHDBC<Self, V>) {}
-}
+impl ConnState for C2 {}
 impl ConnState for C3 {}
 impl ConnState for C4 {}
 
@@ -638,3 +618,32 @@ unsafe impl AsSQLHANDLE for SQL_NULL_HANDLE {
 // TODO: Check https://github.com/microsoft/ODBC-Specification/blob/b7ef71fba508ed010cd979428efae3091b732d75/Windows/inc/sqltypes.h
 // This is unixOBDC value
 pub type SQLHWND = SQLPOINTER;
+
+mod private {
+    use super::*;
+
+    pub trait ConnState {
+        // TODO: If drop impl specialization is allowed this fn will not be required
+        // Related to https://github.com/rust-lang/rust/issues/20400
+        fn disconnect<V: OdbcVersion>(handle: &mut SQLHDBC<Self, V>)
+            where
+                Self: super::ConnState + Sized,
+            {
+                let sql_return = unsafe { extern_api::SQLDisconnect(handle.as_SQLHANDLE()) };
+
+                if sql_return != SQL_SUCCESS && !panicking() {
+                    panic!(
+                        "{}: SQLDisconnect returned {:?}",
+                        type_name::<Self>(),
+                        sql_return
+                    )
+                }
+            }
+    }
+
+    impl ConnState for C2 {
+        fn disconnect<V: OdbcVersion>(_: &mut SQLHDBC<Self, V>) {}
+    }
+    impl ConnState for C3 {}
+    impl ConnState for C4 {}
+}
