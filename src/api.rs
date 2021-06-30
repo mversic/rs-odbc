@@ -12,10 +12,10 @@ use crate::{
     desc::{DescField, WriteDescField},
     diag::{DiagField, SQLSTATE},
     env::{EnvAttr, OdbcVersion},
-    handle::{ConnState, C2, C4, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
+    handle::{BrowseConnect, ConnState, Disconnect, C2, C4, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
     info::InfoType,
     sql_types::SqlType,
-    sqlreturn::{SQLRETURN, SQL_SUCCEEDED, SQL_SUCCESS},
+    sqlreturn::{SQLRETURN, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_SUCCEEDED, SQL_SUCCESS},
     stmt::StmtAttr,
     AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLPOINTER, AttrGet, AttrSet,
     BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion, FreeStmtOption,
@@ -167,15 +167,18 @@ pub fn SQLBindParameter<
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLBrowseConnectA<'env, V: OdbcVersion>(
-    ConnectionHandle: SQLHDBC<'env, C2, V>,
+pub fn SQLBrowseConnectA<'env, C: ConnState, V: OdbcVersion>(
+    ConnectionHandle: SQLHDBC<'env, C, V>,
     InConnectionString: &[SQLCHAR],
     OutConnectionString: Option<&mut [MaybeUninit<SQLCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> (
-    Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+    Result<SQLHDBC<'env, C4, V>, Result<SQLHDBC<'env, C3, V>, SQLHDBC<'env, C2, V>>>,
     SQLRETURN,
-) {
+)
+where
+    SQLHDBC<'env, C, V>: BrowseConnect<'env, V>,
+{
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
@@ -192,9 +195,13 @@ pub fn SQLBrowseConnectA<'env, V: OdbcVersion>(
     };
 
     if SQL_SUCCEEDED(sql_return) {
-        (Ok(ConnectionHandle.connected()), sql_return)
+        (Ok(ConnectionHandle.connect()), sql_return)
+    } else if sql_return == SQL_NEED_DATA {
+        (Err(Ok(ConnectionHandle.need_data())), sql_return)
+    } else if sql_return == SQL_STILL_EXECUTING {
+        unimplemented!("Asynchronous execution not supported")
     } else {
-        (Err(ConnectionHandle), sql_return)
+        (Err(Err(ConnectionHandle.disconnect())), sql_return)
     }
 }
 
@@ -206,15 +213,18 @@ pub fn SQLBrowseConnectA<'env, V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLBrowseConnectW<'env, V: OdbcVersion>(
-    ConnectionHandle: SQLHDBC<'env, C2, V>,
+pub fn SQLBrowseConnectW<'env, C: ConnState, V: OdbcVersion>(
+    ConnectionHandle: SQLHDBC<'env, C, V>,
     InConnectionString: &[SQLWCHAR],
     OutConnectionString: Option<&mut [MaybeUninit<SQLWCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> (
-    Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+    Result<SQLHDBC<'env, C4, V>, Result<SQLHDBC<'env, C3, V>, SQLHDBC<'env, C2, V>>>,
     SQLRETURN,
-) {
+)
+where
+    SQLHDBC<'env, C, V>: BrowseConnect<'env, V>,
+{
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
@@ -231,9 +241,13 @@ pub fn SQLBrowseConnectW<'env, V: OdbcVersion>(
     };
 
     if SQL_SUCCEEDED(sql_return) {
-        (Ok(ConnectionHandle.connected()), sql_return)
+        (Ok(ConnectionHandle.connect()), sql_return)
+    } else if sql_return == SQL_NEED_DATA {
+        (Err(Ok(ConnectionHandle.need_data())), sql_return)
+    } else if sql_return == SQL_STILL_EXECUTING {
+        unimplemented!("Asynchronous execution not supported")
     } else {
-        (Err(ConnectionHandle), sql_return)
+        (Err(Err(ConnectionHandle.disconnect())), sql_return)
     }
 }
 
@@ -589,7 +603,7 @@ pub fn SQLConnectA<'env, V: OdbcVersion>(
     };
 
     if SQL_SUCCEEDED(sql_return) {
-        (Ok(ConnectionHandle.connected()), sql_return)
+        (Ok(ConnectionHandle.connect()), sql_return)
     } else {
         (Err(ConnectionHandle), sql_return)
     }
@@ -629,7 +643,7 @@ pub fn SQLConnectW<'env, V: OdbcVersion>(
     };
 
     if SQL_SUCCEEDED(sql_return) {
-        (Ok(ConnectionHandle.connected()), sql_return)
+        (Ok(ConnectionHandle.connect()), sql_return)
     } else {
         (Err(ConnectionHandle), sql_return)
     }
@@ -833,9 +847,12 @@ pub fn SQLDescribeParam<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDisconnect<V: OdbcVersion>(
-    ConnectionHandle: SQLHDBC<C4, V>,
-) -> (Result<SQLHDBC<C2, V>, SQLHDBC<C4, V>>, SQLRETURN) {
+pub fn SQLDisconnect<'env, C: ConnState, V: OdbcVersion>(
+    ConnectionHandle: SQLHDBC<'env, C, V>,
+) -> (Result<SQLHDBC<'env, C2, V>, SQLHDBC<'env, C, V>>, SQLRETURN)
+where
+    SQLHDBC<'env, C, V>: Disconnect<'env, V>,
+{
     let sql_return = unsafe { extern_api::SQLDisconnect(ConnectionHandle.as_SQLHANDLE()) };
 
     if SQL_SUCCEEDED(sql_return) {
@@ -883,7 +900,7 @@ pub fn SQLDriverConnectA<'env, V: OdbcVersion>(
     };
 
     if SQL_SUCCEEDED(sql_return) {
-        (Ok(ConnectionHandle.connected()), sql_return)
+        (Ok(ConnectionHandle.connect()), sql_return)
     } else {
         (Err(ConnectionHandle), sql_return)
     }
@@ -927,7 +944,7 @@ pub fn SQLDriverConnectW<'env, V: OdbcVersion>(
     };
 
     if SQL_SUCCEEDED(sql_return) {
-        (Ok(ConnectionHandle.connected()), sql_return)
+        (Ok(ConnectionHandle.connect()), sql_return)
     } else {
         (Err(ConnectionHandle), sql_return)
     }

@@ -3,8 +3,7 @@ use crate::diag::SQL_DIAG_SQLSTATE;
 use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::extern_api;
 use crate::{
-    sqlreturn::SQL_SUCCESS, Bool, Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER,
-    SQLSMALLINT,
+    sqlreturn::SQL_SUCCESS, Bool, Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER, SQLSMALLINT,
 };
 use std::any::{type_name, TypeId};
 use std::cell::{Cell, UnsafeCell};
@@ -41,11 +40,14 @@ pub trait SQLCancelHandle: Handle {}
 pub trait SQLCompleteAsyncHandle: Handle {}
 pub trait SQLEndTranHandle: Handle {}
 
+#[derive(Debug)]
 pub enum RowDesc {}
+#[derive(Debug)]
 pub enum ParamDesc {}
 
 pub trait DescType<'buf> {}
 
+#[derive(Debug)]
 pub struct ImplDesc<T> {
     desc_type: PhantomData<T>,
 }
@@ -196,30 +198,6 @@ pub struct SQLHDBC<'env, C: ConnState, V: OdbcVersion> {
     connected: PhantomData<C>,
     version: PhantomData<V>,
 }
-impl<'env, V: OdbcVersion> SQLHDBC<'env, C2, V> {
-    pub fn connected(self) -> SQLHDBC<'env, C4, V> {
-        let conn = ManuallyDrop::new(self);
-
-        SQLHDBC {
-            handle: conn.handle,
-            parent: conn.parent,
-            connected: PhantomData,
-            version: PhantomData,
-        }
-    }
-}
-impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
-    pub fn disconnect(self) -> SQLHDBC<'env, C2, V> {
-        let conn = ManuallyDrop::new(self);
-
-        SQLHDBC {
-            handle: conn.handle,
-            parent: conn.parent,
-            connected: PhantomData,
-            version: PhantomData,
-        }
-    }
-}
 impl<C: ConnState, V: OdbcVersion> Handle for SQLHDBC<'_, C, V> {
     type Ident = SQL_HANDLE_DBC;
 }
@@ -249,22 +227,11 @@ unsafe impl<C: ConnState, V: OdbcVersion> AsSQLHANDLE for SQLHDBC<'_, C, V> {
 pub trait ConnState {
     // TODO: If drop impl specialization is allowed this fn will not be required
     // Related to https://github.com/rust-lang/rust/issues/20400
-    fn disconnect<V: OdbcVersion>(_: &mut SQLHDBC<Self, V>)
+    // TODO: This is publicly visible and shouldn't be
+    fn disconnect<V: OdbcVersion>(handle: &mut SQLHDBC<Self, V>)
     where
         Self: Sized,
     {
-    }
-}
-#[derive(Debug)]
-pub enum C2 {}
-#[derive(Debug)]
-pub enum C3 {}
-#[derive(Debug)]
-pub enum C4 {}
-impl ConnState for C3 {}
-impl ConnState for C2 {}
-impl ConnState for C4 {
-    fn disconnect<V: OdbcVersion>(handle: &mut SQLHDBC<Self, V>) {
         let sql_return = unsafe { extern_api::SQLDisconnect(handle.as_SQLHANDLE()) };
 
         if sql_return != SQL_SUCCESS && !panicking() {
@@ -292,6 +259,60 @@ impl<C: ConnState, V: OdbcVersion> Drop for SQLHDBC<'_, C, V> {
         }
     }
 }
+
+/// Allocated
+#[derive(Debug)]
+pub enum C2 {}
+/// Need data
+#[derive(Debug)]
+pub enum C3 {}
+/// Connected
+#[derive(Debug)]
+pub enum C4 {}
+impl ConnState for C2 {
+    fn disconnect<V: OdbcVersion>(_: &mut SQLHDBC<Self, V>) {}
+}
+impl ConnState for C3 {}
+impl ConnState for C4 {}
+
+impl<'env, OC: ConnState, V: OdbcVersion> SQLHDBC<'env, OC, V> {
+    pub(crate) fn disconnect(self) -> SQLHDBC<'env, C2, V> {
+        let handle = ManuallyDrop::new(self);
+
+        SQLHDBC {
+            handle: handle.handle,
+            parent: handle.parent,
+            connected: PhantomData,
+            version: PhantomData,
+        }
+    }
+    pub(crate) fn need_data(self) -> SQLHDBC<'env, C3, V> {
+        let handle = ManuallyDrop::new(self);
+
+        SQLHDBC {
+            handle: handle.handle,
+            parent: handle.parent,
+            connected: PhantomData,
+            version: PhantomData,
+        }
+    }
+    pub(crate) fn connect(self) -> SQLHDBC<'env, C4, V> {
+        let handle = ManuallyDrop::new(self);
+
+        SQLHDBC {
+            handle: handle.handle,
+            parent: handle.parent,
+            connected: PhantomData,
+            version: PhantomData,
+        }
+    }
+}
+pub trait Disconnect<'env, V: OdbcVersion> {}
+pub trait BrowseConnect<'env, V: OdbcVersion> {}
+impl<'env, V: OdbcVersion> BrowseConnect<'env, V> for SQLHDBC<'env, C2, V> {}
+impl<'env, V: OdbcVersion> BrowseConnect<'env, V> for SQLHDBC<'env, C3, V> {}
+impl<'env, V: OdbcVersion> Disconnect<'env, V> for SQLHDBC<'env, C3, V> {}
+impl<'env, V: OdbcVersion> Disconnect<'env, V> for SQLHDBC<'env, C4, V> {}
 
 /// Statement handle consists of all of the information associated with a SQL statement,
 /// such as any result sets created by the statement and parameters used in the execution
@@ -440,11 +461,10 @@ unsafe impl<'conn, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V
     #[cfg(feature = "odbc_debug")]
     fn from_raw(handle: SQLHANDLE) -> Self {
         unsafe {
-            // TODO: Remove type annotations
-            let ard = SQLHSTMT::get_descriptor_handle::<SQL_ATTR_APP_ROW_DESC>(handle);
-            let apd = SQLHSTMT::get_descriptor_handle::<SQL_ATTR_APP_PARAM_DESC>(handle);
-            let ird = SQLHSTMT::get_descriptor_handle::<SQL_ATTR_IMP_ROW_DESC>(handle);
-            let ipd = SQLHSTMT::get_descriptor_handle::<SQL_ATTR_IMP_PARAM_DESC>(handle);
+            let ard = SQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_ROW_DESC>(handle);
+            let apd = SQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_PARAM_DESC>(handle);
+            let ird = SQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_IMP_ROW_DESC>(handle);
+            let ipd = SQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_IMP_PARAM_DESC>(handle);
 
             Self {
                 parent: PhantomData,
@@ -452,10 +472,10 @@ unsafe impl<'conn, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V
 
                 handle,
 
-                ard: ManuallyDrop::new(SQLHDESC::<AppDesc, _>::from_raw(ard)),
-                apd: ManuallyDrop::new(SQLHDESC::<AppDesc, _>::from_raw(apd)),
-                ird: ManuallyDrop::new(SQLHDESC::<ImplDesc<_>, _>::from_raw(ird)),
-                ipd: ManuallyDrop::new(SQLHDESC::<ImplDesc<_>, _>::from_raw(ipd)),
+                ard: ManuallyDrop::new(SQLHDESC::from_raw(ard)),
+                apd: ManuallyDrop::new(SQLHDESC::from_raw(apd)),
+                ird: ManuallyDrop::new(SQLHDESC::from_raw(ird)),
+                ipd: ManuallyDrop::new(SQLHDESC::from_raw(ipd)),
 
                 explicit_ard: Cell::new(None),
                 explicit_apd: Cell::new(None),

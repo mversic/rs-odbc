@@ -2,7 +2,8 @@ use rs_odbc::env::{
     CpMatch, SQL_ATTR_CP_MATCH, SQL_CP_RELAXED_MATCH, SQL_OV_ODBC3, SQL_OV_ODBC3_80,
 };
 use rs_odbc::handle::{
-    SQLHDBC, SQLHENV, SQLHSTMT, SQL_HANDLE_DBC, SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE,
+    C4, SQLHDBC, SQLHENV, SQLHSTMT, SQL_HANDLE_DBC, SQL_HANDLE_ENV, SQL_HANDLE_STMT,
+    SQL_NULL_HANDLE,
 };
 use rs_odbc::info::{
     TxnIsolation, SQL_TXN_ISOLATION_OPTION, SQL_TXN_READ_COMMITTED, SQL_TXN_READ_UNCOMMITTED,
@@ -10,8 +11,8 @@ use rs_odbc::info::{
 };
 use rs_odbc::stmt::{RefSQLHDESC, SQL_ATTR_APP_ROW_DESC};
 use rs_odbc::{
-    sqlreturn::SQL_SUCCESS, SQLAllocHandle, SQLDisconnect, SQLDriverConnectA, SQLFreeHandle, True,
-    SQLGetEnvAttr, SQLGetInfoA, SQLGetStmtAttrA, SQLSetEnvAttr, SQLCHAR, SQL_DRIVER_COMPLETE,
+    sqlreturn::SQL_SUCCESS, SQLAllocHandle, SQLDisconnect, SQLDriverConnectA, SQLFreeHandle,
+    SQLGetEnvAttr, SQLGetInfoA, SQLGetStmtAttrA, SQLSetEnvAttr, True, SQLCHAR, SQL_DRIVER_COMPLETE,
 };
 use std::mem::MaybeUninit;
 
@@ -26,7 +27,7 @@ fn get_env_handle() -> SQLHENV<SQL_OV_ODBC3_80> {
 
 fn connect_to_test_db<'env>(
     env: &'env mut SQLHENV<SQL_OV_ODBC3_80>,
-) -> SQLHDBC<'env, True, SQL_OV_ODBC3_80> {
+) -> SQLHDBC<'env, C4, SQL_OV_ODBC3_80> {
     let mut conn = MaybeUninit::zeroed();
 
     let res = SQLAllocHandle(SQL_HANDLE_DBC, env, &mut conn);
