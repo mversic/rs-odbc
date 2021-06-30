@@ -1,8 +1,11 @@
 use crate::c_types::DeferredBuf;
+use crate::diag::SQL_DIAG_SQLSTATE;
 use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::extern_api;
-use crate::{sqlreturn::SQL_SUCCESS, Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER, SQLSMALLINT};
-use std::any::type_name;
+use crate::{
+    sqlreturn::SQL_SUCCESS, Bool, Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER, SQLSMALLINT,
+};
+use std::any::{type_name, TypeId};
 use std::cell::{Cell, UnsafeCell};
 use std::marker::PhantomData;
 use std::thread::panicking;
@@ -13,8 +16,9 @@ use crate::stmt::{
 };
 #[cfg(feature = "odbc_debug")]
 use crate::SQLINTEGER;
+use std::mem::ManuallyDrop;
 #[cfg(feature = "odbc_debug")]
-use std::mem::{ManuallyDrop, MaybeUninit};
+use std::mem::MaybeUninit;
 
 pub unsafe trait AsSQLHANDLE {
     #[allow(non_snake_case)]
@@ -36,11 +40,14 @@ pub trait SQLCancelHandle: Handle {}
 pub trait SQLCompleteAsyncHandle: Handle {}
 pub trait SQLEndTranHandle: Handle {}
 
+#[derive(Debug)]
 pub enum RowDesc {}
+#[derive(Debug)]
 pub enum ParamDesc {}
 
 pub trait DescType<'buf> {}
 
+#[derive(Debug)]
 pub struct ImplDesc<T> {
     desc_type: PhantomData<T>,
 }
@@ -105,6 +112,7 @@ pub type HDESC = SQLHANDLE;
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/environment-handles
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct SQLHENV<V: OdbcVersion> {
     pub(crate) handle: SQLHANDLE,
@@ -181,118 +189,110 @@ impl<V: OdbcVersion> SQLEndTranHandle for SQLHENV<V> {}
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/connection-handles
+#[derive(Debug)]
 #[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
-pub struct SQLHDBC<'env, V: OdbcVersion> {
+pub struct SQLHDBC<'env, C: ConnState, V: OdbcVersion> {
     pub(crate) handle: SQLHANDLE,
 
     parent: PhantomData<&'env ()>,
+    connected: PhantomData<C>,
     version: PhantomData<V>,
-
-    #[cfg(feature = "odbc_debug")]
-    connected: bool,
 }
-impl<V: OdbcVersion> SQLHDBC<'_, V> {
-    #[inline]
-    #[cfg(feature = "odbc_debug")]
-    pub(crate) fn set_connected(&mut self) {
-        self.connected = true;
+impl<C: ConnState, V: OdbcVersion> Handle for SQLHDBC<'_, C, V> {
+    type Ident = SQL_HANDLE_DBC;
+}
+unsafe impl<'env, V: OdbcVersion> Allocate<'env> for SQLHDBC<'env, C2, V> {
+    type SrcHandle = SQLHENV<V>;
+
+    fn from_raw(handle: SQLHANDLE) -> Self {
+        Self {
+            handle,
+
+            parent: PhantomData,
+            connected: PhantomData,
+            version: PhantomData,
+        }
     }
-
-    #[inline]
-    #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn set_connected(&mut self) {}
-
-    #[inline]
-    #[cfg(feature = "odbc_debug")]
-    pub(crate) fn set_disconnected(&mut self) {
-        self.connected = false;
+}
+impl SQLCancelHandle for SQLHDBC<'_, C4, SQL_OV_ODBC3_80> {}
+impl SQLCancelHandle for SQLHDBC<'_, C4, SQL_OV_ODBC4> {}
+impl SQLCompleteAsyncHandle for SQLHDBC<'_, C4, SQL_OV_ODBC3_80> {}
+impl SQLCompleteAsyncHandle for SQLHDBC<'_, C4, SQL_OV_ODBC4> {}
+impl<V: OdbcVersion> SQLEndTranHandle for SQLHDBC<'_, C4, V> {}
+unsafe impl<C: ConnState, V: OdbcVersion> AsSQLHANDLE for SQLHDBC<'_, C, V> {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.handle
     }
+}
+pub trait ConnState: private::ConnState {}
+impl<C: ConnState, V: OdbcVersion> Drop for SQLHDBC<'_, C, V> {
+    fn drop(&mut self) {
+        C::disconnect(self);
 
-    #[inline]
-    #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn set_disconnected(&mut self) {}
-
-    #[inline]
-    #[cfg(feature = "odbc_debug")]
-    pub(crate) fn assert_connected(&self) {
-        // TODO: Add a message that attribute should be set only after connection was established
-        assert_eq!(true, self.connected);
-    }
-
-    #[inline]
-    #[cfg(feature = "odbc_debug")]
-    pub(crate) fn assert_not_connected(&self) {
-        // TODO: Add a message that attribute should be set only before connection was established
-        // Also add a message that handle can only be disconnected once it's been disconnected
-        assert_eq!(false, self.connected);
-    }
-
-    fn do_drop(&mut self) {
         let sql_return =
             unsafe { extern_api::SQLFreeHandle(SQL_HANDLE_DBC::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if sql_return != SQL_SUCCESS && !panicking() {
             panic!(
-                "{}: SQLFreeHandle returned {:?}. \
-                Before being deallocated, handle must be disconnected(via SQLDisconnect).",
+                "{}: SQLFreeHandle returned {:?}",
                 type_name::<Self>(),
                 sql_return
             )
         }
     }
 }
-impl<V: OdbcVersion> Handle for SQLHDBC<'_, V> {
-    type Ident = SQL_HANDLE_DBC;
-}
-unsafe impl<'env, V: OdbcVersion> Allocate<'env> for SQLHDBC<'env, V> {
-    type SrcHandle = SQLHENV<V>;
 
-    #[cfg(feature = "odbc_debug")]
-    fn from_raw(handle: SQLHANDLE) -> Self {
-        Self {
-            handle,
+/// Allocated
+#[derive(Debug)]
+pub enum C2 {}
+/// Need data
+#[derive(Debug)]
+pub enum C3 {}
+/// Connected
+#[derive(Debug)]
+pub enum C4 {}
+impl ConnState for C2 {}
+impl ConnState for C3 {}
+impl ConnState for C4 {}
 
-            parent: PhantomData,
+impl<'env, OC: ConnState, V: OdbcVersion> SQLHDBC<'env, OC, V> {
+    pub(crate) fn disconnect(self) -> SQLHDBC<'env, C2, V> {
+        let handle = ManuallyDrop::new(self);
+
+        SQLHDBC {
+            handle: handle.handle,
+            parent: handle.parent,
+            connected: PhantomData,
             version: PhantomData,
-
-            connected: false,
         }
     }
-    #[cfg(not(feature = "odbc_debug"))]
-    fn from_raw(handle: SQLHANDLE) -> Self {
-        Self {
-            handle,
+    pub(crate) fn need_data(self) -> SQLHDBC<'env, C3, V> {
+        let handle = ManuallyDrop::new(self);
 
-            parent: PhantomData,
+        SQLHDBC {
+            handle: handle.handle,
+            parent: handle.parent,
+            connected: PhantomData,
+            version: PhantomData,
+        }
+    }
+    pub(crate) fn connect(self) -> SQLHDBC<'env, C4, V> {
+        let handle = ManuallyDrop::new(self);
+
+        SQLHDBC {
+            handle: handle.handle,
+            parent: handle.parent,
+            connected: PhantomData,
             version: PhantomData,
         }
     }
 }
-impl SQLCancelHandle for SQLHDBC<'_, SQL_OV_ODBC3_80> {}
-impl SQLCancelHandle for SQLHDBC<'_, SQL_OV_ODBC4> {}
-impl SQLCompleteAsyncHandle for SQLHDBC<'_, SQL_OV_ODBC3_80> {}
-impl SQLCompleteAsyncHandle for SQLHDBC<'_, SQL_OV_ODBC4> {}
-impl<V: OdbcVersion> SQLEndTranHandle for SQLHDBC<'_, V> {}
-unsafe impl<V: OdbcVersion> AsSQLHANDLE for SQLHDBC<'_, V> {
-    fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        self.handle
-    }
-}
-impl<V: OdbcVersion> Drop for SQLHDBC<'_, V> {
-    #[cfg(feature = "odbc_debug")]
-    fn drop(&mut self) {
-        if !panicking() {
-            self.assert_not_connected();
-        }
-
-        self.do_drop();
-    }
-
-    #[cfg(not(feature = "odbc_debug"))]
-    fn drop(&mut self) {
-        self.do_drop();
-    }
-}
+pub trait Disconnect<'env, V: OdbcVersion> {}
+pub trait BrowseConnect<'env, V: OdbcVersion> {}
+impl<'env, V: OdbcVersion> BrowseConnect<'env, V> for SQLHDBC<'env, C2, V> {}
+impl<'env, V: OdbcVersion> BrowseConnect<'env, V> for SQLHDBC<'env, C3, V> {}
+impl<'env, V: OdbcVersion> Disconnect<'env, V> for SQLHDBC<'env, C3, V> {}
+impl<'env, V: OdbcVersion> Disconnect<'env, V> for SQLHDBC<'env, C4, V> {}
 
 /// Statement handle consists of all of the information associated with a SQL statement,
 /// such as any result sets created by the statement and parameters used in the execution
@@ -316,6 +316,7 @@ impl<V: OdbcVersion> Drop for SQLHDBC<'_, V> {
 ///
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/statement-handles
+#[derive(Debug)]
 #[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
 pub struct SQLHSTMT<'conn, 'stmt, 'buf, V: OdbcVersion> {
     pub(crate) handle: SQLHANDLE,
@@ -435,12 +436,11 @@ impl<V: OdbcVersion> Handle for SQLHSTMT<'_, '_, '_, V> {
 }
 unsafe impl<'conn, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V> {
     // Valid because SQLHDBC is covariant
-    type SrcHandle = SQLHDBC<'conn, V>;
+    type SrcHandle = SQLHDBC<'conn, C4, V>;
 
     #[cfg(feature = "odbc_debug")]
     fn from_raw(handle: SQLHANDLE) -> Self {
         unsafe {
-            // TODO: Remove type annotations
             let ard = SQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_ROW_DESC>(handle);
             let apd = SQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_PARAM_DESC>(handle);
             let ird = SQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_IMP_ROW_DESC>(handle);
@@ -452,10 +452,10 @@ unsafe impl<'conn, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V
 
                 handle,
 
-                ard: ManuallyDrop::new(SQLHDESC::<AppDesc, _>::from_raw(ard)),
-                apd: ManuallyDrop::new(SQLHDESC::<AppDesc, _>::from_raw(apd)),
-                ird: ManuallyDrop::new(SQLHDESC::<ImplDesc<_>, _>::from_raw(ird)),
-                ipd: ManuallyDrop::new(SQLHDESC::<ImplDesc<_>, _>::from_raw(ipd)),
+                ard: ManuallyDrop::new(SQLHDESC::from_raw(ard)),
+                apd: ManuallyDrop::new(SQLHDESC::from_raw(apd)),
+                ird: ManuallyDrop::new(SQLHDESC::from_raw(ird)),
+                ipd: ManuallyDrop::new(SQLHDESC::from_raw(ipd)),
 
                 explicit_ard: Cell::new(None),
                 explicit_apd: Cell::new(None),
@@ -574,7 +574,7 @@ impl<'buf, V: OdbcVersion, T: DescType<'buf>> Handle for SQLHDESC<'_, T, V> {
 }
 unsafe impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'buf>, V> {
     // Valid because SQLHDBC is covariant
-    type SrcHandle = SQLHDBC<'conn, V>;
+    type SrcHandle = SQLHDBC<'conn, C4, V>;
 
     fn from_raw(handle: SQLHANDLE) -> Self {
         SQLHDESC::from_raw(handle)
@@ -618,3 +618,32 @@ unsafe impl AsSQLHANDLE for SQL_NULL_HANDLE {
 // TODO: Check https://github.com/microsoft/ODBC-Specification/blob/b7ef71fba508ed010cd979428efae3091b732d75/Windows/inc/sqltypes.h
 // This is unixOBDC value
 pub type SQLHWND = SQLPOINTER;
+
+mod private {
+    use super::*;
+
+    pub trait ConnState {
+        // TODO: If drop impl specialization is allowed this fn will not be required
+        // Related to https://github.com/rust-lang/rust/issues/20400
+        fn disconnect<V: OdbcVersion>(handle: &mut SQLHDBC<Self, V>)
+            where
+                Self: super::ConnState + Sized,
+            {
+                let sql_return = unsafe { extern_api::SQLDisconnect(handle.as_SQLHANDLE()) };
+
+                if sql_return != SQL_SUCCESS && !panicking() {
+                    panic!(
+                        "{}: SQLDisconnect returned {:?}",
+                        type_name::<Self>(),
+                        sql_return
+                    )
+                }
+            }
+    }
+
+    impl ConnState for C2 {
+        fn disconnect<V: OdbcVersion>(_: &mut SQLHDBC<Self, V>) {}
+    }
+    impl ConnState for C3 {}
+    impl ConnState for C4 {}
+}

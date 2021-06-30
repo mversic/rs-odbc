@@ -1,58 +1,97 @@
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
+use crate::handle::{ConnState, C2, C4};
 use crate::{
-    handle::SQLHDBC, info::TxnIsolation, stmt::StmtAttr, Attr, AttrGet, AttrLen, AttrSet, Ident,
-    OdbcBool, True, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR, OdbcDefined
+    info::TxnIsolation, stmt::StmtAttr, Attr, AttrGet, AttrLen, AttrSet, Ident, OdbcBool,
+    OdbcDefined, True, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
 
-pub trait ConnAttr<A: Ident, V: OdbcVersion>:
+/// C3 is not a valid state for setting or getting attributes
+pub trait ConnAttr<A: Ident, C: ConnState, V: OdbcVersion>:
     Attr<A> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>
 {
+    // TODO: Attributes for which the value wasn't set with SQLSetConnectAttr
+    // cannot be used in SQLGetConnectAttr except for:
+    // SQL_ATTR_ACCESS_MODE, SQL_ATTR_AUTOCOMMIT, SQL_ATTR_LOGIN_TIMEOUT,
+    // SQL_ATTR_ODBC_CURSORS, SQL_ATTR_TRACE, or SQL_ATTR_TRACEFILE
+    // which have defined default values by the ODBC specification
+    // Check: https://docs.microsoft.com/en-us/sql/odbc/reference/appendixes/connection-transitions?view=sql-server-ver15#sqlbrowseconnect
+
     // TODO: Track active statements in debug mode because SQL_ATTR_ASYNC_ENABLE
     // can only be set when there are no active statements
-
-    #[inline]
-    // TODO: Not really sure whether attributes should be checked when getting them
-    // with SQLGetConnectAttr. Currently only SQLSetConnectAttr uses this
-    fn check_attr(&self, ConnectionHandle: &SQLHDBC<V>) {}
 }
 
 // Implement ConnAttr for all versions of connection attributes
-impl<A: Ident, T: Ident> ConnAttr<A, SQL_OV_ODBC3_80> for T where T: ConnAttr<A, SQL_OV_ODBC3> {}
-impl<A: Ident, T: Ident> ConnAttr<A, SQL_OV_ODBC4> for T where T: ConnAttr<A, SQL_OV_ODBC3_80> {}
-impl<A: Ident> ConnAttr<A, SQL_OV_ODBC3_80> for [SQLCHAR] where [SQLCHAR]: ConnAttr<A, SQL_OV_ODBC3> {}
-impl<A: Ident> ConnAttr<A, SQL_OV_ODBC4> for [SQLCHAR] where [SQLCHAR]: ConnAttr<A, SQL_OV_ODBC3_80> {}
+impl<A: Ident, T: Ident> ConnAttr<A, C4, SQL_OV_ODBC3_80> for T where
+    T: ConnAttr<A, C4, SQL_OV_ODBC3>
+{
+}
+impl<A: Ident, T: Ident> ConnAttr<A, C2, SQL_OV_ODBC3_80> for T where
+    T: ConnAttr<A, C2, SQL_OV_ODBC3>
+{
+}
+impl<A: Ident, T: Ident> ConnAttr<A, C4, SQL_OV_ODBC4> for T where
+    T: ConnAttr<A, C4, SQL_OV_ODBC3_80>
+{
+}
+impl<A: Ident, T: Ident> ConnAttr<A, C2, SQL_OV_ODBC4> for T where
+    T: ConnAttr<A, C2, SQL_OV_ODBC3_80>
+{
+}
+impl<A: Ident> ConnAttr<A, C4, SQL_OV_ODBC3_80> for [SQLCHAR] where
+    [SQLCHAR]: ConnAttr<A, C4, SQL_OV_ODBC3>
+{
+}
+impl<A: Ident> ConnAttr<A, C2, SQL_OV_ODBC3_80> for [SQLCHAR] where
+    [SQLCHAR]: ConnAttr<A, C2, SQL_OV_ODBC3>
+{
+}
+impl<A: Ident> ConnAttr<A, C4, SQL_OV_ODBC4> for [SQLCHAR] where
+    [SQLCHAR]: ConnAttr<A, C4, SQL_OV_ODBC3_80>
+{
+}
+impl<A: Ident> ConnAttr<A, C2, SQL_OV_ODBC4> for [SQLCHAR] where
+    [SQLCHAR]: ConnAttr<A, C2, SQL_OV_ODBC3_80>
+{
+}
 
 // Implement ConnAttr for unicode character connection attributes
-impl<V: OdbcVersion, A: Ident> ConnAttr<A, V> for [SQLWCHAR] where
-    [SQLCHAR]: ConnAttr<A, V, NonBinary = True>
+impl<A: Ident, C: ConnState, V: OdbcVersion> ConnAttr<A, C, V> for [SQLWCHAR] where
+    [SQLCHAR]: ConnAttr<A, C, V, NonBinary = True>
 {
 }
 
 // Implement ConnAttr for uninitialized connection attributes
-impl<V: OdbcVersion, A: Ident, T: Ident> ConnAttr<A, V> for MaybeUninit<T>
+impl<A: Ident, T: Ident, C: ConnState, V: OdbcVersion> ConnAttr<A, C, V> for MaybeUninit<T>
 where
-    T: ConnAttr<A, V>,
+    T: ConnAttr<A, C, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }
-impl<V: OdbcVersion, A: Ident> ConnAttr<A, V> for [MaybeUninit<SQLCHAR>]
+
+impl<A: Ident, C: ConnState, V: OdbcVersion> ConnAttr<A, C, V> for [MaybeUninit<SQLCHAR>]
 where
-    [SQLCHAR]: ConnAttr<A, V>,
+    [SQLCHAR]: ConnAttr<A, C, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }
-impl<V: OdbcVersion, A: Ident> ConnAttr<A, V> for [MaybeUninit<SQLWCHAR>]
+impl<A: Ident, C: ConnState, V: OdbcVersion> ConnAttr<A, C, V> for [MaybeUninit<SQLWCHAR>]
 where
-    [SQLWCHAR]: ConnAttr<A, V>,
+    [SQLWCHAR]: ConnAttr<A, C, V>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
 {
 }
 
 // Implement ConnAttr for references to character connection attributes (used by AttrSet)
-impl<V: OdbcVersion, A: Ident> ConnAttr<A, V> for &[SQLCHAR] where [SQLCHAR]: ConnAttr<A, V> {}
-impl<V: OdbcVersion, A: Ident> ConnAttr<A, V> for &[SQLWCHAR] where [SQLWCHAR]: ConnAttr<A, V> {}
+impl<V: OdbcVersion, A: Ident, C: ConnState> ConnAttr<A, C, V> for &[SQLCHAR] where
+    [SQLCHAR]: ConnAttr<A, C, V>
+{
+}
+impl<V: OdbcVersion, A: Ident, C: ConnState> ConnAttr<A, C, V> for &[SQLWCHAR] where
+    [SQLWCHAR]: ConnAttr<A, C, V>
+{
+}
 
 //=====================================================================================//
 //-------------------------------------Attributes--------------------------------------//
@@ -65,19 +104,22 @@ unsafe impl Attr<SQL_ATTR_ACCESS_MODE> for AccessMode {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_ACCESS_MODE, SQL_OV_ODBC3> for AccessMode {}
+impl ConnAttr<SQL_ATTR_ACCESS_MODE, C2, SQL_OV_ODBC3> for AccessMode {}
+impl ConnAttr<SQL_ATTR_ACCESS_MODE, C4, SQL_OV_ODBC3> for AccessMode {}
 unsafe impl AttrGet<SQL_ATTR_ACCESS_MODE> for AccessMode {}
 unsafe impl AttrSet<SQL_ATTR_ACCESS_MODE> for AccessMode {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 102)]
 #[allow(non_camel_case_types)]
+// TODO: Implement in type system
 pub struct SQL_ATTR_AUTOCOMMIT;
 unsafe impl Attr<SQL_ATTR_AUTOCOMMIT> for AutoCommit {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_AUTOCOMMIT, SQL_OV_ODBC3> for AutoCommit {}
+impl ConnAttr<SQL_ATTR_AUTOCOMMIT, C2, SQL_OV_ODBC3> for AutoCommit {}
+impl ConnAttr<SQL_ATTR_AUTOCOMMIT, C4, SQL_OV_ODBC3> for AutoCommit {}
 unsafe impl AttrGet<SQL_ATTR_AUTOCOMMIT> for AutoCommit {}
 unsafe impl AttrSet<SQL_ATTR_AUTOCOMMIT> for AutoCommit {}
 
@@ -89,7 +131,8 @@ unsafe impl Attr<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_CONNECTION_TIMEOUT, SQL_OV_ODBC3> for SQLUINTEGER {}
+impl ConnAttr<SQL_ATTR_CONNECTION_TIMEOUT, C2, SQL_OV_ODBC3> for SQLUINTEGER {}
+impl ConnAttr<SQL_ATTR_CONNECTION_TIMEOUT, C4, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl AttrGet<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {}
 unsafe impl AttrSet<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {}
 
@@ -101,7 +144,8 @@ unsafe impl Attr<SQL_ATTR_CURRENT_CATALOG> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_CURRENT_CATALOG, SQL_OV_ODBC3> for [SQLCHAR] {}
+impl ConnAttr<SQL_ATTR_CURRENT_CATALOG, C2, SQL_OV_ODBC3> for [SQLCHAR] {}
+impl ConnAttr<SQL_ATTR_CURRENT_CATALOG, C4, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl AttrGet<SQL_ATTR_CURRENT_CATALOG> for [SQLCHAR] {}
 unsafe impl AttrSet<SQL_ATTR_CURRENT_CATALOG> for &[SQLCHAR] {}
 
@@ -113,12 +157,7 @@ unsafe impl Attr<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_LOGIN_TIMEOUT, SQL_OV_ODBC3> for SQLUINTEGER {
-    #[cfg(feature = "odbc_debug")]
-    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3>) {
-        ConnectionHandle.assert_not_connected();
-    }
-}
+impl ConnAttr<SQL_ATTR_LOGIN_TIMEOUT, C2, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl AttrGet<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
 unsafe impl AttrSet<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
 
@@ -130,12 +169,7 @@ unsafe impl Attr<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_PACKET_SIZE, SQL_OV_ODBC3> for SQLUINTEGER {
-    #[cfg(feature = "odbc_debug")]
-    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3>) {
-        ConnectionHandle.assert_not_connected();
-    }
-}
+impl ConnAttr<SQL_ATTR_PACKET_SIZE, C2, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl AttrGet<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
 unsafe impl AttrSet<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
 
@@ -147,7 +181,8 @@ unsafe impl Attr<SQL_ATTR_TRACE> for Trace {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_TRACE, SQL_OV_ODBC3> for Trace {}
+impl ConnAttr<SQL_ATTR_TRACE, C2, SQL_OV_ODBC3> for Trace {}
+impl ConnAttr<SQL_ATTR_TRACE, C4, SQL_OV_ODBC3> for Trace {}
 unsafe impl AttrGet<SQL_ATTR_TRACE> for Trace {}
 unsafe impl AttrSet<SQL_ATTR_TRACE> for Trace {}
 
@@ -159,7 +194,8 @@ unsafe impl Attr<SQL_ATTR_TRACEFILE> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_TRACEFILE, SQL_OV_ODBC3> for [SQLCHAR] {}
+impl ConnAttr<SQL_ATTR_TRACEFILE, C2, SQL_OV_ODBC3> for [SQLCHAR] {}
+impl ConnAttr<SQL_ATTR_TRACEFILE, C4, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl AttrGet<SQL_ATTR_TRACEFILE> for [SQLCHAR] {}
 unsafe impl AttrSet<SQL_ATTR_TRACEFILE> for &[SQLCHAR] {}
 
@@ -171,12 +207,7 @@ unsafe impl Attr<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_TRANSLATE_LIB, SQL_OV_ODBC3> for [SQLCHAR] {
-    #[cfg(feature = "odbc_debug")]
-    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3>) {
-        ConnectionHandle.assert_connected();
-    }
-}
+impl ConnAttr<SQL_ATTR_TRANSLATE_LIB, C4, SQL_OV_ODBC3> for [SQLCHAR] {}
 unsafe impl AttrGet<SQL_ATTR_TRANSLATE_LIB> for [SQLCHAR] {}
 unsafe impl AttrSet<SQL_ATTR_TRANSLATE_LIB> for &[SQLCHAR] {}
 
@@ -189,7 +220,8 @@ unsafe impl Attr<SQL_ATTR_AUTO_IPD> for OdbcBool {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_AUTO_IPD, SQL_OV_ODBC3> for OdbcBool {}
+impl ConnAttr<SQL_ATTR_AUTO_IPD, C2, SQL_OV_ODBC3> for OdbcBool {}
+impl ConnAttr<SQL_ATTR_AUTO_IPD, C4, SQL_OV_ODBC3> for OdbcBool {}
 unsafe impl AttrGet<SQL_ATTR_AUTO_IPD> for OdbcBool {}
 
 #[derive(Ident)]
@@ -200,7 +232,14 @@ unsafe impl Attr<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnabl
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE, SQL_OV_ODBC3_80> for AsyncDbcFunctionsEnable {}
+impl ConnAttr<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE, C2, SQL_OV_ODBC3_80>
+    for AsyncDbcFunctionsEnable
+{
+}
+impl ConnAttr<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE, C4, SQL_OV_ODBC3_80>
+    for AsyncDbcFunctionsEnable
+{
+}
 unsafe impl AttrGet<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {}
 unsafe impl AttrSet<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {}
 
@@ -215,12 +254,7 @@ unsafe impl Attr<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_CONNECTION_DEAD, SQL_OV_ODBC3_80> for ConnectionDead {
-    #[cfg(feature = "odbc_debug")]
-    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3_80>) {
-        ConnectionHandle.assert_connected();
-    }
-}
+impl ConnAttr<SQL_ATTR_CONNECTION_DEAD, C4, SQL_OV_ODBC3_80> for ConnectionDead {}
 unsafe impl AttrGet<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {}
 
 #[derive(Ident)]
@@ -231,12 +265,9 @@ unsafe impl Attr<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_TXN_ISOLATION, SQL_OV_ODBC3> for TxnIsolation {
-    #[cfg(feature = "odbc_debug")]
-    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3>) {
-        ConnectionHandle.assert_connected();
-    }
-}
+// TODO: Check for open transaction
+impl ConnAttr<SQL_ATTR_TXN_ISOLATION, C2, SQL_OV_ODBC3> for TxnIsolation {}
+impl ConnAttr<SQL_ATTR_TXN_ISOLATION, C4, SQL_OV_ODBC3> for TxnIsolation {}
 unsafe impl AttrGet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 
@@ -248,7 +279,7 @@ unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 //    type DefinedBy = OdbcDefined;
 //    type NonBinary = True;
 //}
-//impl ConnAttr<SQL_ATTR_TRANSLATE_OPTION, SQL_OV_ODBC3> for SQLUINTEGER {
+//impl ConnAttr<SQL_ATTR_TRANSLATE_OPTION, C, SQL_OV_ODBC3> for SQLUINTEGER {
 //    #[cfg(feature = "odbc_debug")]
 //    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3>) {
 //        ConnectionHandle.assert_connected();
@@ -261,26 +292,33 @@ unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 //#[identifier(SQLINTEGER, 118)]
 //// This is set-only attribute
 //pub struct SQL_ATTR_DBC_INFO_TOKEN;
-//impl ConnAttr<SQL_ATTR_DBC_INFO_TOKEN, SQL_OV_ODBC3_80> for SQLPOINTER {
+//unsafe impl Attr<SQL_ATTR_DBC_INFO_TOKEN> for SQLPOINTER {
+//    type DefinedBy = OdbcDefined;
+//    type NonBinary = True;
+//}
+//impl ConnAttr<SQL_ATTR_DBC_INFO_TOKEN, C, SQL_OV_ODBC3_80> for SQLPOINTER {
 //    #[cfg(feature = "odbc_debug")]
 //    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3_80>) {
 //        assert_connected(ConnectionHandle);
 //    }
-//}
 //impl AttrSet<SQL_ATTR_DBC_INFO_TOKEN> for SQLPOINTER {}
 
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 119)]
 //pub struct SQL_ATTR_ASYNC_DBC_EVENT;
-//impl ConnAttr<SQL_ATTR_ASYNC_DBC_EVENT, SQL_OV_ODBC3_80> for SQLPOINTER {}
 //// TODO: It's an Event handle. Should probably implement event handle
+//unsafe impl Attr<SQL_ATTR_ASYNC_DBC_EVENT> for SQLPOINTER {
+//    type DefinedBy = OdbcDefined;
+//    type NonBinary = True;
+//}
+//impl ConnAttr<SQL_ATTR_ASYNC_DBC_EVENT, C, SQL_OV_ODBC3_80> for SQLPOINTER {}
 //impl AttrGet<SQL_ATTR_ASYNC_DBC_EVENT> for SQLPOINTER {}
 
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 111)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_QUIET_MODE;
-//impl ConnAttr<SQL_ATTR_QUIET_MODE, SQL_OV_ODBC3> for SQLHWND {}
+//impl ConnAttr<SQL_ATTR_QUIET_MODE, C, SQL_OV_ODBC3> for {}
 
 // TODO: Not found in documentation, only in implementation
 //#[derive(Ident)]
@@ -353,27 +391,44 @@ unsafe impl Attr<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl ConnAttr<SQL_ATTR_REFRESH_CONNECTION, SQL_OV_ODBC4> for RefreshConnection {}
+impl ConnAttr<SQL_ATTR_REFRESH_CONNECTION, C2, SQL_OV_ODBC4> for RefreshConnection {}
+impl ConnAttr<SQL_ATTR_REFRESH_CONNECTION, C4, SQL_OV_ODBC4> for RefreshConnection {}
 unsafe impl AttrGet<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {}
 unsafe impl AttrSet<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {}
 
 // Re-exported as connection attribute
 pub use crate::stmt::SQL_ATTR_ASYNC_ENABLE;
-impl<'stmt, 'buf, T: Ident> ConnAttr<SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3> for T where
+impl<'stmt, 'buf, T: Ident> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C2, SQL_OV_ODBC3> for T where
     T: StmtAttr<'stmt, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
 {
 }
-impl<'stmt, 'buf, T> ConnAttr<SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3> for [T] where
+impl<'stmt, 'buf, T: Ident> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C4, SQL_OV_ODBC3> for T where
+    T: StmtAttr<'stmt, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
+{
+}
+impl<'stmt, 'buf, T> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C2, SQL_OV_ODBC3> for [T] where
+    [T]: StmtAttr<'stmt, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
+{
+}
+impl<'stmt, 'buf, T> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C4, SQL_OV_ODBC3> for [T] where
     [T]: StmtAttr<'stmt, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
 {
 }
 
 pub use crate::stmt::SQL_ATTR_METADATA_ID;
-impl<'stmt, 'buf, T: Ident> ConnAttr<SQL_ATTR_METADATA_ID, SQL_OV_ODBC3> for T where
+impl<'stmt, 'buf, T: Ident> ConnAttr<SQL_ATTR_METADATA_ID, C2, SQL_OV_ODBC3> for T where
     T: StmtAttr<'stmt, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
 {
 }
-impl<'stmt, 'buf, T> ConnAttr<SQL_ATTR_METADATA_ID, SQL_OV_ODBC3> for [T] where
+impl<'stmt, 'buf, T: Ident> ConnAttr<SQL_ATTR_METADATA_ID, C4, SQL_OV_ODBC3> for T where
+    T: StmtAttr<'stmt, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
+{
+}
+impl<'stmt, 'buf, T> ConnAttr<SQL_ATTR_METADATA_ID, C2, SQL_OV_ODBC3> for [T] where
+    [T]: StmtAttr<'stmt, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
+{
+}
+impl<'stmt, 'buf, T> ConnAttr<SQL_ATTR_METADATA_ID, C4, SQL_OV_ODBC3> for [T] where
     [T]: StmtAttr<'stmt, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
 {
 }

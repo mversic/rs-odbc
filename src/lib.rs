@@ -510,8 +510,10 @@ where
 }
 
 pub trait Bool {}
+#[derive(Debug)]
 pub struct True {}
 impl Bool for True {}
+#[derive(Debug)]
 pub struct False {}
 impl Bool for False {}
 pub trait Def {}

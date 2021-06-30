@@ -12,10 +12,10 @@ use crate::{
     desc::{DescField, WriteDescField},
     diag::{DiagField, SQLSTATE},
     env::{EnvAttr, OdbcVersion},
-    handle::{SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
+    handle::{BrowseConnect, ConnState, Disconnect, C2, C4, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
     info::InfoType,
     sql_types::SqlType,
-    sqlreturn::{SQLRETURN, SQL_SUCCEEDED, SQL_SUCCESS},
+    sqlreturn::{SQLRETURN, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_SUCCEEDED, SQL_SUCCESS},
     stmt::StmtAttr,
     AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLPOINTER, AttrGet, AttrSet,
     BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion, FreeStmtOption,
@@ -167,12 +167,18 @@ pub fn SQLBindParameter<
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLBrowseConnectA<V: OdbcVersion>(
-    ConnectionHandle: &mut SQLHDBC<V>,
+pub fn SQLBrowseConnectA<'env, C: ConnState, V: OdbcVersion>(
+    ConnectionHandle: SQLHDBC<'env, C, V>,
     InConnectionString: &[SQLCHAR],
     OutConnectionString: Option<&mut [MaybeUninit<SQLCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-) -> SQLRETURN {
+) -> (
+    Result<SQLHDBC<'env, C4, V>, Result<SQLHDBC<'env, C3, V>, SQLHDBC<'env, C2, V>>>,
+    SQLRETURN,
+)
+where
+    SQLHDBC<'env, C, V>: BrowseConnect<'env, V>,
+{
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
@@ -189,10 +195,14 @@ pub fn SQLBrowseConnectA<V: OdbcVersion>(
     };
 
     if SQL_SUCCEEDED(sql_return) {
-        ConnectionHandle.set_connected();
+        (Ok(ConnectionHandle.connect()), sql_return)
+    } else if sql_return == SQL_NEED_DATA {
+        (Err(Ok(ConnectionHandle.need_data())), sql_return)
+    } else if sql_return == SQL_STILL_EXECUTING {
+        unimplemented!("Asynchronous execution not supported")
+    } else {
+        (Err(Err(ConnectionHandle.disconnect())), sql_return)
     }
-
-    sql_return
 }
 
 /// Supports an iterative method of discovering and enumerating the attributes and attribute values required to connect to a data source. Each call to **SQLBrowseConnect** returns successive levels of attributes and attribute values. When all levels have been enumerated, a connection to the data source is completed and a complete connection string is returned by **SQLBrowseConnect**. A return code of SQL_SUCCESS or SQL_SUCCESS_WITH_INFO indicates that all connection information has been specified and the application is now connected to the data source.
@@ -203,12 +213,18 @@ pub fn SQLBrowseConnectA<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLBrowseConnectW<V: OdbcVersion>(
-    ConnectionHandle: &mut SQLHDBC<V>,
+pub fn SQLBrowseConnectW<'env, C: ConnState, V: OdbcVersion>(
+    ConnectionHandle: SQLHDBC<'env, C, V>,
     InConnectionString: &[SQLWCHAR],
     OutConnectionString: Option<&mut [MaybeUninit<SQLWCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-) -> SQLRETURN {
+) -> (
+    Result<SQLHDBC<'env, C4, V>, Result<SQLHDBC<'env, C3, V>, SQLHDBC<'env, C2, V>>>,
+    SQLRETURN,
+)
+where
+    SQLHDBC<'env, C, V>: BrowseConnect<'env, V>,
+{
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
@@ -225,10 +241,14 @@ pub fn SQLBrowseConnectW<V: OdbcVersion>(
     };
 
     if SQL_SUCCEEDED(sql_return) {
-        ConnectionHandle.set_connected();
+        (Ok(ConnectionHandle.connect()), sql_return)
+    } else if sql_return == SQL_NEED_DATA {
+        (Err(Ok(ConnectionHandle.need_data())), sql_return)
+    } else if sql_return == SQL_STILL_EXECUTING {
+        unimplemented!("Asynchronous execution not supported")
+    } else {
+        (Err(Err(ConnectionHandle.disconnect())), sql_return)
     }
-
-    sql_return
 }
 
 /// Performs bulk insertions and bulk bookmark operations, including update, delete, and fetch by bookmark.
@@ -557,12 +577,15 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLConnectA<V: OdbcVersion>(
-    ConnectionHandle: &mut SQLHDBC<V>,
+pub fn SQLConnectA<'env, V: OdbcVersion>(
+    ConnectionHandle: SQLHDBC<'env, C2, V>,
     ServerName: &[SQLCHAR],
     UserName: &[SQLCHAR],
     Authentication: &[SQLCHAR],
-) -> SQLRETURN {
+) -> (
+    Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+    SQLRETURN,
+) {
     let ServerName = ServerName.as_raw_slice();
     let UserName = UserName.as_raw_slice();
     let Authentication = Authentication.as_raw_slice();
@@ -580,10 +603,10 @@ pub fn SQLConnectA<V: OdbcVersion>(
     };
 
     if SQL_SUCCEEDED(sql_return) {
-        ConnectionHandle.set_connected();
+        (Ok(ConnectionHandle.connect()), sql_return)
+    } else {
+        (Err(ConnectionHandle), sql_return)
     }
-
-    sql_return
 }
 
 /// Establishes connections to a driver and a data source. The connection handle references storage of all information about the connection to the data source, including status, transaction state, and error information.
@@ -594,12 +617,15 @@ pub fn SQLConnectA<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLConnectW<V: OdbcVersion>(
-    ConnectionHandle: &mut SQLHDBC<V>,
+pub fn SQLConnectW<'env, V: OdbcVersion>(
+    ConnectionHandle: SQLHDBC<'env, C2, V>,
     ServerName: &[SQLWCHAR],
     UserName: &[SQLWCHAR],
     Authentication: &[SQLWCHAR],
-) -> SQLRETURN {
+) -> (
+    Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+    SQLRETURN,
+) {
     let ServerName = ServerName.as_raw_slice();
     let UserName = UserName.as_raw_slice();
     let Authentication = Authentication.as_raw_slice();
@@ -617,10 +643,10 @@ pub fn SQLConnectW<V: OdbcVersion>(
     };
 
     if SQL_SUCCEEDED(sql_return) {
-        ConnectionHandle.set_connected();
+        (Ok(ConnectionHandle.connect()), sql_return)
+    } else {
+        (Err(ConnectionHandle), sql_return)
     }
-
-    sql_return
 }
 
 /// Copies descriptor information from one descriptor handle to another.
@@ -821,14 +847,19 @@ pub fn SQLDescribeParam<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDisconnect<V: OdbcVersion>(ConnectionHandle: &mut SQLHDBC<V>) -> SQLRETURN {
+pub fn SQLDisconnect<'env, C: ConnState, V: OdbcVersion>(
+    ConnectionHandle: SQLHDBC<'env, C, V>,
+) -> (Result<SQLHDBC<'env, C2, V>, SQLHDBC<'env, C, V>>, SQLRETURN)
+where
+    SQLHDBC<'env, C, V>: Disconnect<'env, V>,
+{
     let sql_return = unsafe { extern_api::SQLDisconnect(ConnectionHandle.as_SQLHANDLE()) };
 
     if SQL_SUCCEEDED(sql_return) {
-        ConnectionHandle.set_disconnected();
+        (Ok(ConnectionHandle.disconnect()), sql_return)
+    } else {
+        (Err(ConnectionHandle), sql_return)
     }
-
-    sql_return
 }
 
 /// An alternative to **SQLConnect**. It supports data sources that require more connection information than the three arguments in **SQLConnect**, dialog boxes to prompt the user for all connection information, and data sources that are not defined in the system information. For more information, see Connecting with SQLDriverConnect.
@@ -839,14 +870,17 @@ pub fn SQLDisconnect<V: OdbcVersion>(ConnectionHandle: &mut SQLHDBC<V>) -> SQLRE
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDriverConnectA<V: OdbcVersion>(
-    ConnectionHandle: &mut SQLHDBC<V>,
+pub fn SQLDriverConnectA<'env, V: OdbcVersion>(
+    ConnectionHandle: SQLHDBC<'env, C2, V>,
     WindowHandle: Option<SQLHWND>,
     InConnectionString: &[SQLCHAR],
     OutConnectionString: Option<&mut [MaybeUninit<SQLCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
     DriverCompletion: DriverCompletion,
-) -> SQLRETURN {
+) -> (
+    Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+    SQLRETURN,
+) {
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
@@ -866,10 +900,10 @@ pub fn SQLDriverConnectA<V: OdbcVersion>(
     };
 
     if SQL_SUCCEEDED(sql_return) {
-        ConnectionHandle.set_connected();
+        (Ok(ConnectionHandle.connect()), sql_return)
+    } else {
+        (Err(ConnectionHandle), sql_return)
     }
-
-    sql_return
 }
 
 /// An alternative to **SQLConnect**. It supports data sources that require more connection information than the three arguments in **SQLConnect**, dialog boxes to prompt the user for all connection information, and data sources that are not defined in the system information. For more information, see Connecting with SQLDriverConnect.
@@ -880,14 +914,17 @@ pub fn SQLDriverConnectA<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLDriverConnectW<V: OdbcVersion>(
-    ConnectionHandle: &mut SQLHDBC<V>,
+pub fn SQLDriverConnectW<'env, V: OdbcVersion>(
+    ConnectionHandle: SQLHDBC<'env, C2, V>,
     WindowHandle: Option<SQLHWND>,
     InConnectionString: &[SQLWCHAR],
     OutConnectionString: Option<&mut [MaybeUninit<SQLWCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
     DriverCompletion: DriverCompletion,
-) -> SQLRETURN {
+) -> (
+    Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+    SQLRETURN,
+) {
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
@@ -907,10 +944,10 @@ pub fn SQLDriverConnectW<V: OdbcVersion>(
     };
 
     if SQL_SUCCEEDED(sql_return) {
-        ConnectionHandle.set_connected();
+        (Ok(ConnectionHandle.connect()), sql_return)
+    } else {
+        (Err(ConnectionHandle), sql_return)
     }
-
-    sql_return
 }
 
 /// Lists driver descriptions and driver attribute keywords. This function is implemented only by the Driver Manager.
@@ -1222,8 +1259,14 @@ pub fn SQLFreeStmt<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>, V: OdbcVersion>(
-    ConnectionHandle: &SQLHDBC<V>,
+pub fn SQLGetConnectAttrA<
+    A: Ident<Type = SQLINTEGER>,
+    T: ConnAttr<A, C, V>,
+    C: ConnState,
+    V: OdbcVersion,
+>(
+    // TODO: Not sure whether attributes should be checked when getting them with SQLGetConnectAttr
+    ConnectionHandle: &SQLHDBC<C, V>,
     Attribute: A,
     ValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
@@ -1259,8 +1302,14 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>, V: OdbcVersion>(
-    ConnectionHandle: &SQLHDBC<V>,
+pub fn SQLGetConnectAttrW<
+    A: Ident<Type = SQLINTEGER>,
+    T: ConnAttr<A, C, V>,
+    C: ConnState,
+    V: OdbcVersion,
+>(
+    // TODO: Not really sure whether attributes should be checked when getting them with SQLGetConnectAttr
+    ConnectionHandle: &SQLHDBC<C, V>,
     Attribute: A,
     ValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
@@ -1734,7 +1783,7 @@ where
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLGetFunctions<V: OdbcVersion>(
-    ConnectionHandle: &SQLHDBC<V>,
+    ConnectionHandle: &SQLHDBC<C4, V>,
     FunctionId: FunctionId,
     SupportedPtr: &mut MaybeUninit<SQLUSMALLINT>,
 ) -> SQLRETURN {
@@ -1756,7 +1805,8 @@ pub fn SQLGetFunctions<V: OdbcVersion>(
 #[inline]
 #[allow(non_snake_case, unused_variables)]
 pub fn SQLGetInfoA<I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>, V: OdbcVersion>(
-    ConnectionHandle: &SQLHDBC<V>,
+    // TODO: SQL_ODBC_VER can be called on connection that is not open
+    ConnectionHandle: &SQLHDBC<C4, V>,
     InfoType: I,
     InfoValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
@@ -1789,7 +1839,8 @@ where
 #[inline]
 #[allow(non_snake_case, unused_variables)]
 pub fn SQLGetInfoW<I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>, V: OdbcVersion>(
-    ConnectionHandle: &SQLHDBC<V>,
+    // TODO: SQL_ODBC_VER can be called on connection that is not open
+    ConnectionHandle: &SQLHDBC<C4, V>,
     InfoType: I,
     InfoValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
@@ -1950,7 +2001,7 @@ pub fn SQLMoreResults<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETUR
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLNativeSqlA<V: OdbcVersion>(
-    ConnectionHandle: &SQLHDBC<V>,
+    ConnectionHandle: &SQLHDBC<C4, V>,
     InStatementText: &[SQLCHAR],
     OutStatementText: &mut [MaybeUninit<SQLCHAR>],
     TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
@@ -1979,7 +2030,7 @@ pub fn SQLNativeSqlA<V: OdbcVersion>(
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLNativeSqlW<V: OdbcVersion>(
-    ConnectionHandle: &SQLHDBC<V>,
+    ConnectionHandle: &SQLHDBC<C4, V>,
     InStatementText: &[SQLWCHAR],
     OutStatementText: &mut [MaybeUninit<SQLWCHAR>],
     TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
@@ -2337,16 +2388,19 @@ pub fn SQLRowCount<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>, V: OdbcVersion>(
-    ConnectionHandle: &SQLHDBC<V>,
+pub fn SQLSetConnectAttrA<
+    A: Ident<Type = SQLINTEGER>,
+    T: ConnAttr<A, C, V>,
+    C: ConnState,
+    V: OdbcVersion,
+>(
+    ConnectionHandle: &SQLHDBC<C, V>,
     Attribute: A,
     ValuePtr: T,
 ) -> SQLRETURN
 where
     T: AttrSet<A> + AnsiType,
 {
-    ValuePtr.check_attr(ConnectionHandle);
-
     unsafe {
         extern_api::SQLSetConnectAttrA(
             ConnectionHandle.as_SQLHANDLE(),
@@ -2365,16 +2419,19 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, V>, V: OdbcVersion>(
-    ConnectionHandle: &SQLHDBC<V>,
+pub fn SQLSetConnectAttrW<
+    A: Ident<Type = SQLINTEGER>,
+    T: ConnAttr<A, C, V>,
+    C: ConnState,
+    V: OdbcVersion,
+>(
+    ConnectionHandle: &SQLHDBC<C, V>,
     Attribute: A,
     ValuePtr: T,
 ) -> SQLRETURN
 where
     T: AttrSet<A> + UnicodeType,
 {
-    ValuePtr.check_attr(ConnectionHandle);
-
     unsafe {
         extern_api::SQLSetConnectAttrW(
             ConnectionHandle.as_SQLHANDLE(),
