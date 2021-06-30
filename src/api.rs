@@ -12,7 +12,7 @@ use crate::{
     desc::{DescField, WriteDescField},
     diag::{DiagField, SQLSTATE},
     env::{EnvAttr, OdbcVersion},
-    handle::{SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
+    handle::{ConnState, C2, C4, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
     info::InfoType,
     sql_types::SqlType,
     sqlreturn::{SQLRETURN, SQL_SUCCEEDED, SQL_SUCCESS},
@@ -21,7 +21,7 @@ use crate::{
     BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion, FreeStmtOption,
     FunctionId, IOType, Ident, IdentifierType, IntoSQLPOINTER, LockType, NullAllowed, Operation,
     Reserved, Scope, StrLenOrInd, UnicodeType, Unique, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN,
-    SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR, False, True
+    SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
 
 /// Allocates an environment, connection, statement, or descriptor handle.
@@ -168,11 +168,14 @@ pub fn SQLBindParameter<
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLBrowseConnectA<'env, V: OdbcVersion>(
-    ConnectionHandle: SQLHDBC<'env, False, V>,
+    ConnectionHandle: SQLHDBC<'env, C2, V>,
     InConnectionString: &[SQLCHAR],
     OutConnectionString: Option<&mut [MaybeUninit<SQLCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-) -> (Result<SQLHDBC<'env, True, V>, SQLHDBC<'env, False, V>>, SQLRETURN) {
+) -> (
+    Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+    SQLRETURN,
+) {
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
@@ -204,11 +207,14 @@ pub fn SQLBrowseConnectA<'env, V: OdbcVersion>(
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLBrowseConnectW<'env, V: OdbcVersion>(
-    ConnectionHandle: SQLHDBC<'env, False, V>,
+    ConnectionHandle: SQLHDBC<'env, C2, V>,
     InConnectionString: &[SQLWCHAR],
     OutConnectionString: Option<&mut [MaybeUninit<SQLWCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-) -> (Result<SQLHDBC<'env, True, V>, SQLHDBC<'env, False, V>>, SQLRETURN) {
+) -> (
+    Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+    SQLRETURN,
+) {
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
@@ -558,11 +564,14 @@ where
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLConnectA<'env, V: OdbcVersion>(
-    ConnectionHandle: SQLHDBC<'env, False, V>,
+    ConnectionHandle: SQLHDBC<'env, C2, V>,
     ServerName: &[SQLCHAR],
     UserName: &[SQLCHAR],
     Authentication: &[SQLCHAR],
-) -> (Result<SQLHDBC<'env, True, V>, SQLHDBC<'env, False, V>>, SQLRETURN) {
+) -> (
+    Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+    SQLRETURN,
+) {
     let ServerName = ServerName.as_raw_slice();
     let UserName = UserName.as_raw_slice();
     let Authentication = Authentication.as_raw_slice();
@@ -595,11 +604,14 @@ pub fn SQLConnectA<'env, V: OdbcVersion>(
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLConnectW<'env, V: OdbcVersion>(
-    ConnectionHandle: SQLHDBC<'env, False, V>,
+    ConnectionHandle: SQLHDBC<'env, C2, V>,
     ServerName: &[SQLWCHAR],
     UserName: &[SQLWCHAR],
     Authentication: &[SQLWCHAR],
-) -> (Result<SQLHDBC<'env, True, V>, SQLHDBC<'env, False, V>>, SQLRETURN) {
+) -> (
+    Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+    SQLRETURN,
+) {
     let ServerName = ServerName.as_raw_slice();
     let UserName = UserName.as_raw_slice();
     let Authentication = Authentication.as_raw_slice();
@@ -822,12 +834,12 @@ pub fn SQLDescribeParam<V: OdbcVersion>(
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLDisconnect<V: OdbcVersion>(
-    ConnectionHandle: SQLHDBC<True, V>,
-) -> (Result<SQLHDBC<False, V>, SQLHDBC<True, V>>, SQLRETURN) {
+    ConnectionHandle: SQLHDBC<C4, V>,
+) -> (Result<SQLHDBC<C2, V>, SQLHDBC<C4, V>>, SQLRETURN) {
     let sql_return = unsafe { extern_api::SQLDisconnect(ConnectionHandle.as_SQLHANDLE()) };
 
     if SQL_SUCCEEDED(sql_return) {
-        (Ok(ConnectionHandle.disconnected()), sql_return)
+        (Ok(ConnectionHandle.disconnect()), sql_return)
     } else {
         (Err(ConnectionHandle), sql_return)
     }
@@ -842,13 +854,16 @@ pub fn SQLDisconnect<V: OdbcVersion>(
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLDriverConnectA<'env, V: OdbcVersion>(
-    ConnectionHandle: SQLHDBC<'env, False, V>,
+    ConnectionHandle: SQLHDBC<'env, C2, V>,
     WindowHandle: Option<SQLHWND>,
     InConnectionString: &[SQLCHAR],
     OutConnectionString: Option<&mut [MaybeUninit<SQLCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
     DriverCompletion: DriverCompletion,
-) -> (Result<SQLHDBC<'env, True, V>, SQLHDBC<'env, False, V>>, SQLRETURN) {
+) -> (
+    Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+    SQLRETURN,
+) {
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
@@ -883,13 +898,16 @@ pub fn SQLDriverConnectA<'env, V: OdbcVersion>(
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLDriverConnectW<'env, V: OdbcVersion>(
-    ConnectionHandle: SQLHDBC<'env, False, V>,
+    ConnectionHandle: SQLHDBC<'env, C2, V>,
     WindowHandle: Option<SQLHWND>,
     InConnectionString: &[SQLWCHAR],
     OutConnectionString: Option<&mut [MaybeUninit<SQLWCHAR>]>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
     DriverCompletion: DriverCompletion,
-) -> (Result<SQLHDBC<'env, True, V>, SQLHDBC<'env, False, V>>, SQLRETURN) {
+) -> (
+    Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+    SQLRETURN,
+) {
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
@@ -1224,7 +1242,12 @@ pub fn SQLFreeStmt<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, C, V>, C, V: OdbcVersion>(
+pub fn SQLGetConnectAttrA<
+    A: Ident<Type = SQLINTEGER>,
+    T: ConnAttr<A, C, V>,
+    C: ConnState,
+    V: OdbcVersion,
+>(
     // TODO: Not sure whether attributes should be checked when getting them with SQLGetConnectAttr
     ConnectionHandle: &SQLHDBC<C, V>,
     Attribute: A,
@@ -1262,7 +1285,12 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, C, V>, C, V: OdbcVersion>(
+pub fn SQLGetConnectAttrW<
+    A: Ident<Type = SQLINTEGER>,
+    T: ConnAttr<A, C, V>,
+    C: ConnState,
+    V: OdbcVersion,
+>(
     // TODO: Not really sure whether attributes should be checked when getting them with SQLGetConnectAttr
     ConnectionHandle: &SQLHDBC<C, V>,
     Attribute: A,
@@ -1738,7 +1766,7 @@ where
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLGetFunctions<V: OdbcVersion>(
-    ConnectionHandle: &SQLHDBC<True, V>,
+    ConnectionHandle: &SQLHDBC<C4, V>,
     FunctionId: FunctionId,
     SupportedPtr: &mut MaybeUninit<SQLUSMALLINT>,
 ) -> SQLRETURN {
@@ -1761,7 +1789,7 @@ pub fn SQLGetFunctions<V: OdbcVersion>(
 #[allow(non_snake_case, unused_variables)]
 pub fn SQLGetInfoA<I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>, V: OdbcVersion>(
     // TODO: SQL_ODBC_VER can be called on connection that is not open
-    ConnectionHandle: &SQLHDBC<True, V>,
+    ConnectionHandle: &SQLHDBC<C4, V>,
     InfoType: I,
     InfoValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
@@ -1795,7 +1823,7 @@ where
 #[allow(non_snake_case, unused_variables)]
 pub fn SQLGetInfoW<I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>, V: OdbcVersion>(
     // TODO: SQL_ODBC_VER can be called on connection that is not open
-    ConnectionHandle: &SQLHDBC<True, V>,
+    ConnectionHandle: &SQLHDBC<C4, V>,
     InfoType: I,
     InfoValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
@@ -1956,7 +1984,7 @@ pub fn SQLMoreResults<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETUR
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLNativeSqlA<V: OdbcVersion>(
-    ConnectionHandle: &SQLHDBC<True, V>,
+    ConnectionHandle: &SQLHDBC<C4, V>,
     InStatementText: &[SQLCHAR],
     OutStatementText: &mut [MaybeUninit<SQLCHAR>],
     TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
@@ -1985,7 +2013,7 @@ pub fn SQLNativeSqlA<V: OdbcVersion>(
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLNativeSqlW<V: OdbcVersion>(
-    ConnectionHandle: &SQLHDBC<True, V>,
+    ConnectionHandle: &SQLHDBC<C4, V>,
     InStatementText: &[SQLWCHAR],
     OutStatementText: &mut [MaybeUninit<SQLWCHAR>],
     TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
@@ -2343,7 +2371,12 @@ pub fn SQLRowCount<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, C, V>, C, V: OdbcVersion>(
+pub fn SQLSetConnectAttrA<
+    A: Ident<Type = SQLINTEGER>,
+    T: ConnAttr<A, C, V>,
+    C: ConnState,
+    V: OdbcVersion,
+>(
     ConnectionHandle: &SQLHDBC<C, V>,
     Attribute: A,
     ValuePtr: T,
@@ -2369,7 +2402,12 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLSetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, C, V>, C, V: OdbcVersion>(
+pub fn SQLSetConnectAttrW<
+    A: Ident<Type = SQLINTEGER>,
+    T: ConnAttr<A, C, V>,
+    C: ConnState,
+    V: OdbcVersion,
+>(
     ConnectionHandle: &SQLHDBC<C, V>,
     Attribute: A,
     ValuePtr: T,

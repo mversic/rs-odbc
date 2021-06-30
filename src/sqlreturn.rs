@@ -24,6 +24,7 @@ pub const SQL_SUCCESS_WITH_INFO: SQLRETURN = SQLRETURN(1);
 /// function are undefined.
 pub const SQL_ERROR: SQLRETURN = SQLRETURN(-1);
 
+// TODO: Can this error occur?
 /// Function failed due to an invalid environment, connection, statement, or
 /// descriptor handle. This indicates a programming error. No additional information
 /// is available from SQLGetDiagRec or SQLGetDiagField. This code is returned only

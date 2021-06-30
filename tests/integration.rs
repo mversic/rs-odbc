@@ -10,7 +10,7 @@ use rs_odbc::info::{
 };
 use rs_odbc::stmt::{RefSQLHDESC, SQL_ATTR_APP_ROW_DESC};
 use rs_odbc::{
-    sqlreturn::SQL_SUCCESS, SQLAllocHandle, SQLDisconnect, SQLDriverConnectA, SQLFreeHandle,
+    sqlreturn::SQL_SUCCESS, SQLAllocHandle, SQLDisconnect, SQLDriverConnectA, SQLFreeHandle, True,
     SQLGetEnvAttr, SQLGetInfoA, SQLGetStmtAttrA, SQLSetEnvAttr, SQLCHAR, SQL_DRIVER_COMPLETE,
 };
 use std::mem::MaybeUninit;
@@ -26,7 +26,7 @@ fn get_env_handle() -> SQLHENV<SQL_OV_ODBC3_80> {
 
 fn connect_to_test_db<'env>(
     env: &'env mut SQLHENV<SQL_OV_ODBC3_80>,
-) -> SQLHDBC<'env, SQL_OV_ODBC3_80> {
+) -> SQLHDBC<'env, True, SQL_OV_ODBC3_80> {
     let mut conn = MaybeUninit::zeroed();
 
     let res = SQLAllocHandle(SQL_HANDLE_DBC, env, &mut conn);
@@ -35,8 +35,8 @@ fn connect_to_test_db<'env>(
     let mut conn = unsafe { conn.assume_init() };
     let conn_string = "DSN=MariaDB;Database=rs_odbc_test;";
     let mut outstrlen = MaybeUninit::zeroed();
-    let res = SQLDriverConnectA(
-        &mut conn,
+    let (conn, res) = SQLDriverConnectA(
+        conn,
         None,
         conn_string.as_bytes(),
         None,
@@ -45,7 +45,7 @@ fn connect_to_test_db<'env>(
     );
     assert_eq!(SQL_SUCCESS, res);
 
-    return conn;
+    return conn.unwrap();
 }
 
 #[test]
@@ -85,13 +85,13 @@ fn db_connect() {
     let res = SQLAllocHandle(SQL_HANDLE_DBC, &mut env, &mut conn);
     assert_eq!(SQL_SUCCESS, res);
 
-    let mut conn: SQLHDBC<_> = unsafe { conn.assume_init() };
+    let mut conn = unsafe { conn.assume_init() };
 
     let conn_string = "DSN=MariaDB;Database=rs_odbc_test;";
     let mut outstr: [MaybeUninit<_>; 1024] = unsafe { MaybeUninit::zeroed().assume_init() };
     let mut outstrlen = MaybeUninit::zeroed();
-    let res = SQLDriverConnectA(
-        &mut conn,
+    let (conn, res) = SQLDriverConnectA(
+        conn,
         None,
         conn_string.as_bytes(),
         Some(&mut outstr[..]),
@@ -99,6 +99,7 @@ fn db_connect() {
         SQL_DRIVER_COMPLETE,
     );
     assert_eq!(SQL_SUCCESS, res);
+    let conn = conn.unwrap();
 
     let outstrlen: usize = unsafe { outstrlen.assume_init() } as usize;
     assert_eq!(34, outstrlen);
@@ -114,7 +115,7 @@ fn db_connect() {
         &outstr[..outstrlen]
     );
 
-    let res = SQLDisconnect(&mut conn);
+    let (conn, res) = SQLDisconnect(conn);
     assert_eq!(SQL_SUCCESS, res);
 }
 
@@ -135,8 +136,9 @@ fn get_handle() {
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     assert_eq!(SQL_SUCCESS, res);
 
-    let res = SQLDisconnect(&mut conn);
+    let (conn, res) = SQLDisconnect(conn);
     assert_eq!(SQL_SUCCESS, res);
+    let conn = conn.unwrap();
 }
 
 #[test]
@@ -157,7 +159,4 @@ fn get_info() {
     assert_eq!(0x00000002, SQL_TXN_READ_COMMITTED & txn_isolation);
     assert_eq!(0x00000004, SQL_TXN_REPEATABLE_READ & txn_isolation);
     assert_eq!(0x00000008, SQL_TXN_SERIALIZABLE & txn_isolation);
-
-    let res = SQLDisconnect(&mut conn);
-    assert_eq!(SQL_SUCCESS, res);
 }
