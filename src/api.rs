@@ -1589,7 +1589,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_NO_DATA.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetDiagFieldA<H: Handle, D: Ident<Type = SQLSMALLINT>, T: DiagField<H, D>>(
+pub fn SQLGetDiagFieldA<H: Handle, D: Ident<Type = SQLSMALLINT>, T: DiagField<D, H>>(
     HandleType: H::Ident,
     Handle: &H,
     // TODO: Use NoneZeroI16?
@@ -1632,7 +1632,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_NO_DATA.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetDiagFieldW<H: Handle, D: Ident<Type = SQLSMALLINT>, T: DiagField<H, D>>(
+pub fn SQLGetDiagFieldW<H: Handle, D: Ident<Type = SQLSMALLINT>, T: DiagField<D, H>>(
     HandleType: H::Ident,
     Handle: &H,
     // TODO: Use NoneZeroI16?

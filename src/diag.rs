@@ -1,13 +1,13 @@
-use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
+use crate::env::OdbcVersion;
 use crate::handle::{Handle, SQLHSTMT};
 use crate::{
-    sqlreturn::SQLRETURN, AsMutSQLPOINTER, Attr, AttrGet, AttrLen, Ident, OdbcDefined, True, Void,
-    SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLWCHAR,
+    sqlreturn::SQLRETURN, AsMutSQLPOINTER, Attr, AttrGet, AttrLen, AttrZeroAssert, Ident,
+    OdbcDefined, True, Void, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
 
-pub trait DiagField<H: Handle, D: Ident>:
+pub trait DiagField<D: Ident, H: Handle>:
     Attr<D> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>
 {
 }
@@ -85,18 +85,7 @@ where
         other == self
     }
 }
-impl crate::AttrZeroAssert for SQLSTATE<SQLCHAR> {
-    #[inline]
-    fn assert_zeroed(&self) {
-        assert!(self.0.iter().all(|&x| x == 0))
-    }
-}
-impl crate::AttrZeroAssert for SQLSTATE<SQLWCHAR> {
-    #[inline]
-    fn assert_zeroed(&self) {
-        assert!(self.0.iter().all(|&x| x == 0))
-    }
-}
+impl<C> AttrZeroAssert for SQLSTATE<C> {}
 unsafe impl<C> AttrLen<OdbcDefined, True, SQLSMALLINT> for SQLSTATE<C> {
     type StrLen = Void;
 
@@ -112,35 +101,40 @@ unsafe impl<C> AttrLen<OdbcDefined, True, SQLSMALLINT> for MaybeUninit<SQLSTATE<
     }
 }
 
-// Implement DiagField for all versions of diag field attributes
-//impl<D: Ident, T: Ident> DiagField<D, SQL_OV_ODBC3_80> for T where T: DiagField<D, SQL_OV_ODBC3> {}
-//impl<D: Ident, T: Ident> DiagField<D, SQL_OV_ODBC4> for T where T: DiagField<D, SQL_OV_ODBC3_80> {}
-//impl<D: Ident> DiagField<D, SQL_OV_ODBC3_80> for [SQLCHAR] where [SQLCHAR]: DiagField<D, SQL_OV_ODBC3> {}
-//impl<D: Ident> DiagField<D, SQL_OV_ODBC4> for [SQLCHAR] where [SQLCHAR]: DiagField<D, SQL_OV_ODBC3_80> {}
-
-// Implement DiagField for unicode character diag field attributes
-impl<H: Handle, D: Ident> DiagField<H, D> for [SQLWCHAR] where
-    [SQLCHAR]: DiagField<H, D, NonBinary = True>
+// Implement DiagField for unicode character diagnostic attributes
+impl<A: Ident, H: Handle> DiagField<A, H> for [SQLWCHAR] where
+    [SQLCHAR]: DiagField<A, H, NonBinary = True>
 {
 }
 
-// Implement DiagField for uninitialized diag field attributes
-impl<H: Handle, D: Ident, T: Ident> DiagField<H, D> for MaybeUninit<T>
+// Implement DiagField for uninitialized diagnostic attributes
+impl<A: Ident, T: Ident, H: Handle> DiagField<A, H> for MaybeUninit<T>
 where
-    T: DiagField<H, D>,
+    T: DiagField<A, H>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<H: Handle, D: Ident> DiagField<H, D> for [MaybeUninit<SQLCHAR>]
+
+impl<A: Ident, H: Handle> DiagField<A, H> for [MaybeUninit<SQLCHAR>]
 where
-    [SQLCHAR]: DiagField<H, D>,
+    [SQLCHAR]: DiagField<A, H>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<H: Handle, D: Ident> DiagField<H, D> for [MaybeUninit<SQLWCHAR>]
+impl<A: Ident, H: Handle> DiagField<A, H> for [MaybeUninit<SQLWCHAR>]
 where
-    [SQLWCHAR]: DiagField<H, D>,
+    [SQLWCHAR]: DiagField<A, H>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
+{
+}
+
+// Implement DiagField for references to character diagnostic attributes (used by AttrSet)
+impl<A: Ident, H: Handle> DiagField<A, H> for &[SQLCHAR] where
+    [SQLCHAR]: DiagField<A, H>
+{
+}
+impl<A: Ident, H: Handle> DiagField<A, H> for &[SQLWCHAR] where
+    [SQLWCHAR]: DiagField<A, H>
 {
 }
 
@@ -159,7 +153,7 @@ unsafe impl Attr<SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3>, SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {}
+impl<V: OdbcVersion> DiagField<SQL_DIAG_CURSOR_ROW_COUNT, SQLHSTMT<'_, '_, '_, V>> for SQLLEN {}
 unsafe impl AttrGet<SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {}
 
 #[derive(Ident)]
@@ -170,7 +164,10 @@ unsafe impl Attr<SQL_DIAG_DYNAMIC_FUNCTION> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3>, SQL_DIAG_DYNAMIC_FUNCTION> for [SQLCHAR] {}
+impl<V: OdbcVersion> DiagField<SQL_DIAG_DYNAMIC_FUNCTION, SQLHSTMT<'_, '_, '_, V>>
+    for [SQLCHAR]
+{
+}
 unsafe impl AttrGet<SQL_DIAG_DYNAMIC_FUNCTION> for [SQLCHAR] {}
 
 #[derive(Ident)]
@@ -181,7 +178,7 @@ unsafe impl Attr<SQL_DIAG_DYNAMIC_FUNCTION_CODE> for DiagDynamicFunctionCode {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3>, SQL_DIAG_DYNAMIC_FUNCTION_CODE>
+impl<V: OdbcVersion> DiagField<SQL_DIAG_DYNAMIC_FUNCTION_CODE, SQLHSTMT<'_, '_, '_, V>>
     for DiagDynamicFunctionCode
 {
 }
@@ -195,7 +192,7 @@ unsafe impl Attr<SQL_DIAG_NUMBER> for SQLINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<H: Handle> DiagField<H, SQL_DIAG_NUMBER> for SQLINTEGER {}
+impl<H: Handle> DiagField<SQL_DIAG_NUMBER, H> for SQLINTEGER {}
 unsafe impl AttrGet<SQL_DIAG_NUMBER> for SQLINTEGER {}
 
 #[derive(Ident)]
@@ -206,7 +203,7 @@ unsafe impl Attr<SQL_DIAG_RETURNCODE> for SQLRETURN {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<H: Handle> DiagField<H, SQL_DIAG_RETURNCODE> for SQLRETURN {}
+impl<H: Handle> DiagField<SQL_DIAG_RETURNCODE, H> for SQLRETURN {}
 unsafe impl AttrGet<SQL_DIAG_RETURNCODE> for SQLRETURN {}
 
 #[derive(Ident)]
@@ -217,7 +214,7 @@ unsafe impl Attr<SQL_DIAG_ROW_COUNT> for SQLLEN {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3>, SQL_DIAG_ROW_COUNT> for SQLLEN {}
+impl<V: OdbcVersion> DiagField<SQL_DIAG_ROW_COUNT, SQLHSTMT<'_, '_, '_, V>> for SQLLEN {}
 unsafe impl AttrGet<SQL_DIAG_ROW_COUNT> for SQLLEN {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -232,7 +229,7 @@ unsafe impl Attr<SQL_DIAG_CLASS_ORIGIN> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<H: Handle> DiagField<H, SQL_DIAG_CLASS_ORIGIN> for [SQLCHAR] {}
+impl<H: Handle> DiagField<SQL_DIAG_CLASS_ORIGIN, H> for [SQLCHAR] {}
 unsafe impl AttrGet<SQL_DIAG_CLASS_ORIGIN> for [SQLCHAR] {}
 
 #[derive(Ident)]
@@ -243,7 +240,10 @@ unsafe impl Attr<SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3>, SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {}
+impl<V: OdbcVersion> DiagField<SQL_DIAG_COLUMN_NUMBER, SQLHSTMT<'_, '_, '_, V>>
+    for DiagColumnNumber
+{
+}
 unsafe impl AttrGet<SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {}
 
 #[derive(Ident)]
@@ -254,7 +254,7 @@ unsafe impl Attr<SQL_DIAG_CONNECTION_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<H: Handle> DiagField<H, SQL_DIAG_CONNECTION_NAME> for [SQLCHAR] {}
+impl<H: Handle> DiagField<SQL_DIAG_CONNECTION_NAME, H> for [SQLCHAR] {}
 unsafe impl AttrGet<SQL_DIAG_CONNECTION_NAME> for [SQLCHAR] {}
 
 #[derive(Ident)]
@@ -265,7 +265,7 @@ unsafe impl Attr<SQL_DIAG_MESSAGE_TEXT> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<H: Handle> DiagField<H, SQL_DIAG_MESSAGE_TEXT> for [SQLCHAR] {}
+impl<H: Handle> DiagField<SQL_DIAG_MESSAGE_TEXT, H> for [SQLCHAR] {}
 unsafe impl AttrGet<SQL_DIAG_MESSAGE_TEXT> for [SQLCHAR] {}
 
 #[derive(Ident)]
@@ -276,7 +276,7 @@ unsafe impl Attr<SQL_DIAG_NATIVE> for SQLINTEGER {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<H: Handle> DiagField<H, SQL_DIAG_NATIVE> for SQLINTEGER {}
+impl<H: Handle> DiagField<SQL_DIAG_NATIVE, H> for SQLINTEGER {}
 unsafe impl AttrGet<SQL_DIAG_NATIVE> for SQLINTEGER {}
 
 #[derive(Ident)]
@@ -287,7 +287,7 @@ unsafe impl Attr<SQL_DIAG_ROW_NUMBER> for DiagRowNumber {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl DiagField<SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3>, SQL_DIAG_ROW_NUMBER> for DiagRowNumber {}
+impl<V: OdbcVersion> DiagField<SQL_DIAG_ROW_NUMBER, SQLHSTMT<'_, '_, '_, V>> for DiagRowNumber {}
 unsafe impl AttrGet<SQL_DIAG_ROW_NUMBER> for DiagRowNumber {}
 
 #[derive(Ident)]
@@ -298,7 +298,7 @@ unsafe impl Attr<SQL_DIAG_SERVER_NAME> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<H: Handle> DiagField<H, SQL_DIAG_SERVER_NAME> for [SQLCHAR] {}
+impl<H: Handle> DiagField<SQL_DIAG_SERVER_NAME, H> for [SQLCHAR] {}
 unsafe impl AttrGet<SQL_DIAG_SERVER_NAME> for [SQLCHAR] {}
 
 #[derive(Ident)]
@@ -309,7 +309,7 @@ unsafe impl<C> Attr<SQL_DIAG_SQLSTATE> for SQLSTATE<C> {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<H: Handle, C> DiagField<H, SQL_DIAG_SQLSTATE> for SQLSTATE<C> {}
+impl<H: Handle, C> DiagField<SQL_DIAG_SQLSTATE, H> for SQLSTATE<C> {}
 unsafe impl AttrGet<SQL_DIAG_SQLSTATE> for SQLSTATE<SQLCHAR> {}
 unsafe impl AttrGet<SQL_DIAG_SQLSTATE> for SQLSTATE<SQLWCHAR> {}
 
@@ -321,7 +321,7 @@ unsafe impl Attr<SQL_DIAG_SUBCLASS_ORIGIN> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<H: Handle> DiagField<H, SQL_DIAG_SUBCLASS_ORIGIN> for [SQLCHAR] {}
+impl<H: Handle> DiagField<SQL_DIAG_SUBCLASS_ORIGIN, H> for [SQLCHAR] {}
 unsafe impl AttrGet<SQL_DIAG_SUBCLASS_ORIGIN> for [SQLCHAR] {}
 
 //=====================================================================================//

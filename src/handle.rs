@@ -1,11 +1,10 @@
 use crate::c_types::DeferredBuf;
-use crate::diag::SQL_DIAG_SQLSTATE;
 use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::extern_api;
 use crate::{
-    sqlreturn::SQL_SUCCESS, Bool, Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER, SQLSMALLINT,
+    sqlreturn::SQL_SUCCESS, Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER, SQLSMALLINT,
 };
-use std::any::{type_name, TypeId};
+use std::any::type_name;
 use std::cell::{Cell, UnsafeCell};
 use std::marker::PhantomData;
 use std::thread::panicking;
@@ -36,9 +35,9 @@ pub unsafe trait Allocate<'src>: Handle + Drop {
     fn from_raw(handle: SQLHANDLE) -> Self;
 }
 
-pub trait SQLCancelHandle: Handle {}
-pub trait SQLCompleteAsyncHandle: Handle {}
-pub trait SQLEndTranHandle: Handle {}
+pub trait SQLCancelHandle {}
+pub trait SQLCompleteAsyncHandle {}
+pub trait SQLEndTranHandle {}
 
 #[derive(Debug)]
 pub enum RowDesc {}
@@ -626,19 +625,19 @@ mod private {
         // TODO: If drop impl specialization is allowed this fn will not be required
         // Related to https://github.com/rust-lang/rust/issues/20400
         fn disconnect<V: OdbcVersion>(handle: &mut SQLHDBC<Self, V>)
-            where
-                Self: super::ConnState + Sized,
-            {
-                let sql_return = unsafe { extern_api::SQLDisconnect(handle.as_SQLHANDLE()) };
+        where
+            Self: super::ConnState + Sized,
+        {
+            let sql_return = unsafe { extern_api::SQLDisconnect(handle.as_SQLHANDLE()) };
 
-                if sql_return != SQL_SUCCESS && !panicking() {
-                    panic!(
-                        "{}: SQLDisconnect returned {:?}",
-                        type_name::<Self>(),
-                        sql_return
-                    )
-                }
+            if sql_return != SQL_SUCCESS && !panicking() {
+                panic!(
+                    "{}: SQLDisconnect returned {:?}",
+                    type_name::<Self>(),
+                    sql_return
+                )
             }
+        }
     }
 
     impl ConnState for C2 {

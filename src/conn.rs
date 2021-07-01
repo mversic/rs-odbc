@@ -84,11 +84,11 @@ where
 }
 
 // Implement ConnAttr for references to character connection attributes (used by AttrSet)
-impl<V: OdbcVersion, A: Ident, C: ConnState> ConnAttr<A, C, V> for &[SQLCHAR] where
+impl< A: Ident, C: ConnState, V: OdbcVersion> ConnAttr<A, C, V> for &[SQLCHAR] where
     [SQLCHAR]: ConnAttr<A, C, V>
 {
 }
-impl<V: OdbcVersion, A: Ident, C: ConnState> ConnAttr<A, C, V> for &[SQLWCHAR] where
+impl< A: Ident, C: ConnState, V: OdbcVersion> ConnAttr<A, C, V> for &[SQLWCHAR] where
     [SQLWCHAR]: ConnAttr<A, C, V>
 {
 }
