@@ -9,7 +9,7 @@ use crate::{
     c_types::DeferredBuf,
     col::ColAttr,
     conn::ConnAttr,
-    desc::{DescField, WriteDescField},
+    desc::DescField,
     diag::{DiagField, SQLSTATE},
     env::{EnvAttr, OdbcVersion},
     handle::{BrowseConnect, ConnState, Disconnect, C2, C4, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
@@ -1427,7 +1427,13 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetDescFieldA<DT, A: Ident<Type = SQLSMALLINT>, T: DescField<DT, A>, V: OdbcVersion>(
+pub fn SQLGetDescFieldA<
+    'buf,
+    A: Ident<Type = SQLSMALLINT>,
+    T: DescField<A, DT>,
+    DT: DescType<'buf>,
+    V: OdbcVersion,
+>(
     DescriptorHandle: &mut SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     FieldIdentifier: A,
@@ -1466,7 +1472,13 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLGetDescFieldW<DT, A: Ident<Type = SQLSMALLINT>, T: DescField<DT, A>, V: OdbcVersion>(
+pub fn SQLGetDescFieldW<
+    'buf,
+    A: Ident<Type = SQLSMALLINT>,
+    T: DescField<A, DT>,
+    DT: DescType<'buf>,
+    V: OdbcVersion,
+>(
     DescriptorHandle: &mut SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     FieldIdentifier: A,
@@ -1505,7 +1517,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetDescRecA<DT, ST: SqlType<V>, V: OdbcVersion>(
+pub fn SQLGetDescRecA<'buf, ST: SqlType<V>, DT: DescType<'buf>, V: OdbcVersion>(
     DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     Name: Option<&mut [MaybeUninit<SQLCHAR>]>,
@@ -1516,10 +1528,7 @@ pub fn SQLGetDescRecA<DT, ST: SqlType<V>, V: OdbcVersion>(
     PrecisionPtr: &mut MaybeUninit<SQLSMALLINT>,
     ScalePtr: &mut MaybeUninit<SQLSMALLINT>,
     NullablePtr: &mut MaybeUninit<NullAllowed>,
-) -> SQLRETURN
-where
-    DT: for<'buf> DescType<'buf>,
-{
+) -> SQLRETURN {
     let Name = Name.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     unsafe {
@@ -1547,7 +1556,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
-pub fn SQLGetDescRecW<DT, ST: SqlType<V>, V: OdbcVersion>(
+pub fn SQLGetDescRecW<'buf, ST: SqlType<V>, DT: DescType<'buf>, V: OdbcVersion>(
     DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     Name: Option<&mut [MaybeUninit<SQLWCHAR>]>,
@@ -1558,10 +1567,7 @@ pub fn SQLGetDescRecW<DT, ST: SqlType<V>, V: OdbcVersion>(
     PrecisionPtr: &mut MaybeUninit<SQLSMALLINT>,
     ScalePtr: &mut MaybeUninit<SQLSMALLINT>,
     NullablePtr: &mut MaybeUninit<NullAllowed>,
-) -> SQLRETURN
-where
-    DT: for<'buf> DescType<'buf>,
-{
+) -> SQLRETURN {
     let Name = Name.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     unsafe {
@@ -2489,9 +2495,10 @@ pub fn SQLSetCursorNameW<V: OdbcVersion>(
 #[inline]
 #[allow(non_snake_case, unused_variables)]
 pub fn SQLSetDescFieldA<
-    DT,
+    'buf,
     A: Ident<Type = SQLSMALLINT>,
-    T: WriteDescField<DT, A>,
+    T: DescField<A, DT>,
+    DT: DescType<'buf>,
     V: OdbcVersion,
 >(
     DescriptorHandle: &SQLHDESC<DT, V>,
@@ -2500,7 +2507,7 @@ pub fn SQLSetDescFieldA<
     ValuePtr: Option<T>,
 ) -> SQLRETURN
 where
-    T: AnsiType,
+    T: AttrSet<A> + AnsiType,
 {
     let sql_return = unsafe {
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -2532,9 +2539,10 @@ where
 #[inline]
 #[allow(non_snake_case, unused_variables)]
 pub fn SQLSetDescFieldW<
-    DT,
+    'buf,
     A: Ident<Type = SQLSMALLINT>,
-    T: WriteDescField<DT, A>,
+    T: DescField<A, DT>,
+    DT: DescType<'buf>,
     V: OdbcVersion,
 >(
     DescriptorHandle: &SQLHDESC<DT, V>,
@@ -2543,7 +2551,7 @@ pub fn SQLSetDescFieldW<
     ValuePtr: Option<T>,
 ) -> SQLRETURN
 where
-    T: UnicodeType,
+    T: AttrSet<A> + UnicodeType,
 {
     let sql_return = unsafe {
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -2575,7 +2583,7 @@ where
 #[inline]
 #[allow(non_snake_case)]
 // TODO: Must not accept IRD
-pub fn SQLSetDescRec<'buf, DT, ST: SqlType<V>, PTR, V: OdbcVersion>(
+pub fn SQLSetDescRec<'buf, ST: SqlType<V>, DT: DescType<'buf>, PTR, V: OdbcVersion>(
     DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
     Type: ST,
@@ -2590,7 +2598,6 @@ pub fn SQLSetDescRec<'buf, DT, ST: SqlType<V>, PTR, V: OdbcVersion>(
     IndicatorPtr: &'buf mut MaybeUninit<SQLLEN>,
 ) -> SQLRETURN
 where
-    DT: DescType<'buf>,
     &'buf PTR: IntoSQLPOINTER,
 {
     unsafe {

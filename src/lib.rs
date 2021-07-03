@@ -457,7 +457,7 @@ where
     type StrLen = LEN;
 
     fn len(&self) -> LEN {
-        // TODO: Check for multiplication overflow
+        // TODO: Check for multiplication overflow with checked_mul
         slice_len::<_, LEN>(self)
             * LEN::try_from(std::mem::size_of::<SQLWCHAR>()).expect(SLICE_LEN_TOO_LARGE_MSG)
     }

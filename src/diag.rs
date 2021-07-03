@@ -1,7 +1,7 @@
 use crate::env::OdbcVersion;
 use crate::handle::{Handle, SQLHSTMT};
 use crate::{
-    sqlreturn::SQLRETURN, AsMutSQLPOINTER, Attr, AttrGet, AttrLen, AttrZeroAssert, Ident,
+    sqlreturn::SQLRETURN, AsMutSQLPOINTER, Attr, AttrGet, AttrLen, AttrZeroAssert, Def, Ident,
     OdbcDefined, True, Void, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
@@ -10,6 +10,11 @@ use std::mem::MaybeUninit;
 pub trait DiagField<D: Ident, H: Handle>:
     Attr<D> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>
 {
+    // TODO: These could be checked by the type system
+    // SQL_DIAG_CURSOR_ROW_COUNT -> The contents of this field are defined only after SQLExecute, SQLExecDirect, or SQLMoreResults
+    // SQL_DIAG_DYNAMIC_FUNCTION -> The contents of this field are defined only after SQLExecute, SQLExecDirect, or SQLMoreResults
+    // SQL_DIAG_DYNAMIC_FUNCTION_CODE -> The contents of this field are defined only after SQLExecute, SQLExecDirect, or SQLMoreResults
+    // SQL_DIAG_ROW_COUNT -> SQLExecute, SQLExecDirect, SQLBulkOperations, or SQLSetPos
 }
 
 pub const SQLSTATE_SIZE: usize = 5;
@@ -85,56 +90,59 @@ where
         other == self
     }
 }
-impl<C> AttrZeroAssert for SQLSTATE<C> {}
-unsafe impl<C> AttrLen<OdbcDefined, True, SQLSMALLINT> for SQLSTATE<C> {
+impl<C> AttrZeroAssert for SQLSTATE<C> {
+    // This is character field and doesn't have to be zero checked
+}
+unsafe impl<C> AttrLen<OdbcDefined, True, SQLSMALLINT> for SQLSTATE<C>
+where
+    MaybeUninit<SQLSTATE<C>>: AttrLen<OdbcDefined, True, SQLSMALLINT>,
+{
+    type StrLen = Void;
+
+    fn len(&self) -> SQLSMALLINT {
+        // This is ok because MaybeUninit<T> has the same memory layout as T
+        <MaybeUninit<SQLSTATE<C>>>::len(unsafe { std::mem::transmute(self) })
+    }
+}
+unsafe impl<AD: Def> AttrLen<AD, True, SQLSMALLINT> for MaybeUninit<SQLSTATE<SQLCHAR>> {
     type StrLen = Void;
 
     fn len(&self) -> SQLSMALLINT {
         (SQLSTATE_SIZE + 1) as SQLSMALLINT
     }
 }
-unsafe impl<C> AttrLen<OdbcDefined, True, SQLSMALLINT> for MaybeUninit<SQLSTATE<C>> {
+unsafe impl<AD: Def> AttrLen<AD, True, SQLSMALLINT> for MaybeUninit<SQLSTATE<SQLWCHAR>> {
     type StrLen = Void;
 
     fn len(&self) -> SQLSMALLINT {
-        (SQLSTATE_SIZE + 1) as SQLSMALLINT
+        (std::mem::size_of::<SQLWCHAR>() * (SQLSTATE_SIZE + 1)) as SQLSMALLINT
     }
 }
 
 // Implement DiagField for unicode character diagnostic attributes
-impl<A: Ident, H: Handle> DiagField<A, H> for [SQLWCHAR] where
-    [SQLCHAR]: DiagField<A, H, NonBinary = True>
+impl<D: Ident, H: Handle> DiagField<D, H> for [SQLWCHAR] where
+    [SQLCHAR]: DiagField<D, H, NonBinary = True>
 {
 }
 
 // Implement DiagField for uninitialized diagnostic attributes
-impl<A: Ident, T: Ident, H: Handle> DiagField<A, H> for MaybeUninit<T>
+impl<D: Ident, T: Ident, H: Handle> DiagField<D, H> for MaybeUninit<T>
 where
-    T: DiagField<A, H>,
+    T: DiagField<D, H>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
 
-impl<A: Ident, H: Handle> DiagField<A, H> for [MaybeUninit<SQLCHAR>]
+impl<D: Ident, H: Handle> DiagField<D, H> for [MaybeUninit<SQLCHAR>]
 where
-    [SQLCHAR]: DiagField<A, H>,
+    [SQLCHAR]: DiagField<D, H>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
 {
 }
-impl<A: Ident, H: Handle> DiagField<A, H> for [MaybeUninit<SQLWCHAR>]
+impl<D: Ident, H: Handle> DiagField<D, H> for [MaybeUninit<SQLWCHAR>]
 where
-    [SQLWCHAR]: DiagField<A, H>,
+    [SQLWCHAR]: DiagField<D, H>,
     Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLSMALLINT>,
-{
-}
-
-// Implement DiagField for references to character diagnostic attributes (used by AttrSet)
-impl<A: Ident, H: Handle> DiagField<A, H> for &[SQLCHAR] where
-    [SQLCHAR]: DiagField<A, H>
-{
-}
-impl<A: Ident, H: Handle> DiagField<A, H> for &[SQLWCHAR] where
-    [SQLWCHAR]: DiagField<A, H>
 {
 }
 
@@ -164,10 +172,7 @@ unsafe impl Attr<SQL_DIAG_DYNAMIC_FUNCTION> for [SQLCHAR] {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<V: OdbcVersion> DiagField<SQL_DIAG_DYNAMIC_FUNCTION, SQLHSTMT<'_, '_, '_, V>>
-    for [SQLCHAR]
-{
-}
+impl<V: OdbcVersion> DiagField<SQL_DIAG_DYNAMIC_FUNCTION, SQLHSTMT<'_, '_, '_, V>> for [SQLCHAR] {}
 unsafe impl AttrGet<SQL_DIAG_DYNAMIC_FUNCTION> for [SQLCHAR] {}
 
 #[derive(Ident)]
@@ -309,9 +314,9 @@ unsafe impl<C> Attr<SQL_DIAG_SQLSTATE> for SQLSTATE<C> {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-impl<H: Handle, C> DiagField<SQL_DIAG_SQLSTATE, H> for SQLSTATE<C> {}
-unsafe impl AttrGet<SQL_DIAG_SQLSTATE> for SQLSTATE<SQLCHAR> {}
-unsafe impl AttrGet<SQL_DIAG_SQLSTATE> for SQLSTATE<SQLWCHAR> {}
+impl<H: Handle> DiagField<SQL_DIAG_SQLSTATE, H> for SQLSTATE<SQLCHAR> {}
+impl<H: Handle> DiagField<SQL_DIAG_SQLSTATE, H> for SQLSTATE<SQLWCHAR> {}
+unsafe impl<C> AttrGet<SQL_DIAG_SQLSTATE> for SQLSTATE<C> {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 9)]
@@ -380,6 +385,8 @@ mod test {
     #[allow(non_snake_case)]
     fn new_sqlstate_SQLCHAR() {
         let sqlstate = SQLSTATE::<SQLCHAR>::new("12345");
+
+        assert_eq!(6, sqlstate.len());
         assert_eq!([49, 50, 51, 52, 53, 0], sqlstate.0);
     }
 
@@ -387,6 +394,8 @@ mod test {
     #[allow(non_snake_case)]
     fn new_sqlstate_SQLWCHAR() {
         let sqlstate = SQLSTATE::<SQLWCHAR>::new("12345");
+
+        assert_eq!(12, sqlstate.len());
         assert_eq!([49, 50, 51, 52, 53, 0], sqlstate.0);
     }
 

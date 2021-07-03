@@ -99,6 +99,14 @@ pub type HDBC = SQLHANDLE;
 pub type HSTMT = SQLHANDLE;
 pub type HDESC = SQLHANDLE;
 
+#[allow(non_camel_case_types)]
+pub struct SQL_NULL_HANDLE;
+unsafe impl AsSQLHANDLE for SQL_NULL_HANDLE {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        std::ptr::null_mut()
+    }
+}
+
 /// An environment is a global context which holds information such as:
 /// * The environment's state
 /// * The current environment-level diagnostics
@@ -223,7 +231,6 @@ unsafe impl<C: ConnState, V: OdbcVersion> AsSQLHANDLE for SQLHDBC<'_, C, V> {
         self.handle
     }
 }
-pub trait ConnState: private::ConnState {}
 impl<C: ConnState, V: OdbcVersion> Drop for SQLHDBC<'_, C, V> {
     fn drop(&mut self) {
         C::disconnect(self);
@@ -241,6 +248,7 @@ impl<C: ConnState, V: OdbcVersion> Drop for SQLHDBC<'_, C, V> {
     }
 }
 
+pub trait ConnState: private::ConnState {}
 /// Allocated
 #[derive(Debug)]
 pub enum C2 {}
@@ -545,18 +553,6 @@ pub struct SQLHDESC<'conn, T, V: OdbcVersion> {
     pub(crate) data: PhantomData<T>,
 }
 impl<'buf, V: OdbcVersion, T: DescType<'buf>> SQLHDESC<'_, T, V> {
-    #[cfg(not(feature = "odbc_debug"))]
-    fn from_raw(handle: SQLHANDLE) -> Self {
-        Self {
-            handle,
-
-            parent: PhantomData,
-            version: PhantomData,
-
-            data: PhantomData,
-        }
-    }
-    #[cfg(feature = "odbc_debug")]
     fn from_raw(handle: SQLHANDLE) -> Self {
         Self {
             handle,
@@ -603,14 +599,6 @@ impl<V: OdbcVersion, T> Drop for SQLHDESC<'_, T, V> {
                 sql_return
             )
         }
-    }
-}
-
-#[allow(non_camel_case_types)]
-pub struct SQL_NULL_HANDLE;
-unsafe impl AsSQLHANDLE for SQL_NULL_HANDLE {
-    fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        std::ptr::null_mut()
     }
 }
 
