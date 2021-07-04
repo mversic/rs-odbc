@@ -145,15 +145,75 @@ impl<'stmt, T, V: OdbcVersion> Deref for RefSQLHDESC<'stmt, T, V> {
     }
 }
 
-// FIXME: Implement functions in all of these blanket implementations. This is very dangerous
+fn as_version<'a, 'conn, 'stmt, 'buf, IV: OdbcVersion, OV: OdbcVersion>(StatementHandle: &'a SQLHSTMT<'conn, 'stmt, 'buf, IV>) -> &'a SQLHSTMT<'conn, 'stmt, 'buf, OV> {
+    // This is valid because SQLHSTMT is either repr(transparent) or repr(C)
+    unsafe { std::mem::transmute(StatementHandle) }
+}
+
 // Implement StmtAttr for all versions of statement attributes
 impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80> for T where
     T: StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3>
 {
+    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, SQL_OV_ODBC3_80>) where T: AttrSet<A> {
+        self.update_handle(as_version::<_, SQL_OV_ODBC3>(StatementHandle));
+    }
+
+    fn readA(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
+        StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN
+    where
+        A: Ident<Type = SQLINTEGER>,
+        Self: AttrGet<A> + crate::AnsiType,
+        MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
+    {
+        self.readA(as_version::<_, SQL_OV_ODBC3>(StatementHandle), StringLengthPtr)
+    }
+    fn readW(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
+        StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN
+    where
+        A: Ident<Type = SQLINTEGER>,
+        Self: AttrGet<A> + crate::UnicodeType,
+        MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
+    {
+        self.readW(as_version::<_, SQL_OV_ODBC3>(StatementHandle), StringLengthPtr)
+    }
 }
 impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC4> for T where
     T: StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80>
 {
+    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, SQL_OV_ODBC4>) where T: AttrSet<A> {
+        self.update_handle(as_version::<_, SQL_OV_ODBC3_80>(StatementHandle));
+    }
+
+    fn readA(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
+        StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN
+    where
+        A: Ident<Type = SQLINTEGER>,
+        Self: AttrGet<A> + crate::AnsiType,
+        MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
+    {
+        self.readA(as_version::<_, SQL_OV_ODBC3_80>(StatementHandle), StringLengthPtr)
+    }
+    fn readW(
+        &mut self,
+        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
+        StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
+    ) -> SQLRETURN
+    where
+        A: Ident<Type = SQLINTEGER>,
+        Self: AttrGet<A> + crate::UnicodeType,
+        MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
+    {
+        self.readW(as_version::<_, SQL_OV_ODBC3_80>(StatementHandle), StringLengthPtr)
+    }
 }
 impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80> for [SQLCHAR] where
     [SQLCHAR]: StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3>
@@ -213,6 +273,8 @@ unsafe impl Attr<SQL_ATTR_QUERY_TIMEOUT> for SQLULEN {
     type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_QUERY_TIMEOUT, SQL_OV_ODBC3> for SQLULEN {}
+unsafe impl AttrGet<SQL_ATTR_QUERY_TIMEOUT> for SQLULEN {}
+unsafe impl AttrSet<SQL_ATTR_QUERY_TIMEOUT> for SQLULEN {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 1)]
@@ -223,6 +285,8 @@ unsafe impl Attr<SQL_ATTR_MAX_ROWS> for SQLULEN {
     type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_MAX_ROWS, SQL_OV_ODBC3> for SQLULEN {}
+unsafe impl AttrGet<SQL_ATTR_MAX_ROWS> for SQLULEN {}
+unsafe impl AttrSet<SQL_ATTR_MAX_ROWS> for SQLULEN {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 2)]
@@ -233,6 +297,8 @@ unsafe impl Attr<SQL_ATTR_NOSCAN> for Noscan {
     type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_NOSCAN, SQL_OV_ODBC3> for Noscan {}
+unsafe impl AttrGet<SQL_ATTR_NOSCAN> for Noscan {}
+unsafe impl AttrSet<SQL_ATTR_NOSCAN> for Noscan {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 3)]
@@ -243,26 +309,34 @@ unsafe impl Attr<SQL_ATTR_MAX_LENGTH> for SQLULEN {
     type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_MAX_LENGTH, SQL_OV_ODBC3> for SQLULEN {}
+unsafe impl AttrGet<SQL_ATTR_MAX_LENGTH> for SQLULEN {}
+unsafe impl AttrSet<SQL_ATTR_MAX_LENGTH> for SQLULEN {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 6)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CURSOR_TYPE;
+// TODO: This attribute cannot be specified after the SQL statement has been prepared.
 unsafe impl Attr<SQL_ATTR_CURSOR_TYPE> for CursorType {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_CURSOR_TYPE, SQL_OV_ODBC3> for CursorType {}
+unsafe impl AttrGet<SQL_ATTR_CURSOR_TYPE> for CursorType {}
+unsafe impl AttrSet<SQL_ATTR_CURSOR_TYPE> for CursorType {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 7)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_CONCURRENCY;
+// TODO: This attribute cannot be specified for an open cursor
 unsafe impl Attr<SQL_ATTR_CONCURRENCY> for Concurrency {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_CONCURRENCY, SQL_OV_ODBC3> for Concurrency {}
+unsafe impl AttrGet<SQL_ATTR_CONCURRENCY> for Concurrency {}
+unsafe impl AttrSet<SQL_ATTR_CONCURRENCY> for Concurrency {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 8)]
@@ -273,6 +347,8 @@ unsafe impl Attr<SQL_ATTR_KEYSET_SIZE> for SQLULEN {
     type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_KEYSET_SIZE, SQL_OV_ODBC3> for SQLULEN {}
+unsafe impl AttrGet<SQL_ATTR_KEYSET_SIZE> for SQLULEN {}
+unsafe impl AttrSet<SQL_ATTR_KEYSET_SIZE> for SQLULEN {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 10)]
@@ -283,6 +359,8 @@ unsafe impl Attr<SQL_ATTR_SIMULATE_CURSOR> for SimulateCursor {
     type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_SIMULATE_CURSOR, SQL_OV_ODBC3> for SimulateCursor {}
+unsafe impl AttrGet<SQL_ATTR_SIMULATE_CURSOR> for SimulateCursor {}
+unsafe impl AttrSet<SQL_ATTR_SIMULATE_CURSOR> for SimulateCursor {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 11)]
@@ -293,6 +371,8 @@ unsafe impl Attr<SQL_ATTR_RETRIEVE_DATA> for RetrieveData {
     type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_RETRIEVE_DATA, SQL_OV_ODBC3> for RetrieveData {}
+unsafe impl AttrGet<SQL_ATTR_RETRIEVE_DATA> for RetrieveData {}
+unsafe impl AttrSet<SQL_ATTR_RETRIEVE_DATA> for RetrieveData {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 12)]
@@ -303,17 +383,39 @@ unsafe impl Attr<SQL_ATTR_USE_BOOKMARKS> for UseBookmarks {
     type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_USE_BOOKMARKS, SQL_OV_ODBC3> for UseBookmarks {}
+unsafe impl AttrGet<SQL_ATTR_USE_BOOKMARKS> for UseBookmarks {}
+unsafe impl AttrSet<SQL_ATTR_USE_BOOKMARKS> for UseBookmarks {}
 
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, 15)]
-//#[allow(non_camel_case_types)]
-//pub struct SQL_ATTR_ENABLE_AUTO_IPD;
-//
+#[derive(Ident)]
+#[identifier(SQLINTEGER, 15)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ATTR_ENABLE_AUTO_IPD;
+unsafe impl Attr<SQL_ATTR_ENABLE_AUTO_IPD> for OdbcBool {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+impl StmtAttr<'_, '_, SQL_ATTR_ENABLE_AUTO_IPD, SQL_OV_ODBC3> for OdbcBool {}
+unsafe impl AttrGet<SQL_ATTR_ENABLE_AUTO_IPD> for OdbcBool {}
+unsafe impl AttrSet<SQL_ATTR_ENABLE_AUTO_IPD> for OdbcBool {}
+
+#[derive(Ident)]
+#[identifier(SQLINTEGER, 14)]
+#[allow(non_camel_case_types)]
+// This is read-only attribute
+pub struct SQL_ATTR_ROW_NUMBER;
+unsafe impl Attr<SQL_ATTR_ROW_NUMBER> for SQLULEN {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+impl StmtAttr<'_, '_, SQL_ATTR_ROW_NUMBER, SQL_OV_ODBC3> for SQLULEN {}
+unsafe impl AttrGet<SQL_ATTR_ROW_NUMBER> for SQLULEN {}
+
+// TODO:
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 16)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_FETCH_BOOKMARK_PTR;
-//
+
 //// The following are Header fields--------------------------------
 //
 //// TODO: This one could be special??
@@ -422,13 +524,6 @@ impl StmtAttr<'_, '_, SQL_ATTR_USE_BOOKMARKS, SQL_OV_ODBC3> for UseBookmarks {}
 //#[cfg(feature = "v4")]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_ATTR_LENGTH_EXCEPTION_BEHAVIOR;
-//
-//// TODO: Write-only - Cannot be used with Setident
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, 14)]
-//#[allow(non_camel_case_types)]
-//// This is read-only attribute
-//pub struct SQL_ATTR_ROW_NUMBER;
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 10010)]
@@ -790,22 +885,30 @@ unsafe impl<V: OdbcVersion> AttrGet<SQL_ATTR_IMP_PARAM_DESC>
 {
 }
 
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, -1)]
-//#[allow(non_camel_case_types)]
-//pub struct SQL_ATTR_CURSOR_SCROLLABLE;
-//
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, -2)]
-//#[allow(non_camel_case_types)]
-//pub struct SQL_ATTR_CURSOR_SENSITIVITY;
-//
-//// TODO: Not found in implementation
-//// #[cfg(feature = "v3_8")]
-//// SQL_ATTR_ASYNC_STMT_PCALLBACK
-//// #[cfg(feature = "v3_8")]
-//// SQL_ATTR_ASYNC_STMT_PCONTEXT
-//
+#[derive(Ident)]
+#[identifier(SQLINTEGER, -1)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ATTR_CURSOR_SCROLLABLE;
+unsafe impl Attr<SQL_ATTR_CURSOR_SCROLLABLE> for CursorScrollable {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+impl StmtAttr<'_, '_, SQL_ATTR_CURSOR_SCROLLABLE, SQL_OV_ODBC3> for CursorScrollable {}
+unsafe impl AttrGet<SQL_ATTR_CURSOR_SCROLLABLE> for CursorScrollable {}
+unsafe impl AttrSet<SQL_ATTR_CURSOR_SCROLLABLE> for CursorScrollable {}
+
+#[derive(Ident)]
+#[identifier(SQLINTEGER, -2)]
+#[allow(non_camel_case_types)]
+pub struct SQL_ATTR_CURSOR_SENSITIVITY;
+unsafe impl Attr<SQL_ATTR_CURSOR_SENSITIVITY> for CursorSensitivity {
+    type DefinedBy = OdbcDefined;
+    type NonBinary = True;
+}
+impl StmtAttr<'_, '_, SQL_ATTR_CURSOR_SENSITIVITY, SQL_OV_ODBC3> for CursorSensitivity {}
+unsafe impl AttrGet<SQL_ATTR_CURSOR_SENSITIVITY> for CursorSensitivity {}
+unsafe impl AttrSet<SQL_ATTR_CURSOR_SENSITIVITY> for CursorSensitivity {}
+
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 10014)]
 #[allow(non_camel_case_types)]
@@ -814,21 +917,29 @@ unsafe impl Attr<SQL_ATTR_METADATA_ID> for OdbcBool {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-//impl StmtAttr<SQL_ATTR_METADATA_ID> for OdbcBool {}
-//unsafe impl AttrGet<SQL_ATTR_METADATA_ID> for OdbcBool {}
-//unsafe impl AttrSet<SQL_ATTR_METADATA_ID> for OdbcBool {}
+impl StmtAttr<'_, '_, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3> for OdbcBool {}
+unsafe impl AttrGet<SQL_ATTR_METADATA_ID> for OdbcBool {}
+unsafe impl AttrSet<SQL_ATTR_METADATA_ID> for OdbcBool {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 4)]
 #[allow(non_camel_case_types)]
 pub struct SQL_ATTR_ASYNC_ENABLE;
-unsafe impl Attr<SQL_ATTR_ASYNC_ENABLE> for SQLULEN {
+// TODO: For drivers with statement level asynchronous execution support,
+// the statement attribute SQL_ATTR_ASYNC_ENABLE is read only
+unsafe impl Attr<SQL_ATTR_ASYNC_ENABLE> for AsyncEnable {
     type DefinedBy = OdbcDefined;
     type NonBinary = True;
 }
-//impl StmtAttr<SQL_ATTR_ASYNC_ENABLE> for SQLULEN {}
-//unsafe impl AttrGet<SQL_ATTR_ASYNC_ENABLE> for SQLULEN {}
-//unsafe impl AttrSet<SQL_ATTR_ASYNC_ENABLE> for SQLULEN {}
+impl StmtAttr<'_, '_, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3> for AsyncEnable {}
+unsafe impl AttrGet<SQL_ATTR_ASYNC_ENABLE> for AsyncEnable {}
+unsafe impl AttrSet<SQL_ATTR_ASYNC_ENABLE> for AsyncEnable {}
+
+// TODO: Not found in implementation
+// #[cfg(feature = "v3_8")]
+// SQL_ATTR_ASYNC_STMT_PCALLBACK
+// #[cfg(feature = "v3_8")]
+// SQL_ATTR_ASYNC_STMT_PCONTEXT
 
 //=====================================================================================//
 
@@ -866,6 +977,22 @@ pub const SQL_RD_ON: RetrieveData = RetrieveData(1);
 pub struct UseBookmarks;
 pub const SQL_UB_OFF: UseBookmarks = UseBookmarks(0);
 pub const SQL_UB_ON: UseBookmarks = UseBookmarks(1);
+
+#[odbc_type(SQLULEN)]
+pub struct AsyncEnable;
+pub const SQL_ASYNC_ENABLE_OFF: AsyncEnable = AsyncEnable(0);
+pub const SQL_ASYNC_ENABLE_ON: AsyncEnable = AsyncEnable(1);
+
+#[odbc_type(SQLULEN)]
+pub struct CursorScrollable;
+pub const SQL_NONSCROLLABLE: CursorScrollable = CursorScrollable(0);
+pub const SQL_SCROLLABLE: CursorScrollable = CursorScrollable(1);
+
+#[odbc_type(SQLULEN)]
+pub struct CursorSensitivity;
+pub const SQL_UNSPECIFIED: CursorSensitivity = CursorSensitivity(0);
+pub const SQL_INSENSITIVE: CursorSensitivity = CursorSensitivity(1);
+pub const SQL_SENSITIVE: CursorSensitivity = CursorSensitivity(2);
 
 // TODO: These seem to be from v2.0
 #[deprecated]
