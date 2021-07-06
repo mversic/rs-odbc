@@ -34,7 +34,7 @@ pub trait DescField<A: crate::Ident, DT>:
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 1099)]
+#[identifier(SQLSMALLINT, 1099)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DESC_ALLOC_TYPE;
 //// This is read-only attribute
@@ -46,7 +46,7 @@ impl<DT> DescField<SQL_DESC_ALLOC_TYPE, DT> for AllocType {}
 unsafe impl AttrGet<SQL_DESC_ALLOC_TYPE> for AllocType {}
 
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 20)]
+#[identifier(SQLSMALLINT, 20)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DESC_ARRAY_SIZE;
 unsafe impl Attr<SQL_DESC_ARRAY_SIZE> for SQLULEN {
@@ -58,7 +58,7 @@ unsafe impl AttrGet<SQL_DESC_ARRAY_SIZE> for SQLULEN {}
 unsafe impl AttrSet<SQL_DESC_ARRAY_SIZE> for SQLULEN {}
 
 //#[derive(Ident)]
-//#[identifier(SQLINTEGER, 21)]
+//#[identifier(SQLSMALLINT, 21)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DESC_ARRAY_STATUS_PTR;
 //unsafe impl<DT> Attr<SQL_DESC_ARRAY_STATUS_PTR, DT> for [SQLUSMALLINT] {
@@ -72,7 +72,7 @@ unsafe impl AttrSet<SQL_DESC_ARRAY_SIZE> for SQLULEN {}
 
 // TODO: How can I support this. This is very unsafe
 //#[derive(Ident)]
-//#[identifier(SQLINTEGER, 24)]
+//#[identifier(SQLSMALLINT, 24)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DESC_BIND_OFFSET_PTR;
 //unsafe impl Attr<SQL_DESC_BIND_OFFSET_PTR, AppDesc<'_>> for [SQLLEN] {
@@ -85,7 +85,7 @@ unsafe impl AttrSet<SQL_DESC_ARRAY_SIZE> for SQLULEN {}
 
 // TODO: This is actually integer type
 //#[derive(Ident)]
-//#[identifier(SQLINTEGER, 25)]
+//#[identifier(SQLSMALLINT, 25)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DESC_BIND_TYPE;
 //unsafe impl Attr<SQL_DESC_BIND_TYPE> for BindType {
@@ -97,7 +97,7 @@ unsafe impl AttrSet<SQL_DESC_ARRAY_SIZE> for SQLULEN {}
 //unsafe impl AttrSet<SQL_DESC_BIND_TYPE> for BindType {}
 
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 1001)]
+#[identifier(SQLSMALLINT, 1001)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DESC_COUNT;
 unsafe impl Attr<SQL_DESC_COUNT> for SQLSMALLINT {
@@ -110,7 +110,7 @@ unsafe impl AttrSet<SQL_DESC_COUNT> for SQLSMALLINT {}
 
 // TODO: Can be both *SQLUINTEGER or *SQLULEN
 //#[derive(Ident)]
-//#[identifier(SQLINTEGER, 34)]
+//#[identifier(SQLSMALLINT, 34)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DESC_ROWS_PROCESSED_PTR;
 //unsafe impl Attr<SQL_DESC_ROWS_PROCESSED_PTR> for  {
@@ -126,7 +126,7 @@ unsafe impl AttrSet<SQL_DESC_COUNT> for SQLSMALLINT {}
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 11)]
+#[identifier(SQLSMALLINT, 11)]
 #[allow(non_camel_case_types)]
 //// This is read-only attribute
 pub struct SQL_DESC_AUTO_UNIQUE_VALUE;
@@ -138,7 +138,7 @@ impl DescField<SQL_DESC_AUTO_UNIQUE_VALUE, ImplDesc<RowDesc>> for OdbcBool {}
 unsafe impl AttrGet<SQL_DESC_AUTO_UNIQUE_VALUE> for OdbcBool {}
 
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 22)]
+#[identifier(SQLSMALLINT, 22)]
 #[allow(non_camel_case_types)]
 //// This is read-only attribute
 pub struct SQL_DESC_BASE_COLUMN_NAME;
@@ -150,7 +150,7 @@ impl DescField<SQL_DESC_BASE_COLUMN_NAME, ImplDesc<RowDesc>> for [SQLCHAR] {}
 unsafe impl AttrGet<SQL_DESC_BASE_COLUMN_NAME> for [SQLCHAR] {}
 
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 23)]
+#[identifier(SQLSMALLINT, 23)]
 #[allow(non_camel_case_types)]
 //// This is read-only attribute
 pub struct SQL_DESC_BASE_TABLE_NAME;
@@ -162,7 +162,7 @@ impl DescField<SQL_DESC_BASE_TABLE_NAME, ImplDesc<RowDesc>> for [SQLCHAR] {}
 unsafe impl AttrGet<SQL_DESC_BASE_TABLE_NAME> for [SQLCHAR] {}
 
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 12)]
+#[identifier(SQLSMALLINT, 12)]
 #[allow(non_camel_case_types)]
 //// This is read-only attribute
 pub struct SQL_DESC_CASE_SENSITIVE;
@@ -174,7 +174,7 @@ impl DescField<SQL_DESC_CASE_SENSITIVE, ImplDesc<RowDesc>> for OdbcBool {}
 unsafe impl AttrGet<SQL_DESC_CASE_SENSITIVE> for OdbcBool {}
 
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 17)]
+#[identifier(SQLSMALLINT, 17)]
 #[allow(non_camel_case_types)]
 //// This is read-only attribute
 pub struct SQL_DESC_CATALOG_NAME;
@@ -186,7 +186,7 @@ impl DescField<SQL_DESC_CATALOG_NAME, ImplDesc<RowDesc>> for [SQLCHAR] {}
 unsafe impl AttrGet<SQL_DESC_CATALOG_NAME> for [SQLCHAR] {}
 
 //#[derive(Ident)]
-//#[identifier(SQLINTEGER, 2)]
+//#[identifier(SQLSMALLINT, 2)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DESC_CONCISE_TYPE;
 //unsafe impl Attr<SQL_DESC_CONCISE_TYPE> for SqlType {
@@ -198,7 +198,7 @@ unsafe impl AttrGet<SQL_DESC_CATALOG_NAME> for [SQLCHAR] {}
 //unsafe impl AttrSet<SQL_DESC_CONCISE_TYPE> for SqlType {}
 
 //#[derive(Ident)]
-//#[identifier(SQLINTEGER, 1010)]
+//#[identifier(SQLSMALLINT, 1010)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DESC_DATA_PTR;
 //unsafe impl Attr<SQL_DESC_DATA_PTR> for  {
@@ -210,7 +210,7 @@ unsafe impl AttrGet<SQL_DESC_CATALOG_NAME> for [SQLCHAR] {}
 //unsafe impl AttrSet<SQL_DESC_DATA_PTR> for  {}
 
 //#[derive(Ident)]
-//#[identifier(SQLINTEGER, 1007)]
+//#[identifier(SQLSMALLINT, 1007)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DESC_DATETIME_INTERVAL_CODE;
 //unsafe impl Attr<SQL_DESC_DATETIME_INTERVAL_CODE> for DatetimeIntervalCode {
@@ -222,33 +222,33 @@ unsafe impl AttrGet<SQL_DESC_CATALOG_NAME> for [SQLCHAR] {}
 //unsafe impl AttrSet<SQL_DESC_DATETIME_INTERVAL_CODE> for DatetimeIntervalCode {}
 
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 26)]
+#[identifier(SQLSMALLINT, 26)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DESC_DATETIME_INTERVAL_PRECISION;
 
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 1009)]
+#[identifier(SQLSMALLINT, 1009)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DESC_INDICATOR_PTR;
 
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 1004)]
+#[identifier(SQLSMALLINT, 1004)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DESC_OCTET_LENGTH_PTR;
 
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 33)]
+#[identifier(SQLSMALLINT, 33)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DESC_PARAMETER_TYPE;
 
 #[cfg(feature = "v3_5")]
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 35)]
+#[identifier(SQLSMALLINT, 35)]
 #[allow(non_camel_case_types)]
 pub struct SQL_DESC_ROWVER;
 
 #[derive(Ident)]
-#[identifier(SQLINTEGER, 1012)]
+#[identifier(SQLSMALLINT, 1012)]
 #[allow(non_camel_case_types)]
 pub struct nQL_DESC_UNNAMED;
 

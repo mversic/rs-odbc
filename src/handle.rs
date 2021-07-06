@@ -535,10 +535,6 @@ impl<V: OdbcVersion> Drop for SQLHSTMT<'_, '_, '_, V> {
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/descriptor-handles
 #[derive(Debug)]
-// Handle is repr(C) to be able to transmute different versions of handle
-// TODO: Will memory layout be the same for different ZST such as version?
-// If yes, then repr(C) requirement is not necessary
-#[cfg_attr(feature = "odbc_debug", repr(C))]
 #[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
 pub struct SQLHDESC<'conn, T, V: OdbcVersion> {
     pub(crate) handle: SQLHANDLE,
