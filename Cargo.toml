@@ -10,6 +10,7 @@ edition = "2018"
 rustc_version = "*"
 
 [dev-dependencies]
+trybuild = "^1"
 # mockall = "*"             # to be used with miri eventually
 
 [dependencies]

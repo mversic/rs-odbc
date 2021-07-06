@@ -3,16 +3,18 @@ use rs_odbc::env::{
 };
 use rs_odbc::handle::{
     C4, SQLHDBC, SQLHENV, SQLHSTMT, SQL_HANDLE_DBC, SQL_HANDLE_ENV, SQL_HANDLE_STMT,
-    SQL_NULL_HANDLE,
+    SQL_NULL_HANDLE, SQLHDESC, SQL_HANDLE_DESC
 };
 use rs_odbc::info::{
     TxnIsolation, SQL_TXN_ISOLATION_OPTION, SQL_TXN_READ_COMMITTED, SQL_TXN_READ_UNCOMMITTED,
     SQL_TXN_REPEATABLE_READ, SQL_TXN_SERIALIZABLE,
 };
 use rs_odbc::stmt::{RefSQLHDESC, SQL_ATTR_APP_ROW_DESC};
+use rs_odbc::desc::SQL_DESC_ARRAY_SIZE;
 use rs_odbc::{
     sqlreturn::SQL_SUCCESS, SQLAllocHandle, SQLDisconnect, SQLDriverConnectA, SQLFreeHandle,
-    SQLGetEnvAttr, SQLGetInfoA, SQLGetStmtAttrA, SQLSetEnvAttr, True, SQLCHAR, SQL_DRIVER_COMPLETE,
+    SQLGetEnvAttr, SQLGetInfoA, SQLGetStmtAttrA, SQLSetEnvAttr, SQLCHAR, SQL_DRIVER_COMPLETE, SQLSetDescFieldA, SQLGetDescFieldA,
+    SQLSetStmtAttrA
 };
 use std::mem::MaybeUninit;
 
@@ -33,7 +35,7 @@ fn connect_to_test_db<'env>(
     let res = SQLAllocHandle(SQL_HANDLE_DBC, env, &mut conn);
     assert_eq!(SQL_SUCCESS, res);
 
-    let mut conn = unsafe { conn.assume_init() };
+    let conn = unsafe { conn.assume_init() };
     let conn_string = "DSN=MariaDB;Database=rs_odbc_test;";
     let mut outstrlen = MaybeUninit::zeroed();
     let (conn, res) = SQLDriverConnectA(
@@ -86,7 +88,7 @@ fn db_connect() {
     let res = SQLAllocHandle(SQL_HANDLE_DBC, &mut env, &mut conn);
     assert_eq!(SQL_SUCCESS, res);
 
-    let mut conn = unsafe { conn.assume_init() };
+    let conn = unsafe { conn.assume_init() };
 
     let conn_string = "DSN=MariaDB;Database=rs_odbc_test;";
     let mut outstr: [MaybeUninit<_>; 1024] = unsafe { MaybeUninit::zeroed().assume_init() };
@@ -118,12 +120,13 @@ fn db_connect() {
 
     let (conn, res) = SQLDisconnect(conn);
     assert_eq!(SQL_SUCCESS, res);
+    assert_eq!(true, conn.is_ok());
 }
 
 #[test]
-fn get_handle() {
+fn stmt_get_desc_handle() {
     let mut env = get_env_handle();
-    let mut conn = connect_to_test_db(&mut env);
+    let conn = connect_to_test_db(&mut env);
     let mut stmt = MaybeUninit::<SQLHSTMT<_>>::zeroed();
     let mut desc = MaybeUninit::<RefSQLHDESC<_, _>>::zeroed();
 
@@ -134,26 +137,66 @@ fn get_handle() {
     let res = SQLGetStmtAttrA(&stmt, SQL_ATTR_APP_ROW_DESC, Some(&mut desc), None);
     assert_eq!(SQL_SUCCESS, res);
 
-    SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+    let val = 10;
+    let mut desc = unsafe { desc.assume_init() };
+    let res = SQLSetDescFieldA(&desc, 0, SQL_DESC_ARRAY_SIZE, Some(val));
+    assert_eq!(SQL_SUCCESS, res);
+
+    let mut val = 0;
+    let res = SQLGetDescFieldA(&mut desc, 0, SQL_DESC_ARRAY_SIZE, Some(&mut val), None);
+    assert_eq!(SQL_SUCCESS, res);
+    assert_eq!(10, val);
+
+    let res = SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     assert_eq!(SQL_SUCCESS, res);
 
     let (conn, res) = SQLDisconnect(conn);
     assert_eq!(SQL_SUCCESS, res);
-    let conn = conn.unwrap();
+    assert_eq!(true, conn.is_ok());
+}
+
+#[test]
+fn stmt_set_desc_handle() {
+    let mut env = get_env_handle();
+    let conn = connect_to_test_db(&mut env);
+    let mut stmt = MaybeUninit::<SQLHSTMT<_>>::zeroed();
+    let mut desc = MaybeUninit::<SQLHDESC<_, _>>::zeroed();
+
+    let res = SQLAllocHandle(SQL_HANDLE_DESC, &conn, &mut desc);
+    assert_eq!(SQL_SUCCESS, res);
+
+    let res = SQLAllocHandle(SQL_HANDLE_STMT, &conn, &mut stmt);
+    assert_eq!(SQL_SUCCESS, res);
+
+    let desc = unsafe { desc.assume_init() };
+    let stmt = unsafe { stmt.assume_init() };
+    let res = SQLSetStmtAttrA(&stmt, SQL_ATTR_APP_ROW_DESC, Some(&desc));
+    assert_eq!(SQL_SUCCESS, res);
+
+    let res = SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+    assert_eq!(SQL_SUCCESS, res);
+
+    let res = SQLFreeHandle(SQL_HANDLE_DESC, desc);
+    assert_eq!(SQL_SUCCESS, res);
+
+    let (conn, res) = SQLDisconnect(conn);
+    assert_eq!(SQL_SUCCESS, res);
+    assert_eq!(true, conn.is_ok());
 }
 
 #[test]
 fn get_info() {
     let mut env = get_env_handle();
-    let mut conn = connect_to_test_db(&mut env);
+    let conn = connect_to_test_db(&mut env);
     let mut txn_isolation = MaybeUninit::<TxnIsolation>::zeroed();
 
-    SQLGetInfoA(
+    let res = SQLGetInfoA(
         &conn,
         SQL_TXN_ISOLATION_OPTION,
         Some(&mut txn_isolation),
         None,
     );
+    assert_eq!(SQL_SUCCESS, res);
 
     let txn_isolation = unsafe { txn_isolation.assume_init() };
     assert_eq!(0x00000001, SQL_TXN_READ_UNCOMMITTED & txn_isolation);

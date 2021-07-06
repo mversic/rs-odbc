@@ -24,4 +24,5 @@ jobs:
       run: docker exec -t rs-odbc sh -lc 'cargo build --release'
 
     - name: Run tests for rs-odbc
-      run: docker exec -t rs-odbc sh -lc 'cargo test --release'
+      # TODO: Don't allow warnings even in tests
+      run: docker exec -t rs-odbc sh -lc 'RUSTFLAGS=-Awarnings cargo test --release'
