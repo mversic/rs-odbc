@@ -6,8 +6,8 @@ use crate::{
     SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
-use std::mem::MaybeUninit;
-use std::ops::Deref;
+use std::mem::{MaybeUninit, ManuallyDrop};
+use std::ops::{Deref, DerefMut};
 
 #[cfg(feature = "odbc_debug")]
 use crate::sqlreturn::SQL_SUCCESS;
@@ -117,16 +117,14 @@ fn get_ipd<'stmt, V: OdbcVersion>(
     SQL_SUCCESS
 }
 
+#[derive(Debug)]
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy)]
-pub struct RefSQLHDESC<'stmt, T, V: OdbcVersion>(&'stmt SQLHDESC<'stmt, T, V>);
-impl<'stmt, T, V: OdbcVersion> Ident for RefSQLHDESC<'stmt, T, V> {
-    type Type = <Option<&'stmt SQLHDESC<'stmt, T, V>> as Ident>::Type;
+pub struct RefSQLHDESC<'conn, T, V: OdbcVersion>(ManuallyDrop<SQLHDESC<'conn, T, V>>);
+impl<'desc, T, V: OdbcVersion> Ident for RefSQLHDESC<'desc, T, V> {
+    type Type = <Option<&'desc SQLHDESC<'desc, T, V>> as Ident>::Type;
     const IDENTIFIER: Self::Type = <Option<&SQLHDESC<T, V>>>::IDENTIFIER;
 }
-unsafe impl<'buf, T: crate::handle::DescType<'buf>, V: OdbcVersion> AsMutSQLPOINTER
-    for MaybeUninit<RefSQLHDESC<'_, T, V>>
-{
+unsafe impl<T, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<RefSQLHDESC<'_, T, V>> {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
         if cfg!(feature = "odbc_debug") {
             // SQLHDESC is not transparent
@@ -137,11 +135,16 @@ unsafe impl<'buf, T: crate::handle::DescType<'buf>, V: OdbcVersion> AsMutSQLPOIN
         }
     }
 }
-impl<'stmt, T, V: OdbcVersion> Deref for RefSQLHDESC<'stmt, T, V> {
-    type Target = SQLHDESC<'stmt, T, V>;
+impl<'conn, T, V: OdbcVersion> Deref for RefSQLHDESC<'conn, T, V> {
+    type Target = SQLHDESC<'conn, T, V>;
 
     fn deref(&self) -> &Self::Target {
-        self.0
+        &self.0
+    }
+}
+impl<'conn, T, V: OdbcVersion> DerefMut for RefSQLHDESC<'conn, T, V> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
