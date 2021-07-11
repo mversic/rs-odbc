@@ -1,13 +1,11 @@
 use rs_odbc::env::SQL_OV_ODBC3_80;
 use rs_odbc::handle::{
-    C4, SQLHDBC, SQLHENV, SQLHSTMT, SQL_HANDLE_DBC, SQL_HANDLE_DESC, SQL_HANDLE_ENV,
-    SQL_HANDLE_STMT, SQL_NULL_HANDLE,
+    C4, SQLHDBC, SQLHENV, SQLHSTMT, SQL_HANDLE_DBC, SQL_HANDLE_ENV, SQL_HANDLE_STMT,
+    SQL_NULL_HANDLE,
 };
-use rs_odbc::sqlreturn::SQL_SUCCESS;
-use rs_odbc::stmt::{SQL_ATTR_APP_ROW_DESC, RefSQLHDESC};
+use rs_odbc::stmt::{RefSQLHDESC, SQL_ATTR_APP_ROW_DESC};
 use rs_odbc::{
-    SQLAllocHandle, SQLDisconnect, SQLDriverConnectA, SQLFreeHandle, SQLGetStmtAttrA,
-    SQL_DRIVER_COMPLETE,
+    SQLAllocHandle, SQLDriverConnectA, SQLFreeHandle, SQLGetStmtAttrA, SQL_DRIVER_COMPLETE,
 };
 use std::mem::MaybeUninit;
 
@@ -40,13 +38,14 @@ fn connect_to_test_db<'env>(
 fn main() {
     let mut env = get_env_handle();
     let conn = connect_to_test_db(&mut env);
-    let mut stmt = MaybeUninit::<SQLHSTMT<_>>::uninit();
-    let mut desc = MaybeUninit::<RefSQLHDESC<_, _>>::uninit();
+    let mut stmt = MaybeUninit::uninit();
+    let mut desc = MaybeUninit::uninit();
 
     SQLAllocHandle(SQL_HANDLE_STMT, &conn, &mut stmt);
-    let stmt = unsafe { stmt.assume_init() };
+    let stmt: SQLHSTMT<_> = unsafe { stmt.assume_init() };
 
     SQLGetStmtAttrA(&stmt, SQL_ATTR_APP_ROW_DESC, Some(&mut desc), None);
+    let desc: RefSQLHDESC<_, _> = unsafe { desc.assume_init() };
 
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     drop(desc);
