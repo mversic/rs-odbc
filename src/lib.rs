@@ -5,7 +5,6 @@ pub mod conn;
 pub mod desc;
 pub mod diag;
 pub mod env;
-pub(crate) mod extern_api;
 pub mod handle;
 pub mod info;
 pub mod sql_types;

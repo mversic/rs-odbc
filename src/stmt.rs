@@ -1,7 +1,8 @@
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::handle::{AppDesc, AsSQLHANDLE, ImplDesc, ParamDesc, RowDesc, SQLHDESC};
+use crate::api::ffi;
 use crate::{
-    extern_api, handle::SQLHSTMT, sqlreturn::SQLRETURN, AsMutPtr, AsMutSQLPOINTER, Attr, AttrGet,
+    handle::SQLHSTMT, sqlreturn::SQLRETURN, AsMutPtr, AsMutSQLPOINTER, Attr, AttrGet,
     AttrLen, AttrSet, Ident, OdbcBool, OdbcDefined, True, SQLCHAR, SQLINTEGER, SQLPOINTER, SQLULEN,
     SQLWCHAR,
 };
@@ -37,7 +38,7 @@ pub trait StmtAttr<'stmt, 'buf, A: Ident, V: OdbcVersion>:
         let ValuePtrLen = self.len();
 
         unsafe {
-            extern_api::SQLGetStmtAttrA(
+            ffi::SQLGetStmtAttrA(
                 StatementHandle.as_SQLHANDLE(),
                 A::IDENTIFIER,
                 self.as_mut_SQLPOINTER(),
@@ -60,7 +61,7 @@ pub trait StmtAttr<'stmt, 'buf, A: Ident, V: OdbcVersion>:
         let ValuePtrLen = self.len();
 
         unsafe {
-            extern_api::SQLGetStmtAttrW(
+            ffi::SQLGetStmtAttrW(
                 StatementHandle.as_SQLHANDLE(),
                 A::IDENTIFIER,
                 self.as_mut_SQLPOINTER(),

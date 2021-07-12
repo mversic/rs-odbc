@@ -11,10 +11,12 @@ rustc_version = "*"
 
 [dev-dependencies]
 trybuild = "^1"
-# mockall = "*"             # to be used with miri eventually
+mockall = "*"
+# TODO: use miri eventually
 
 [dependencies]
 rs_odbc_derive = {path = "./rs_odbc_derive", version = "*"}
+mockall_double = "*"
 
 [features]
 odbc_debug = []

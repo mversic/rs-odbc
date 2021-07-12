@@ -1,4 +1,3 @@
-use crate::extern_api;
 use crate::handle::*;
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
@@ -43,7 +42,7 @@ where
     let mut output_handle: SQLHANDLE = ptr::null_mut();
 
     unsafe {
-        let sql_return = extern_api::SQLAllocHandle(
+        let sql_return = ffi::SQLAllocHandle(
             OH::Ident::IDENTIFIER,
             InputHandle.as_SQLHANDLE(),
             &mut output_handle,
@@ -84,7 +83,7 @@ pub fn SQLBindCol<
             (TargetValuePtr.into_SQLPOINTER(), TargetValuePtr.len())
         });
 
-        extern_api::SQLBindCol(
+        ffi::SQLBindCol(
             StatementHandle.as_SQLHANDLE(),
             ColumnNumber,
             TT::IDENTIFIER,
@@ -136,7 +135,7 @@ pub fn SQLBindParameter<
                 (ParameterValuePtr.into_SQLPOINTER(), ParameterValuePtr.len())
             });
 
-        extern_api::SQLBindParameter(
+        ffi::SQLBindParameter(
             StatementHandle.as_SQLHANDLE(),
             ParameterNumber,
             InputOutputType.identifier(),
@@ -184,7 +183,7 @@ where
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     let sql_return = unsafe {
-        extern_api::SQLBrowseConnectA(
+        ffi::SQLBrowseConnectA(
             ConnectionHandle.as_SQLHANDLE(),
             InConnectionString.0,
             InConnectionString.1,
@@ -230,7 +229,7 @@ where
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     let sql_return = unsafe {
-        extern_api::SQLBrowseConnectW(
+        ffi::SQLBrowseConnectW(
             ConnectionHandle.as_SQLHANDLE(),
             InConnectionString.0,
             InConnectionString.1,
@@ -264,7 +263,7 @@ pub fn SQLBulkOperations<V: OdbcVersion>(
     Operation: BulkOperation,
 ) -> SQLRETURN {
     unsafe {
-        extern_api::SQLBulkOperations(StatementHandle.as_SQLHANDLE(), Operation as SQLUSMALLINT)
+        ffi::SQLBulkOperations(StatementHandle.as_SQLHANDLE(), Operation as SQLUSMALLINT)
     }
 }
 
@@ -278,7 +277,7 @@ pub fn SQLBulkOperations<V: OdbcVersion>(
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLCancel<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
-    unsafe { extern_api::SQLCancel(StatementHandle.as_SQLHANDLE()) }
+    unsafe { ffi::SQLCancel(StatementHandle.as_SQLHANDLE()) }
 }
 
 /// Cancels the processing on a connection or statement. The Driver Manager maps a call to **SQLCancelHandle** to a call to **SQLCancel** when `HandleType` is SQL_HANDLE_STMT.
@@ -293,7 +292,7 @@ pub fn SQLCancelHandle<H: Handle>(HandleType: H::Ident, Handle: &H) -> SQLRETURN
 where
     H: AsSQLHANDLE + SQLCancelHandle,
 {
-    unsafe { extern_api::SQLCancelHandle(H::Ident::IDENTIFIER, Handle.as_SQLHANDLE()) }
+    unsafe { ffi::SQLCancelHandle(H::Ident::IDENTIFIER, Handle.as_SQLHANDLE()) }
 }
 
 /// Closes a cursor that has been opened on a statement and discards pending results.
@@ -305,7 +304,7 @@ where
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLCloseCursor<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
-    unsafe { extern_api::SQLCloseCursor(StatementHandle.as_SQLHANDLE()) }
+    unsafe { ffi::SQLCloseCursor(StatementHandle.as_SQLHANDLE()) }
 }
 
 /// Returns descriptor information for a column in a result set. Descriptor information is returned as a character string, a descriptor-dependent value, or an integer value.
@@ -342,7 +341,7 @@ where
         });
 
     unsafe {
-        extern_api::SQLColAttributeA(
+        ffi::SQLColAttributeA(
             StatementHandle.as_SQLHANDLE(),
             ColumnNumber,
             A::IDENTIFIER,
@@ -388,7 +387,7 @@ where
         });
 
     unsafe {
-        extern_api::SQLColAttributeW(
+        ffi::SQLColAttributeW(
             StatementHandle.as_SQLHANDLE(),
             ColumnNumber,
             A::IDENTIFIER,
@@ -421,7 +420,7 @@ pub fn SQLColumnPrivilegesA<V: OdbcVersion>(
     let ColumnName = ColumnName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLColumnPrivilegesA(
+        ffi::SQLColumnPrivilegesA(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -456,7 +455,7 @@ pub fn SQLColumnPrivilegesW<V: OdbcVersion>(
     let ColumnName = ColumnName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLColumnPrivilegesW(
+        ffi::SQLColumnPrivilegesW(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -491,7 +490,7 @@ pub fn SQLColumnsA<V: OdbcVersion>(
     let ColumnName = ColumnName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLColumnsA(
+        ffi::SQLColumnsA(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -526,7 +525,7 @@ pub fn SQLColumnsW<V: OdbcVersion>(
     let ColumnName = ColumnName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLColumnsW(
+        ffi::SQLColumnsW(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -561,7 +560,7 @@ where
     H: AsSQLHANDLE + SQLCompleteAsyncHandle,
 {
     unsafe {
-        extern_api::SQLCompleteAsync(
+        ffi::SQLCompleteAsync(
             H::Ident::IDENTIFIER,
             Handle.as_SQLHANDLE(),
             AsyncRetCodePtr.as_mut_ptr(),
@@ -591,7 +590,7 @@ pub fn SQLConnectA<'env, V: OdbcVersion>(
     let Authentication = Authentication.as_raw_slice();
 
     let sql_return = unsafe {
-        extern_api::SQLConnectA(
+        ffi::SQLConnectA(
             ConnectionHandle.as_SQLHANDLE(),
             ServerName.0,
             ServerName.1,
@@ -631,7 +630,7 @@ pub fn SQLConnectW<'env, V: OdbcVersion>(
     let Authentication = Authentication.as_raw_slice();
 
     let sql_return = unsafe {
-        extern_api::SQLConnectW(
+        ffi::SQLConnectW(
             ConnectionHandle.as_SQLHANDLE(),
             ServerName.0,
             ServerName.1,
@@ -668,7 +667,7 @@ where
     DT2: for<'buf> DescType<'buf>,
 {
     unsafe {
-        extern_api::SQLCopyDesc(
+        ffi::SQLCopyDesc(
             SourceDescHandle.as_SQLHANDLE(),
             TargetDescHandle.as_SQLHANDLE(),
         )
@@ -695,7 +694,7 @@ pub fn SQLDataSourcesA<V: OdbcVersion>(
     let Description = Description.as_mut_raw_slice();
 
     unsafe {
-        extern_api::SQLDataSourcesA(
+        ffi::SQLDataSourcesA(
             EnvironmentHandle.as_SQLHANDLE(),
             Direction,
             ServerName.0,
@@ -728,7 +727,7 @@ pub fn SQLDataSourcesW<V: OdbcVersion>(
     let Description = Description.as_mut_raw_slice();
 
     unsafe {
-        extern_api::SQLDataSourcesW(
+        ffi::SQLDataSourcesW(
             EnvironmentHandle.as_SQLHANDLE(),
             Direction,
             ServerName.0,
@@ -762,7 +761,7 @@ pub fn SQLDescribeColA<V: OdbcVersion>(
     let ColumnName = ColumnName.as_mut_raw_slice();
 
     unsafe {
-        extern_api::SQLDescribeColA(
+        ffi::SQLDescribeColA(
             StatementHandle.as_SQLHANDLE(),
             ColumnNumber,
             ColumnName.0,
@@ -797,7 +796,7 @@ pub fn SQLDescribeColW<V: OdbcVersion>(
     let ColumnName = ColumnName.as_mut_raw_slice();
 
     unsafe {
-        extern_api::SQLDescribeColW(
+        ffi::SQLDescribeColW(
             StatementHandle.as_SQLHANDLE(),
             ColumnNumber,
             ColumnName.0,
@@ -828,7 +827,7 @@ pub fn SQLDescribeParam<V: OdbcVersion>(
     NullablePtr: &mut MaybeUninit<NullAllowed>,
 ) -> SQLRETURN {
     unsafe {
-        extern_api::SQLDescribeParam(
+        ffi::SQLDescribeParam(
             StatementHandle.as_SQLHANDLE(),
             ParameterNumber,
             DataTypePtr.as_mut_ptr(),
@@ -853,7 +852,7 @@ pub fn SQLDisconnect<'env, C: ConnState, V: OdbcVersion>(
 where
     SQLHDBC<'env, C, V>: Disconnect<'env, V>,
 {
-    let sql_return = unsafe { extern_api::SQLDisconnect(ConnectionHandle.as_SQLHANDLE()) };
+    let sql_return = unsafe { ffi::SQLDisconnect(ConnectionHandle.as_SQLHANDLE()) };
 
     if SQL_SUCCEEDED(sql_return) {
         (Ok(ConnectionHandle.disconnect()), sql_return)
@@ -886,7 +885,7 @@ pub fn SQLDriverConnectA<'env, V: OdbcVersion>(
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     let sql_return = unsafe {
-        extern_api::SQLDriverConnectA(
+        ffi::SQLDriverConnectA(
             ConnectionHandle.as_SQLHANDLE(),
             // TODO: Fix this
             ptr::null_mut(),
@@ -930,7 +929,7 @@ pub fn SQLDriverConnectW<'env, V: OdbcVersion>(
         OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     let sql_return = unsafe {
-        extern_api::SQLDriverConnectW(
+        ffi::SQLDriverConnectW(
             ConnectionHandle.as_SQLHANDLE(),
             // TODO: Fix this
             ptr::null_mut(),
@@ -970,7 +969,7 @@ pub fn SQLDriversA<V: OdbcVersion>(
     let DriverAttributes = DriverAttributes.as_mut_raw_slice();
 
     unsafe {
-        extern_api::SQLDriversA(
+        ffi::SQLDriversA(
             EnvironmentHandle.as_SQLHANDLE(),
             Direction,
             DriverDescription.0,
@@ -1003,7 +1002,7 @@ pub fn SQLDriversW<V: OdbcVersion>(
     let DriverAttributes = DriverAttributes.as_mut_raw_slice();
 
     unsafe {
-        extern_api::SQLDriversW(
+        ffi::SQLDriversW(
             EnvironmentHandle.as_SQLHANDLE(),
             Direction,
             DriverDescription.0,
@@ -1033,7 +1032,7 @@ where
     H: AsSQLHANDLE + SQLEndTranHandle,
 {
     unsafe {
-        extern_api::SQLEndTran(
+        ffi::SQLEndTran(
             H::Ident::IDENTIFIER,
             Handle.as_SQLHANDLE(),
             CompletionType as SQLSMALLINT,
@@ -1055,7 +1054,7 @@ pub unsafe fn SQLExecDirectA<V: OdbcVersion>(
 ) -> SQLRETURN {
     let StatementText = StatementText.as_raw_slice();
 
-    extern_api::SQLExecDirectA(
+    ffi::SQLExecDirectA(
         StatementHandle.as_SQLHANDLE(),
         StatementText.0,
         StatementText.1,
@@ -1076,7 +1075,7 @@ pub unsafe fn SQLExecDirectW<V: OdbcVersion>(
 ) -> SQLRETURN {
     let StatementText = StatementText.as_raw_slice();
 
-    extern_api::SQLExecDirectW(
+    ffi::SQLExecDirectW(
         StatementHandle.as_SQLHANDLE(),
         StatementText.0,
         StatementText.1,
@@ -1092,7 +1091,7 @@ pub unsafe fn SQLExecDirectW<V: OdbcVersion>(
 #[inline]
 #[allow(non_snake_case)]
 pub unsafe fn SQLExecute<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
-    extern_api::SQLExecute(StatementHandle.as_SQLHANDLE())
+    ffi::SQLExecute(StatementHandle.as_SQLHANDLE())
 }
 
 /// Fetches the next rowset of data from the result set and returns data for all bound columns.
@@ -1104,7 +1103,7 @@ pub unsafe fn SQLExecute<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRE
 #[inline]
 #[allow(non_snake_case)]
 pub unsafe fn SQLFetch<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
-    extern_api::SQLFetch(StatementHandle.as_SQLHANDLE())
+    ffi::SQLFetch(StatementHandle.as_SQLHANDLE())
 }
 
 /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
@@ -1121,7 +1120,7 @@ pub unsafe fn SQLFetchScroll<V: OdbcVersion>(
     FetchOrientation: SQLSMALLINT,
     FetchOffset: SQLLEN,
 ) -> SQLRETURN {
-    extern_api::SQLFetchScroll(
+    ffi::SQLFetchScroll(
         StatementHandle.as_SQLHANDLE(),
         FetchOrientation,
         FetchOffset,
@@ -1158,7 +1157,7 @@ pub fn SQLForeignKeysA<V: OdbcVersion>(
     let FKTableName = FKTableName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLForeignKeysA(
+        ffi::SQLForeignKeysA(
             StatementHandle.as_SQLHANDLE(),
             PKCatalogName.0,
             PKCatalogName.1,
@@ -1206,7 +1205,7 @@ pub fn SQLForeignKeysW<V: OdbcVersion>(
     let FKTableName = FKTableName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLForeignKeysW(
+        ffi::SQLForeignKeysW(
             StatementHandle.as_SQLHANDLE(),
             PKCatalogName.0,
             PKCatalogName.1,
@@ -1248,7 +1247,7 @@ pub fn SQLFreeStmt<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     Option: FreeStmtOption,
 ) -> SQLRETURN {
-    unsafe { extern_api::SQLFreeStmt(StatementHandle.as_SQLHANDLE(), Option as SQLUSMALLINT) }
+    unsafe { ffi::SQLFreeStmt(StatementHandle.as_SQLHANDLE(), Option as SQLUSMALLINT) }
 }
 
 /// Returns the current setting of a connection attribute.
@@ -1284,7 +1283,7 @@ where
     });
 
     unsafe {
-        extern_api::SQLGetConnectAttrA(
+        ffi::SQLGetConnectAttrA(
             ConnectionHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
             ValuePtr.0,
@@ -1327,7 +1326,7 @@ where
     });
 
     unsafe {
-        extern_api::SQLGetConnectAttrW(
+        ffi::SQLGetConnectAttrW(
             ConnectionHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
             ValuePtr.0,
@@ -1353,7 +1352,7 @@ pub fn SQLGetCursorNameA<V: OdbcVersion>(
     let CursorName = CursorName.as_mut_raw_slice();
 
     unsafe {
-        extern_api::SQLGetCursorNameA(
+        ffi::SQLGetCursorNameA(
             StatementHandle.as_SQLHANDLE(),
             CursorName.0,
             CursorName.1,
@@ -1378,7 +1377,7 @@ pub fn SQLGetCursorNameW<V: OdbcVersion>(
     let CursorName = CursorName.as_mut_raw_slice();
 
     unsafe {
-        extern_api::SQLGetCursorNameW(
+        ffi::SQLGetCursorNameW(
             StatementHandle.as_SQLHANDLE(),
             CursorName.0,
             CursorName.1,
@@ -1408,7 +1407,7 @@ where
     MaybeUninit<StrLenOrInd>: AsMutPtr<SQLLEN>,
 {
     unsafe {
-        extern_api::SQLGetData(
+        ffi::SQLGetData(
             StatementHandle.as_SQLHANDLE(),
             Col_or_Param_Num,
             TT::IDENTIFIER,
@@ -1453,7 +1452,7 @@ where
     });
 
     unsafe {
-        extern_api::SQLGetDescFieldA(
+        ffi::SQLGetDescFieldA(
             DescriptorHandle.as_SQLHANDLE(),
             RecNumber,
             A::IDENTIFIER,
@@ -1498,7 +1497,7 @@ where
     });
 
     unsafe {
-        extern_api::SQLGetDescFieldW(
+        ffi::SQLGetDescFieldW(
             DescriptorHandle.as_SQLHANDLE(),
             RecNumber,
             A::IDENTIFIER,
@@ -1532,7 +1531,7 @@ pub fn SQLGetDescRecA<'buf, ST: SqlType<V>, DT: DescType<'buf>, V: OdbcVersion>(
     let Name = Name.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     unsafe {
-        extern_api::SQLGetDescRecA(
+        ffi::SQLGetDescRecA(
             DescriptorHandle.as_SQLHANDLE(),
             RecNumber,
             Name.0,
@@ -1571,7 +1570,7 @@ pub fn SQLGetDescRecW<'buf, ST: SqlType<V>, DT: DescType<'buf>, V: OdbcVersion>(
     let Name = Name.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
     unsafe {
-        extern_api::SQLGetDescRecW(
+        ffi::SQLGetDescRecW(
             DescriptorHandle.as_SQLHANDLE(),
             RecNumber,
             Name.0,
@@ -1618,7 +1617,7 @@ where
     });
 
     unsafe {
-        extern_api::SQLGetDiagFieldA(
+        ffi::SQLGetDiagFieldA(
             H::Ident::IDENTIFIER,
             Handle.as_SQLHANDLE(),
             RecNumber.get(),
@@ -1661,7 +1660,7 @@ where
     });
 
     unsafe {
-        extern_api::SQLGetDiagFieldW(
+        ffi::SQLGetDiagFieldW(
             H::Ident::IDENTIFIER,
             Handle.as_SQLHANDLE(),
             RecNumber.get(),
@@ -1697,7 +1696,7 @@ where
     let MessageText = MessageText.as_mut_raw_slice();
 
     unsafe {
-        extern_api::SQLGetDiagRecA(
+        ffi::SQLGetDiagRecA(
             H::Ident::IDENTIFIER,
             Handle.as_SQLHANDLE(),
             RecNumber.get(),
@@ -1734,7 +1733,7 @@ where
     let MessageText = MessageText.as_mut_raw_slice();
 
     unsafe {
-        extern_api::SQLGetDiagRecW(
+        ffi::SQLGetDiagRecW(
             H::Ident::IDENTIFIER,
             Handle.as_SQLHANDLE(),
             RecNumber.get(),
@@ -1770,7 +1769,7 @@ where
     });
 
     unsafe {
-        extern_api::SQLGetEnvAttr(
+        ffi::SQLGetEnvAttr(
             EnvironmentHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
             ValuePtr.0,
@@ -1794,7 +1793,7 @@ pub fn SQLGetFunctions<V: OdbcVersion>(
     SupportedPtr: &mut MaybeUninit<SQLUSMALLINT>,
 ) -> SQLRETURN {
     unsafe {
-        extern_api::SQLGetFunctions(
+        ffi::SQLGetFunctions(
             ConnectionHandle.as_SQLHANDLE(),
             FunctionId as SQLUSMALLINT,
             SupportedPtr.as_mut_ptr(),
@@ -1826,7 +1825,7 @@ where
     });
 
     unsafe {
-        extern_api::SQLGetInfoA(
+        ffi::SQLGetInfoA(
             ConnectionHandle.as_SQLHANDLE(),
             I::IDENTIFIER,
             InfoValuePtr.0,
@@ -1860,7 +1859,7 @@ where
     });
 
     unsafe {
-        extern_api::SQLGetInfoW(
+        ffi::SQLGetInfoW(
             ConnectionHandle.as_SQLHANDLE(),
             I::IDENTIFIER,
             InfoValuePtr.0,
@@ -1902,7 +1901,7 @@ where
         ValuePtr.readA(StatementHandle, StringLengthPtr)
     } else {
         unsafe {
-            extern_api::SQLGetStmtAttrA(
+            ffi::SQLGetStmtAttrA(
                 StatementHandle.as_SQLHANDLE(),
                 A::IDENTIFIER,
                 ptr::null_mut(),
@@ -1945,7 +1944,7 @@ where
         ValuePtr.readW(StatementHandle, StringLengthPtr)
     } else {
         unsafe {
-            extern_api::SQLGetStmtAttrW(
+            ffi::SQLGetStmtAttrW(
                 StatementHandle.as_SQLHANDLE(),
                 A::IDENTIFIER,
                 ptr::null_mut(),
@@ -1968,7 +1967,7 @@ pub fn SQLGetTypeInfoA<V: OdbcVersion, ST: SqlType<V>>(
     StatementHandle: &SQLHSTMT<V>,
     DataType: ST,
 ) -> SQLRETURN {
-    unsafe { extern_api::SQLGetTypeInfoA(StatementHandle.as_SQLHANDLE(), DataType.identifier()) }
+    unsafe { ffi::SQLGetTypeInfoA(StatementHandle.as_SQLHANDLE(), DataType.identifier()) }
 }
 
 /// Returns information about data types supported by the data source. The driver returns the information in the form of an SQL result set. The data types are intended for use in Data Definition Language (DDL) statements.
@@ -1983,7 +1982,7 @@ pub fn SQLGetTypeInfoW<V: OdbcVersion, ST: SqlType<V>>(
     StatementHandle: &SQLHSTMT<V>,
     DataType: ST,
 ) -> SQLRETURN {
-    unsafe { extern_api::SQLGetTypeInfoW(StatementHandle.as_SQLHANDLE(), DataType.identifier()) }
+    unsafe { ffi::SQLGetTypeInfoW(StatementHandle.as_SQLHANDLE(), DataType.identifier()) }
 }
 
 /// Determines whether more results are available on a statement containing **SELECT**, **UPDATE**, **INSERT**, or **DELETE** statements and, if so, initializes processing for those results.
@@ -1995,7 +1994,7 @@ pub fn SQLGetTypeInfoW<V: OdbcVersion, ST: SqlType<V>>(
 #[inline]
 #[allow(non_snake_case)]
 pub fn SQLMoreResults<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
-    unsafe { extern_api::SQLMoreResults(StatementHandle.as_SQLHANDLE()) }
+    unsafe { ffi::SQLMoreResults(StatementHandle.as_SQLHANDLE()) }
 }
 
 /// Returns the SQL string as modified by the driver. **SQLNativeSql** does not execute the SQL statement.
@@ -2016,7 +2015,7 @@ pub fn SQLNativeSqlA<V: OdbcVersion>(
     let OutStatementText = OutStatementText.as_mut_raw_slice();
 
     unsafe {
-        extern_api::SQLNativeSqlA(
+        ffi::SQLNativeSqlA(
             ConnectionHandle.as_SQLHANDLE(),
             InStatementText.0,
             InStatementText.1,
@@ -2045,7 +2044,7 @@ pub fn SQLNativeSqlW<V: OdbcVersion>(
     let OutStatementText = OutStatementText.as_mut_raw_slice();
 
     unsafe {
-        extern_api::SQLNativeSqlW(
+        ffi::SQLNativeSqlW(
             ConnectionHandle.as_SQLHANDLE(),
             InStatementText.0,
             InStatementText.1,
@@ -2069,7 +2068,7 @@ pub fn SQLNumParams<V: OdbcVersion>(
     ParameterCountPtr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> SQLRETURN {
     unsafe {
-        extern_api::SQLNumParams(
+        ffi::SQLNumParams(
             StatementHandle.as_SQLHANDLE(),
             ParameterCountPtr.as_mut_ptr(),
         )
@@ -2089,7 +2088,7 @@ pub fn SQLNumResultCols<V: OdbcVersion>(
     ColumnCountPtr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> SQLRETURN {
     unsafe {
-        extern_api::SQLNumResultCols(StatementHandle.as_SQLHANDLE(), ColumnCountPtr.as_mut_ptr())
+        ffi::SQLNumResultCols(StatementHandle.as_SQLHANDLE(), ColumnCountPtr.as_mut_ptr())
     }
 }
 
@@ -2105,7 +2104,7 @@ pub fn SQLParamData<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     ValuePtrPtr: &mut MaybeUninit<SQLPOINTER>,
 ) -> SQLRETURN {
-    unsafe { extern_api::SQLParamData(StatementHandle.as_SQLHANDLE(), ValuePtrPtr.as_mut_ptr()) }
+    unsafe { ffi::SQLParamData(StatementHandle.as_SQLHANDLE(), ValuePtrPtr.as_mut_ptr()) }
 }
 
 /// Prepares an SQL string for execution.
@@ -2123,7 +2122,7 @@ pub fn SQLPrepareA<V: OdbcVersion>(
     let StatementText = StatementText.as_raw_slice();
 
     unsafe {
-        extern_api::SQLPrepareA(
+        ffi::SQLPrepareA(
             StatementHandle.as_SQLHANDLE(),
             StatementText.0,
             StatementText.1,
@@ -2146,7 +2145,7 @@ pub fn SQLPrepareW<V: OdbcVersion>(
     let StatementText = StatementText.as_raw_slice();
 
     unsafe {
-        extern_api::SQLPrepareW(
+        ffi::SQLPrepareW(
             StatementHandle.as_SQLHANDLE(),
             StatementText.0,
             StatementText.1,
@@ -2173,7 +2172,7 @@ pub fn SQLPrimaryKeysA<V: OdbcVersion>(
     let TableName = TableName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLPrimaryKeysA(
+        ffi::SQLPrimaryKeysA(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -2204,7 +2203,7 @@ pub fn SQLPrimaryKeysW<V: OdbcVersion>(
     let TableName = TableName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLPrimaryKeysW(
+        ffi::SQLPrimaryKeysW(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -2237,7 +2236,7 @@ pub fn SQLProcedureColumnsA<V: OdbcVersion>(
     let ColumnName = ColumnName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLProcedureColumnsA(
+        ffi::SQLProcedureColumnsA(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -2272,7 +2271,7 @@ pub fn SQLProcedureColumnsW<V: OdbcVersion>(
     let ColumnName = ColumnName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLProcedureColumnsW(
+        ffi::SQLProcedureColumnsW(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -2305,7 +2304,7 @@ pub fn SQLProceduresA<V: OdbcVersion>(
     let ProcName = ProcName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLProceduresA(
+        ffi::SQLProceduresA(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -2336,7 +2335,7 @@ pub fn SQLProceduresW<V: OdbcVersion>(
     let ProcName = ProcName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLProceduresW(
+        ffi::SQLProceduresW(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -2368,7 +2367,7 @@ where
     });
 
     // TODO: This function is incredibly unsafe. How to know which type to provide and panic at runtime if incorrect?
-    extern_api::SQLPutData(StatementHandle.as_SQLHANDLE(), DataPtr.0, DataPtr.1)
+    ffi::SQLPutData(StatementHandle.as_SQLHANDLE(), DataPtr.0, DataPtr.1)
 }
 
 /// Returns the number of rows affected by an **UPDATE**, **INSERT**, or **DELETE** statement; an SQL_ADD, SQL_UPDATE_BY_BOOKMARK, or SQL_DELETE_BY_BOOKMARK operation in **SQLBulkOperations**; or an SQL_UPDATE or SQL_DELETE operation in **SQLSetPos**.
@@ -2383,7 +2382,7 @@ pub fn SQLRowCount<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     RowCountPtr: &mut MaybeUninit<SQLLEN>,
 ) -> SQLRETURN {
-    unsafe { extern_api::SQLRowCount(StatementHandle.as_SQLHANDLE(), RowCountPtr.as_mut_ptr()) }
+    unsafe { ffi::SQLRowCount(StatementHandle.as_SQLHANDLE(), RowCountPtr.as_mut_ptr()) }
 }
 
 /// Sets attributes that govern aspects of connections.
@@ -2408,7 +2407,7 @@ where
     T: AttrSet<A> + AnsiType,
 {
     unsafe {
-        extern_api::SQLSetConnectAttrA(
+        ffi::SQLSetConnectAttrA(
             ConnectionHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
             ValuePtr.into_SQLPOINTER(),
@@ -2439,7 +2438,7 @@ where
     T: AttrSet<A> + UnicodeType,
 {
     unsafe {
-        extern_api::SQLSetConnectAttrW(
+        ffi::SQLSetConnectAttrW(
             ConnectionHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
             ValuePtr.into_SQLPOINTER(),
@@ -2463,7 +2462,7 @@ pub fn SQLSetCursorNameA<V: OdbcVersion>(
     let CursorName = CursorName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLSetCursorNameA(StatementHandle.as_SQLHANDLE(), CursorName.0, CursorName.1)
+        ffi::SQLSetCursorNameA(StatementHandle.as_SQLHANDLE(), CursorName.0, CursorName.1)
     }
 }
 
@@ -2482,7 +2481,7 @@ pub fn SQLSetCursorNameW<V: OdbcVersion>(
     let CursorName = CursorName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLSetCursorNameW(StatementHandle.as_SQLHANDLE(), CursorName.0, CursorName.1)
+        ffi::SQLSetCursorNameW(StatementHandle.as_SQLHANDLE(), CursorName.0, CursorName.1)
     }
 }
 
@@ -2514,7 +2513,7 @@ where
             (ValuePtr.into_SQLPOINTER(), ValuePtr.len())
         });
 
-        extern_api::SQLSetDescFieldA(
+        ffi::SQLSetDescFieldA(
             DescriptorHandle.as_SQLHANDLE(),
             RecNumber,
             A::IDENTIFIER,
@@ -2558,7 +2557,7 @@ where
             (ValuePtr.into_SQLPOINTER(), ValuePtr.len())
         });
 
-        extern_api::SQLSetDescFieldW(
+        ffi::SQLSetDescFieldW(
             DescriptorHandle.as_SQLHANDLE(),
             RecNumber,
             A::IDENTIFIER,
@@ -2601,7 +2600,7 @@ where
     &'buf PTR: IntoSQLPOINTER,
 {
     unsafe {
-        extern_api::SQLSetDescRec(
+        ffi::SQLSetDescRec(
             DescriptorHandle.as_SQLHANDLE(),
             RecNumber,
             Type.identifier(),
@@ -2635,7 +2634,7 @@ where
     T: AttrSet<A>,
 {
     unsafe {
-        extern_api::SQLSetEnvAttr(
+        ffi::SQLSetEnvAttr(
             EnvironmentHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
             ValuePtr.into_SQLPOINTER(),
@@ -2658,7 +2657,7 @@ pub unsafe fn SQLSetPos<V: OdbcVersion>(
     Operation: Operation,
     LockType: LockType,
 ) -> SQLRETURN {
-    extern_api::SQLSetPos(
+    ffi::SQLSetPos(
         StatementHandle.as_SQLHANDLE(),
         RowNumber,
         Operation as SQLUSMALLINT,
@@ -2689,7 +2688,7 @@ where
     T: AttrSet<A> + AnsiType,
 {
     let sql_return = unsafe {
-        extern_api::SQLSetStmtAttrA(
+        ffi::SQLSetStmtAttrA(
             StatementHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
             ValuePtr.into_SQLPOINTER(),
@@ -2727,7 +2726,7 @@ where
     T: AttrSet<A> + UnicodeType,
 {
     let sql_return = unsafe {
-        extern_api::SQLSetStmtAttrW(
+        ffi::SQLSetStmtAttrW(
             StatementHandle.as_SQLHANDLE(),
             A::IDENTIFIER,
             ValuePtr.into_SQLPOINTER(),
@@ -2767,7 +2766,7 @@ pub fn SQLSpecialColumnsA<V: OdbcVersion>(
     let TableName = TableName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLSpecialColumnsA(
+        ffi::SQLSpecialColumnsA(
             StatementHandle.as_SQLHANDLE(),
             IdentifierType as SQLSMALLINT,
             CatalogName.0,
@@ -2807,7 +2806,7 @@ pub fn SQLSpecialColumnsW<V: OdbcVersion>(
     let TableName = TableName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLSpecialColumnsW(
+        ffi::SQLSpecialColumnsW(
             StatementHandle.as_SQLHANDLE(),
             IdentifierType as SQLSMALLINT,
             CatalogName.0,
@@ -2843,7 +2842,7 @@ pub fn SQLStatisticsA<V: OdbcVersion>(
     let TableName = TableName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLStatisticsA(
+        ffi::SQLStatisticsA(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -2878,7 +2877,7 @@ pub fn SQLStatisticsW<V: OdbcVersion>(
     let TableName = TableName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLStatisticsW(
+        ffi::SQLStatisticsW(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -2911,7 +2910,7 @@ pub fn SQLTablePrivilegesA<V: OdbcVersion>(
     let TableName = TableName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLTablePrivilegesA(
+        ffi::SQLTablePrivilegesA(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -2942,7 +2941,7 @@ pub fn SQLTablePrivilegesW<V: OdbcVersion>(
     let TableName = TableName.as_raw_slice();
 
     unsafe {
-        extern_api::SQLTablePrivilegesW(
+        ffi::SQLTablePrivilegesW(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -2975,7 +2974,7 @@ pub fn SQLTablesA<V: OdbcVersion>(
     let TableType = TableType.as_raw_slice();
 
     unsafe {
-        extern_api::SQLTablesA(
+        ffi::SQLTablesA(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -3010,7 +3009,7 @@ pub fn SQLTablesW<V: OdbcVersion>(
     let TableType = TableType.as_raw_slice();
 
     unsafe {
-        extern_api::SQLTablesW(
+        ffi::SQLTablesW(
             StatementHandle.as_SQLHANDLE(),
             CatalogName.0,
             CatalogName.1,
@@ -3021,5 +3020,825 @@ pub fn SQLTablesW<V: OdbcVersion>(
             TableType.0,
             TableType.1,
         )
+    }
+}
+
+#[cfg(test)]
+use mockall::automock;
+#[cfg_attr(test, automock)]
+pub(crate) mod ffi {
+    use crate::handle::{HDBC, HDESC, HENV, HSTMT, SQLHWND};
+    use crate::{
+        diag::SQLSTATE_SIZE, handle::SQLHANDLE, sqlreturn::SQLRETURN, RETCODE, SQLCHAR, SQLINTEGER,
+        SQLLEN, SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
+    };
+
+    // TODO: Replace these two types with SQLPOINTER once library is stabilized
+    // they are used to avoid provenance related errors during initial development
+    type ConstSQLPOINTER = *const std::ffi::c_void;
+    type MutSQLPOINTER = *mut std::ffi::c_void;
+    impl crate::Ident for ConstSQLPOINTER {
+        type Type = SQLSMALLINT;
+        const IDENTIFIER: Self::Type = crate::SQL_IS_POINTER;
+    }
+
+    // TODO: static linking is not supported for windows
+    #[cfg_attr(windows, link(name = "odbc32", kind = "dylib"))]
+    #[cfg_attr(
+        all(not(windows), feature = "static"),
+        link(name = "odbc", kind = "static")
+    )]
+    #[cfg_attr(
+        all(not(windows), not(feature = "static")),
+        link(name = "odbc", kind = "dylib")
+    )]
+    extern "system" {
+        pub(crate) fn SQLAllocHandle(
+            HandleType: SQLSMALLINT,
+            InputHandle: SQLHANDLE,
+            OutputHandlePtr: *mut SQLHANDLE,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLBindCol(
+            StatementHandle: HSTMT,
+            ColumnNumber: SQLUSMALLINT,
+            TargetType: SQLSMALLINT,
+            TargetValuePtr: MutSQLPOINTER,
+            BufferLength: SQLLEN,
+            StrLen_or_IndPtr: *mut SQLLEN,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLBindParameter(
+            StatementHandle: HSTMT,
+            ParameterNumber: SQLUSMALLINT,
+            InputOutputType: SQLSMALLINT,
+            ValueType: SQLSMALLINT,
+            ParameterType: SQLSMALLINT,
+            ColumnSize: SQLULEN,
+            DecimalDigits: SQLSMALLINT,
+            ParameterValuePtr: SQLPOINTER,
+            BufferLength: SQLLEN,
+            StrLen_or_IndPtr: *const SQLLEN,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLBrowseConnectA(
+            ConnectionHandle: HDBC,
+            InConnectionString: *const SQLCHAR,
+            StringLength1: SQLSMALLINT,
+            OutConnectionString: *mut SQLCHAR,
+            BufferLength: SQLSMALLINT,
+            StringLength2Ptr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLBrowseConnectW(
+            ConnectionHandle: HDBC,
+            InConnectionString: *const SQLWCHAR,
+            StringLength1: SQLSMALLINT,
+            OutConnectionString: *mut SQLWCHAR,
+            BufferLength: SQLSMALLINT,
+            StringLength2Ptr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLBulkOperations(StatementHandle: HSTMT, Operation: SQLUSMALLINT) -> SQLRETURN;
+
+        pub(crate) fn SQLCancel(StatementHandle: HSTMT) -> SQLRETURN;
+
+        pub(crate) fn SQLCancelHandle(HandleType: SQLSMALLINT, Handle: SQLHANDLE) -> SQLRETURN;
+
+        pub(crate) fn SQLCloseCursor(StatementHandle: HSTMT) -> SQLRETURN;
+
+        pub(crate) fn SQLColAttributeA(
+            StatementHandle: HSTMT,
+            ColumnNumber: SQLUSMALLINT,
+            FieldIdentifier: SQLUSMALLINT,
+            CharacterAttributePtr: MutSQLPOINTER,
+            BufferLength: SQLSMALLINT,
+            StringLengthPtr: *mut SQLSMALLINT,
+            NumericAttributePtr: *mut SQLLEN,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLColAttributeW(
+            StatementHandle: HSTMT,
+            ColumnNumber: SQLUSMALLINT,
+            FieldIdentifier: SQLUSMALLINT,
+            CharacterAttributePtr: MutSQLPOINTER,
+            BufferLength: SQLSMALLINT,
+            StringLengthPtr: *mut SQLSMALLINT,
+            NumericAttributePtr: *mut SQLLEN,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLColumnPrivilegesA(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLCHAR,
+            NameLength3: SQLSMALLINT,
+            ColumnName: *const SQLCHAR,
+            NameLength4: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLColumnPrivilegesW(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLWCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLWCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLWCHAR,
+            NameLength3: SQLSMALLINT,
+            ColumnName: *const SQLWCHAR,
+            NameLength4: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLColumnsA(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLCHAR,
+            NameLength3: SQLSMALLINT,
+            ColumnName: *const SQLCHAR,
+            NameLength4: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLColumnsW(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLWCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLWCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLWCHAR,
+            NameLength3: SQLSMALLINT,
+            ColumnName: *const SQLWCHAR,
+            NameLength4: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLCompleteAsync(
+            HandleType: SQLSMALLINT,
+            Handle: SQLHANDLE,
+            AsyncRetCodePtr: *mut RETCODE,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLConnectA(
+            ConnectionHandle: HDBC,
+            ServerName: *const SQLCHAR,
+            NameLength1: SQLSMALLINT,
+            UserName: *const SQLCHAR,
+            NameLength2: SQLSMALLINT,
+            Authentication: *const SQLCHAR,
+            NameLength3: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLConnectW(
+            ConnectionHandle: HDBC,
+            ServerName: *const SQLWCHAR,
+            NameLength1: SQLSMALLINT,
+            UserName: *const SQLWCHAR,
+            NameLength2: SQLSMALLINT,
+            Authentication: *const SQLWCHAR,
+            NameLength3: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLCopyDesc(SourceDescHandle: HDESC, TargetDescHandle: HDESC) -> SQLRETURN;
+
+        pub(crate) fn SQLDataSourcesA(
+            EnvironmentHandle: HENV,
+            Direction: SQLUSMALLINT,
+            ServerName: *mut SQLCHAR,
+            BufferLength1: SQLSMALLINT,
+            NameLength1Ptr: *mut SQLSMALLINT,
+            Description: *mut SQLCHAR,
+            BufferLength2: SQLSMALLINT,
+            NameLength2Ptr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLDataSourcesW(
+            EnvironmentHandle: HENV,
+            Direction: SQLUSMALLINT,
+            ServerName: *mut SQLWCHAR,
+            BufferLength1: SQLSMALLINT,
+            NameLength1Ptr: *mut SQLSMALLINT,
+            Description: *mut SQLWCHAR,
+            BufferLength2: SQLSMALLINT,
+            NameLength2Ptr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLDescribeColA(
+            StatementHandle: HSTMT,
+            ColumnNumber: SQLUSMALLINT,
+            ColumnName: *mut SQLCHAR,
+            BufferLength: SQLSMALLINT,
+            NameLengthPtr: *mut SQLSMALLINT,
+            DataTypePtr: *mut SQLSMALLINT,
+            ColumnSizePtr: *mut SQLULEN,
+            DecimalDigitsPtr: *mut SQLSMALLINT,
+            NullablePtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLDescribeColW(
+            StatementHandle: HSTMT,
+            ColumnNumber: SQLUSMALLINT,
+            ColumnName: *mut SQLWCHAR,
+            BufferLength: SQLSMALLINT,
+            NameLengthPtr: *mut SQLSMALLINT,
+            DataTypePtr: *mut SQLSMALLINT,
+            ColumnSizePtr: *mut SQLULEN,
+            DecimalDigitsPtr: *mut SQLSMALLINT,
+            NullablePtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLDescribeParam(
+            StatementHandle: HSTMT,
+            ParameterNumber: SQLUSMALLINT,
+            DataTypePtr: *mut SQLSMALLINT,
+            ParameterSizePtr: *mut SQLULEN,
+            DecimalDigitsPtr: *mut SQLSMALLINT,
+            NullablePtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLDisconnect(ConnectionHandle: HDBC) -> SQLRETURN;
+
+        pub(crate) fn SQLDriverConnectA(
+            ConnectionHandle: HDBC,
+            WindowHandle: SQLHWND,
+            InConnectionString: *const SQLCHAR,
+            StringLength1: SQLSMALLINT,
+            OutConnectionString: *mut SQLCHAR,
+            BufferLength: SQLSMALLINT,
+            StringLength2Ptr: *mut SQLSMALLINT,
+            DriverCompletion: SQLUSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLDriverConnectW(
+            ConnectionHandle: HDBC,
+            WindowHandle: SQLHWND,
+            InConnectionString: *const SQLWCHAR,
+            StringLength1: SQLSMALLINT,
+            OutConnectionString: *mut SQLWCHAR,
+            BufferLength: SQLSMALLINT,
+            StringLength2Ptr: *mut SQLSMALLINT,
+            DriverCompletion: SQLUSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLDriversA(
+            EnvironmentHandle: HENV,
+            Direction: SQLUSMALLINT,
+            DriverDescription: *mut SQLCHAR,
+            BufferLength1: SQLSMALLINT,
+            DescriptionLengthPtr: *mut SQLSMALLINT,
+            DriverAttributes: *mut SQLCHAR,
+            BufferLength2: SQLSMALLINT,
+            AttributesLengthPtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLDriversW(
+            EnvironmentHandle: HENV,
+            Direction: SQLUSMALLINT,
+            DriverDescription: *mut SQLWCHAR,
+            BufferLength1: SQLSMALLINT,
+            DescriptionLengthPtr: *mut SQLSMALLINT,
+            DriverAttributes: *mut SQLWCHAR,
+            BufferLength2: SQLSMALLINT,
+            AttributesLengthPtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLEndTran(
+            HandleType: SQLSMALLINT,
+            Handle: SQLHANDLE,
+            CompletionType: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLExecDirectA(
+            StatementHandle: HSTMT,
+            StatementText: *const SQLCHAR,
+            TextLength: SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLExecDirectW(
+            StatementHandle: HSTMT,
+            StatementText: *const SQLWCHAR,
+            TextLength: SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLExecute(StatementHandle: HSTMT) -> SQLRETURN;
+
+        pub(crate) fn SQLFetch(StatementHandle: HSTMT) -> SQLRETURN;
+
+        pub(crate) fn SQLFetchScroll(
+            StatementHandle: HSTMT,
+            FetchOrientation: SQLSMALLINT,
+            FetchOffset: SQLLEN,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLForeignKeysA(
+            StatementHandle: HSTMT,
+            PKCatalogName: *const SQLCHAR,
+            NameLength1: SQLSMALLINT,
+            PKSchemaName: *const SQLCHAR,
+            NameLength2: SQLSMALLINT,
+            PKTableName: *const SQLCHAR,
+            NameLength3: SQLSMALLINT,
+            FKCatalogName: *const SQLCHAR,
+            NameLength4: SQLSMALLINT,
+            FKSchemaName: *const SQLCHAR,
+            NameLength5: SQLSMALLINT,
+            FKTableName: *const SQLCHAR,
+            NameLength6: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLForeignKeysW(
+            StatementHandle: HSTMT,
+            PKCatalogName: *const SQLWCHAR,
+            NameLength1: SQLSMALLINT,
+            PKSchemaName: *const SQLWCHAR,
+            NameLength2: SQLSMALLINT,
+            PKTableName: *const SQLWCHAR,
+            NameLength3: SQLSMALLINT,
+            FKCatalogName: *const SQLWCHAR,
+            NameLength4: SQLSMALLINT,
+            FKSchemaName: *const SQLWCHAR,
+            NameLength5: SQLSMALLINT,
+            FKTableName: *const SQLWCHAR,
+            NameLength6: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLFreeHandle(HandleType: SQLSMALLINT, Handle: SQLHANDLE) -> SQLRETURN;
+
+        pub(crate) fn SQLFreeStmt(StatementHandle: HSTMT, Option: SQLUSMALLINT) -> SQLRETURN;
+
+        pub(crate) fn SQLGetConnectAttrA(
+            ConnectionHandle: HDBC,
+            Attribute: SQLINTEGER,
+            ValuePtr: MutSQLPOINTER,
+            BufferLength: SQLINTEGER,
+            StringLengthPtr: *mut SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetConnectAttrW(
+            ConnectionHandle: HDBC,
+            Attribute: SQLINTEGER,
+            ValuePtr: MutSQLPOINTER,
+            BufferLength: SQLINTEGER,
+            StringLengthPtr: *mut SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetCursorNameA(
+            StatementHandle: HSTMT,
+            CursorName: *mut SQLCHAR,
+            BufferLength: SQLSMALLINT,
+            NameLengthPtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetCursorNameW(
+            StatementHandle: HSTMT,
+            CursorName: *mut SQLWCHAR,
+            BufferLength: SQLSMALLINT,
+            NameLengthPtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetData(
+            StatementHandle: HSTMT,
+            Col_or_Param_Num: SQLUSMALLINT,
+            TargetType: SQLSMALLINT,
+            TargetValuePtr: MutSQLPOINTER,
+            BufferLength: SQLLEN,
+            StrLen_or_IndPtr: *mut SQLLEN,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetDescFieldA(
+            DescriptorHandle: HDESC,
+            RecNumber: SQLSMALLINT,
+            FieldIdentifier: SQLSMALLINT,
+            ValuePtr: MutSQLPOINTER,
+            BufferLength: SQLINTEGER,
+            StringLengthPtr: *mut SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetDescFieldW(
+            DescriptorHandle: HDESC,
+            RecNumber: SQLSMALLINT,
+            FieldIdentifier: SQLSMALLINT,
+            ValuePtr: MutSQLPOINTER,
+            BufferLength: SQLINTEGER,
+            StringLengthPtr: *mut SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetDescRecA(
+            DescriptorHandle: HDESC,
+            RecNumber: SQLSMALLINT,
+            Name: *mut SQLCHAR,
+            BufferLength: SQLSMALLINT,
+            StringLengthPtr: *mut SQLSMALLINT,
+            TypePtr: *mut SQLSMALLINT,
+            SubTypePtr: *mut SQLSMALLINT,
+            LengthPtr: *mut SQLLEN,
+            PrecisionPtr: *mut SQLSMALLINT,
+            ScalePtr: *mut SQLSMALLINT,
+            NullablePtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetDescRecW(
+            DescriptorHandle: HDESC,
+            RecNumber: SQLSMALLINT,
+            Name: *mut SQLWCHAR,
+            BufferLength: SQLSMALLINT,
+            StringLengthPtr: *mut SQLSMALLINT,
+            TypePtr: *mut SQLSMALLINT,
+            SubTypePtr: *mut SQLSMALLINT,
+            LengthPtr: *mut SQLLEN,
+            PrecisionPtr: *mut SQLSMALLINT,
+            ScalePtr: *mut SQLSMALLINT,
+            NullablePtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetDiagFieldA(
+            HandleType: SQLSMALLINT,
+            Handle: SQLHANDLE,
+            RecNumber: SQLSMALLINT,
+            DiagIdentifier: SQLSMALLINT,
+            DiagInfoPtr: MutSQLPOINTER,
+            BufferLength: SQLSMALLINT,
+            StringLengthPtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetDiagFieldW(
+            HandleType: SQLSMALLINT,
+            Handle: SQLHANDLE,
+            RecNumber: SQLSMALLINT,
+            DiagIdentifier: SQLSMALLINT,
+            DiagInfoPtr: MutSQLPOINTER,
+            BufferLength: SQLSMALLINT,
+            StringLengthPtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetDiagRecA(
+            HandleType: SQLSMALLINT,
+            Handle: SQLHANDLE,
+            RecNumber: SQLSMALLINT,
+            SQLState: *mut [SQLCHAR; SQLSTATE_SIZE + 1],
+            NativeErrorPtr: *mut SQLINTEGER,
+            MessageText: *mut SQLCHAR,
+            BufferLength: SQLSMALLINT,
+            TextLengthPtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetDiagRecW(
+            HandleType: SQLSMALLINT,
+            Handle: SQLHANDLE,
+            RecNumber: SQLSMALLINT,
+            SQLState: *mut [SQLWCHAR; SQLSTATE_SIZE + 1],
+            NativeErrorPtr: *mut SQLINTEGER,
+            MessageText: *mut SQLWCHAR,
+            BufferLength: SQLSMALLINT,
+            TextLengthPtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetEnvAttr(
+            EnvironmentHandle: HENV,
+            Attribute: SQLINTEGER,
+            ValuePtr: MutSQLPOINTER,
+            BufferLength: SQLINTEGER,
+            StringLengthPtr: *mut SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetFunctions(
+            ConnectionHandle: HDBC,
+            FunctionId: SQLUSMALLINT,
+            SupportedPtr: *mut SQLUSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetInfoA(
+            ConnectionHandle: HDBC,
+            InfoType: SQLUSMALLINT,
+            InfoValuePtr: MutSQLPOINTER,
+            BufferLength: SQLSMALLINT,
+            StringLengthPtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetInfoW(
+            ConnectionHandle: HDBC,
+            InfoType: SQLUSMALLINT,
+            InfoValuePtr: MutSQLPOINTER,
+            BufferLength: SQLSMALLINT,
+            StringLengthPtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetStmtAttrA(
+            StatementHandle: HSTMT,
+            Attribute: SQLINTEGER,
+            ValuePtr: MutSQLPOINTER,
+            BufferLength: SQLINTEGER,
+            StringLengthPtr: *mut SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetStmtAttrW(
+            StatementHandle: HSTMT,
+            Attribute: SQLINTEGER,
+            ValuePtr: MutSQLPOINTER,
+            BufferLength: SQLINTEGER,
+            StringLengthPtr: *mut SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLGetTypeInfoA(StatementHandle: HSTMT, DataType: SQLSMALLINT) -> SQLRETURN;
+
+        pub(crate) fn SQLGetTypeInfoW(StatementHandle: HSTMT, DataType: SQLSMALLINT) -> SQLRETURN;
+
+        pub(crate) fn SQLMoreResults(StatementHandle: HSTMT) -> SQLRETURN;
+
+        pub(crate) fn SQLNativeSqlA(
+            ConnectionHandle: HDBC,
+            InStatementText: *const SQLCHAR,
+            TextLength1: SQLINTEGER,
+            OutStatementText: *mut SQLCHAR,
+            BufferLength: SQLINTEGER,
+            TextLength2Ptr: *mut SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLNativeSqlW(
+            ConnectionHandle: HDBC,
+            InStatementText: *const SQLWCHAR,
+            TextLength1: SQLINTEGER,
+            OutStatementText: *mut SQLWCHAR,
+            BufferLength: SQLINTEGER,
+            TextLength2Ptr: *mut SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLNumParams(
+            StatementHandle: HSTMT,
+            ParameterCountPtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLNumResultCols(
+            StatementHandle: HSTMT,
+            ColumnCountPtr: *mut SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLParamData(
+            StatementHandle: HSTMT,
+            ValuePtrPtr: *mut MutSQLPOINTER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLPrepareA(
+            StatementHandle: HSTMT,
+            StatementText: *const SQLCHAR,
+            TextLength: SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLPrepareW(
+            StatementHandle: HSTMT,
+            StatementText: *const SQLWCHAR,
+            TextLength: SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLPrimaryKeysA(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLCHAR,
+            NameLength3: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLPrimaryKeysW(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLWCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLWCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLWCHAR,
+            NameLength3: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLProcedureColumnsA(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLCHAR,
+            NameLength2: SQLSMALLINT,
+            ProcName: *const SQLCHAR,
+            NameLength3: SQLSMALLINT,
+            ColumnName: *const SQLCHAR,
+            NameLength4: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLProcedureColumnsW(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLWCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLWCHAR,
+            NameLength2: SQLSMALLINT,
+            ProcName: *const SQLWCHAR,
+            NameLength3: SQLSMALLINT,
+            ColumnName: *const SQLWCHAR,
+            NameLength4: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLProceduresA(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLCHAR,
+            NameLength2: SQLSMALLINT,
+            ProcName: *const SQLCHAR,
+            NameLength3: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLProceduresW(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLWCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLWCHAR,
+            NameLength2: SQLSMALLINT,
+            ProcName: *const SQLWCHAR,
+            NameLength3: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLPutData(
+            StatementHandle: HSTMT,
+            DataPtr: ConstSQLPOINTER,
+            StrLen_or_Ind: SQLLEN,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLRowCount(StatementHandle: HSTMT, RowCountPtr: *mut SQLLEN) -> SQLRETURN;
+
+        pub(crate) fn SQLSetConnectAttrA(
+            ConnectionHandle: HDBC,
+            Attribute: SQLINTEGER,
+            ValuePtr: ConstSQLPOINTER,
+            StringLength: SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLSetConnectAttrW(
+            ConnectionHandle: HDBC,
+            Attribute: SQLINTEGER,
+            ValuePtr: ConstSQLPOINTER,
+            StringLength: SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLSetCursorNameA(
+            StatementHandle: HSTMT,
+            CursorName: *const SQLCHAR,
+            NameLength: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLSetCursorNameW(
+            StatementHandle: HSTMT,
+            CursorName: *const SQLWCHAR,
+            NameLength: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLSetDescFieldA(
+            DescriptorHandle: HDESC,
+            RecNumber: SQLSMALLINT,
+            FieldIdentifier: SQLSMALLINT,
+            ValuePtr: ConstSQLPOINTER,
+            BufferLength: SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLSetDescFieldW(
+            DescriptorHandle: HDESC,
+            RecNumber: SQLSMALLINT,
+            FieldIdentifier: SQLSMALLINT,
+            ValuePtr: ConstSQLPOINTER,
+            BufferLength: SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLSetDescRec(
+            DescriptorHandle: HDESC,
+            RecNumber: SQLSMALLINT,
+            Type: SQLSMALLINT,
+            SubType: SQLSMALLINT,
+            Length: SQLLEN,
+            Precision: SQLSMALLINT,
+            Scale: SQLSMALLINT,
+            DataPtr: MutSQLPOINTER,
+            StringLengthPtr: *mut SQLLEN,
+            IndicatorPtr: *mut SQLLEN,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLSetEnvAttr(
+            EnvironmentHandle: HENV,
+            Attribute: SQLINTEGER,
+            ValuePtr: ConstSQLPOINTER,
+            StringLength: SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLSetPos(
+            StatementHandle: HSTMT,
+            RowNumber: SQLSETPOSIROW,
+            Operation: SQLUSMALLINT,
+            LockType: SQLUSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLSetStmtAttrA(
+            StatementHandle: HSTMT,
+            Attribute: SQLINTEGER,
+            ValuePtr: ConstSQLPOINTER,
+            StringLength: SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLSetStmtAttrW(
+            StatementHandle: HSTMT,
+            Attribute: SQLINTEGER,
+            ValuePtr: ConstSQLPOINTER,
+            StringLength: SQLINTEGER,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLSpecialColumnsA(
+            StatementHandle: HSTMT,
+            IdentifierType: SQLSMALLINT,
+            CatalogName: *const SQLCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLCHAR,
+            NameLength3: SQLSMALLINT,
+            Scope: SQLSMALLINT,
+            Nullable: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLSpecialColumnsW(
+            StatementHandle: HSTMT,
+            IdentifierType: SQLSMALLINT,
+            CatalogName: *const SQLWCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLWCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLWCHAR,
+            NameLength3: SQLSMALLINT,
+            Scope: SQLSMALLINT,
+            Nullable: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLStatisticsA(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLCHAR,
+            NameLength3: SQLSMALLINT,
+            Unique: SQLUSMALLINT,
+            Reserved: SQLUSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLStatisticsW(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLWCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLWCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLWCHAR,
+            NameLength3: SQLSMALLINT,
+            Unique: SQLUSMALLINT,
+            Reserved: SQLUSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLTablePrivilegesA(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLCHAR,
+            NameLength3: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLTablePrivilegesW(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLWCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLWCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLWCHAR,
+            NameLength3: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLTablesA(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLCHAR,
+            NameLength3: SQLSMALLINT,
+            TableType: *const SQLCHAR,
+            NameLength4: SQLSMALLINT,
+        ) -> SQLRETURN;
+
+        pub(crate) fn SQLTablesW(
+            StatementHandle: HSTMT,
+            CatalogName: *const SQLWCHAR,
+            NameLength1: SQLSMALLINT,
+            SchemaName: *const SQLWCHAR,
+            NameLength2: SQLSMALLINT,
+            TableName: *const SQLWCHAR,
+            NameLength3: SQLSMALLINT,
+            TableType: *const SQLWCHAR,
+            NameLength4: SQLSMALLINT,
+        ) -> SQLRETURN;
     }
 }

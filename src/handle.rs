@@ -1,9 +1,9 @@
+#[double]
+use crate::api::ffi;
 use crate::c_types::DeferredBuf;
 use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
-use crate::extern_api;
-use crate::{
-    sqlreturn::SQL_SUCCESS, Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER, SQLSMALLINT,
-};
+use crate::{sqlreturn::SQL_SUCCESS, Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER, SQLSMALLINT};
+use mockall_double::double;
 use std::any::type_name;
 use std::cell::{Cell, UnsafeCell};
 use std::marker::PhantomData;
@@ -138,7 +138,7 @@ unsafe impl<V: OdbcVersion> Allocate<'_> for SQLHENV<V> {
         };
 
         let sql_return = unsafe {
-            extern_api::SQLSetEnvAttr(
+            ffi::SQLSetEnvAttr(
                 val.as_SQLHANDLE(),
                 SQL_ATTR_ODBC_VERSION::IDENTIFIER,
                 V::IDENTIFIER.into_SQLPOINTER(),
@@ -165,7 +165,7 @@ unsafe impl<V: OdbcVersion> AsSQLHANDLE for SQLHENV<V> {
 impl<V: OdbcVersion> Drop for SQLHENV<V> {
     fn drop(&mut self) {
         let sql_return =
-            unsafe { extern_api::SQLFreeHandle(SQL_HANDLE_ENV::IDENTIFIER, self.as_SQLHANDLE()) };
+            unsafe { ffi::SQLFreeHandle(SQL_HANDLE_ENV::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if sql_return != SQL_SUCCESS && !panicking() {
             panic!(
@@ -197,7 +197,7 @@ impl<V: OdbcVersion> SQLEndTranHandle for SQLHENV<V> {}
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/connection-handles
 #[derive(Debug)]
-#[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
+#[repr(transparent)]
 pub struct SQLHDBC<'env, C: ConnState, V: OdbcVersion> {
     pub(crate) handle: SQLHANDLE,
 
@@ -236,7 +236,7 @@ impl<C: ConnState, V: OdbcVersion> Drop for SQLHDBC<'_, C, V> {
         C::disconnect(self);
 
         let sql_return =
-            unsafe { extern_api::SQLFreeHandle(SQL_HANDLE_DBC::IDENTIFIER, self.as_SQLHANDLE()) };
+            unsafe { ffi::SQLFreeHandle(SQL_HANDLE_DBC::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if sql_return != SQL_SUCCESS && !panicking() {
             panic!(
@@ -366,7 +366,7 @@ impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
     unsafe fn get_descriptor_handle<A: Ident<Type = SQLINTEGER>>(handle: SQLHANDLE) -> SQLHANDLE {
         let mut descriptor_handle = MaybeUninit::uninit();
 
-        let sql_return = extern_api::SQLGetStmtAttrA(
+        let sql_return = ffi::SQLGetStmtAttrA(
             handle,
             A::IDENTIFIER,
             descriptor_handle.as_mut_ptr() as SQLPOINTER,
@@ -500,7 +500,7 @@ unsafe impl<V: OdbcVersion> AsSQLHANDLE for SQLHSTMT<'_, '_, '_, V> {
 impl<V: OdbcVersion> Drop for SQLHSTMT<'_, '_, '_, V> {
     fn drop(&mut self) {
         let sql_return =
-            unsafe { extern_api::SQLFreeHandle(SQL_HANDLE_STMT::IDENTIFIER, self.as_SQLHANDLE()) };
+            unsafe { ffi::SQLFreeHandle(SQL_HANDLE_STMT::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if sql_return != SQL_SUCCESS && !panicking() {
             panic!(
@@ -586,7 +586,7 @@ unsafe impl<'buf, V: OdbcVersion, T: DescType<'buf>> IntoSQLPOINTER
 impl<V: OdbcVersion, T> Drop for SQLHDESC<'_, T, V> {
     fn drop(&mut self) {
         let sql_return =
-            unsafe { extern_api::SQLFreeHandle(SQL_HANDLE_DESC::IDENTIFIER, self.as_SQLHANDLE()) };
+            unsafe { ffi::SQLFreeHandle(SQL_HANDLE_DESC::IDENTIFIER, self.as_SQLHANDLE()) };
 
         if sql_return != SQL_SUCCESS && !panicking() {
             panic!(
@@ -612,7 +612,7 @@ mod private {
         where
             Self: super::ConnState + Sized,
         {
-            let sql_return = unsafe { extern_api::SQLDisconnect(handle.as_SQLHANDLE()) };
+            let sql_return = unsafe { ffi::SQLDisconnect(handle.as_SQLHANDLE()) };
 
             if sql_return != SQL_SUCCESS && !panicking() {
                 panic!(
@@ -629,4 +629,114 @@ mod private {
     }
     impl ConnState for C3 {}
     impl ConnState for C4 {}
+}
+
+#[cfg(test)]
+mod test {
+    #![allow(non_snake_case)]
+    use super::*;
+
+    #[test]
+    fn disconnect_C2() {
+        let raw_handle = 13 as SQLHANDLE;
+
+        let SQLDisconnect_ctx = ffi::SQLDisconnect_context();
+        let SQLFreeHandle_ctx = ffi::SQLFreeHandle_context();
+
+        SQLDisconnect_ctx.expect().never();
+        SQLFreeHandle_ctx
+            .expect()
+            .once()
+            .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == raw_handle)
+            .return_const(SQL_SUCCESS);
+
+        SQLHDBC::<C2, SQL_OV_ODBC3_80>::from_raw(raw_handle);
+    }
+
+    #[test]
+    fn disconnect_C3() {
+        let raw_handle = 13 as SQLHANDLE;
+
+        let SQLDisconnect_ctx = ffi::SQLDisconnect_context();
+        let SQLFreeHandle_ctx = ffi::SQLFreeHandle_context();
+
+        SQLDisconnect_ctx
+            .expect()
+            .once()
+            .withf_st(move |x| *x == raw_handle)
+            .return_const(SQL_SUCCESS);
+        SQLFreeHandle_ctx
+            .expect()
+            .once()
+            .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == raw_handle)
+            .return_const(SQL_SUCCESS);
+
+        SQLHDBC::<_, SQL_OV_ODBC3_80>::from_raw(raw_handle).need_data();
+    }
+
+    #[test]
+    fn disconnect_C4() {
+        let raw_handle = 13 as SQLHANDLE;
+
+        let SQLDisconnect_ctx = ffi::SQLDisconnect_context();
+        let SQLFreeHandle_ctx = ffi::SQLFreeHandle_context();
+
+        SQLDisconnect_ctx
+            .expect()
+            .once()
+            .withf_st(move |x| *x == raw_handle)
+            .return_const(SQL_SUCCESS);
+        SQLFreeHandle_ctx
+            .expect()
+            .once()
+            .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == raw_handle)
+            .return_const(SQL_SUCCESS);
+
+        SQLHDBC::<_, SQL_OV_ODBC3_80>::from_raw(raw_handle).connect();
+    }
+
+    // TODO: Mockall is buggy and these tests fail more often
+    //#[test]
+    //#[should_panic]
+    //fn disconnect_C3_panic() {
+    //    let raw_handle = 13 as SQLHANDLE;
+
+    //    let SQLDisconnect_ctx = ffi::SQLDisconnect_context();
+    //    let SQLFreeHandle_ctx = ffi::SQLFreeHandle_context();
+
+    //    SQLDisconnect_ctx
+    //        .expect()
+    //        .once()
+    //        .withf_st(move |x| *x == raw_handle)
+    //        .return_const(SQL_ERROR);
+    //    SQLFreeHandle_ctx
+    //        .expect()
+    //        .once()
+    //        .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == raw_handle)
+    //        .return_const(SQL_SUCCESS);
+
+    //    SQLHDBC::<_, SQL_OV_ODBC3_80>::from_raw(raw_handle).need_data();
+    //}
+
+    //#[test]
+    //#[should_panic]
+    //fn disconnect_C4_panic() {
+    //    let raw_handle = 13 as SQLHANDLE;
+
+    //    let SQLDisconnect_ctx = ffi::SQLDisconnect_context();
+    //    let SQLFreeHandle_ctx = ffi::SQLFreeHandle_context();
+
+    //    SQLDisconnect_ctx
+    //        .expect()
+    //        .once()
+    //        .withf_st(move |x| *x == raw_handle)
+    //        .return_const(SQL_ERROR);
+    //    SQLFreeHandle_ctx
+    //        .expect()
+    //        .once()
+    //        .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == raw_handle)
+    //        .return_const(SQL_SUCCESS);
+
+    //    SQLHDBC::<_, SQL_OV_ODBC3_80>::from_raw(raw_handle).connect();
+    //}
 }
