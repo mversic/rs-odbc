@@ -19,6 +19,8 @@ rs_odbc_derive = {path = "./rs_odbc_derive", version = "*"}
 mockall_double = "*"
 
 [features]
+# TODO: Rename odbc_debug to something more appropriate like runtime_checks
+default = [] # TODO: Add static as default?
 odbc_debug = []
-default = []
+raw_api = []
 static = []

@@ -1,20 +1,19 @@
+use crate::api::ffi;
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::handle::{AppDesc, AsSQLHANDLE, ImplDesc, ParamDesc, RowDesc, SQLHDESC};
-use crate::api::ffi;
 use crate::{
-    handle::SQLHSTMT, sqlreturn::SQLRETURN, AsMutPtr, AsMutSQLPOINTER, Attr, AttrGet,
-    AttrLen, AttrSet, Ident, OdbcBool, OdbcDefined, True, SQLCHAR, SQLINTEGER, SQLPOINTER, SQLULEN,
-    SQLWCHAR,
+    handle::SQLHSTMT, sqlreturn::SQLRETURN, AsMutPtr, AsMutSQLPOINTER, Attr, AttrGet, AttrLen,
+    AttrSet, Ident, OdbcBool, OdbcChar, OdbcDefined, OdbcStr, SQLINTEGER, SQLPOINTER, SQLULEN, SQLCHAR, SQLWCHAR
 };
 use rs_odbc_derive::{odbc_type, Ident};
-use std::mem::{MaybeUninit, ManuallyDrop};
+use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::{Deref, DerefMut};
 
 #[cfg(feature = "odbc_debug")]
 use crate::sqlreturn::SQL_SUCCESS;
 
 pub trait StmtAttr<'stmt, 'buf, A: Ident, V: OdbcVersion>:
-    Attr<A> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>
+    Attr<A> + AttrLen<Self::DefinedBy, SQLINTEGER>
 {
     // TODO: Can I use here descriptor and statement defined on different connections??? This
     // should not be allowed If this is true, then I need to use unelided lifetime 'conn to
@@ -149,16 +148,22 @@ impl<'conn, T, V: OdbcVersion> DerefMut for RefSQLHDESC<'conn, T, V> {
     }
 }
 
-fn as_version<'a, 'conn, 'stmt, 'buf, IV: OdbcVersion, OV: OdbcVersion>(StatementHandle: &'a SQLHSTMT<'conn, 'stmt, 'buf, IV>) -> &'a SQLHSTMT<'conn, 'stmt, 'buf, OV> {
+fn as_version<'a, 'conn, 'stmt, 'buf, IV: OdbcVersion, OV: OdbcVersion>(
+    StatementHandle: &'a SQLHSTMT<'conn, 'stmt, 'buf, IV>,
+) -> &'a SQLHSTMT<'conn, 'stmt, 'buf, OV> {
     // This is valid because SQLHSTMT is either repr(transparent) or repr(C)
     unsafe { std::mem::transmute(StatementHandle) }
 }
 
 // Implement StmtAttr for all versions of statement attributes
-impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80> for T where
-    T: StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3>
+impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80> for T
+where
+    T: StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3>,
 {
-    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, SQL_OV_ODBC3_80>) where T: AttrSet<A> {
+    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, SQL_OV_ODBC3_80>)
+    where
+        T: AttrSet<A>,
+    {
         self.update_handle(as_version::<_, SQL_OV_ODBC3>(StatementHandle));
     }
 
@@ -172,7 +177,10 @@ impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80> 
         Self: AttrGet<A> + crate::AnsiType,
         MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
-        self.readA(as_version::<_, SQL_OV_ODBC3>(StatementHandle), StringLengthPtr)
+        self.readA(
+            as_version::<_, SQL_OV_ODBC3>(StatementHandle),
+            StringLengthPtr,
+        )
     }
     fn readW(
         &mut self,
@@ -184,13 +192,20 @@ impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80> 
         Self: AttrGet<A> + crate::UnicodeType,
         MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
-        self.readW(as_version::<_, SQL_OV_ODBC3>(StatementHandle), StringLengthPtr)
+        self.readW(
+            as_version::<_, SQL_OV_ODBC3>(StatementHandle),
+            StringLengthPtr,
+        )
     }
 }
-impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC4> for T where
-    T: StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80>
+impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC4> for T
+where
+    T: StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80>,
 {
-    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, SQL_OV_ODBC4>) where T: AttrSet<A> {
+    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, SQL_OV_ODBC4>)
+    where
+        T: AttrSet<A>,
+    {
         self.update_handle(as_version::<_, SQL_OV_ODBC3_80>(StatementHandle));
     }
 
@@ -204,7 +219,10 @@ impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC4> for
         Self: AttrGet<A> + crate::AnsiType,
         MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
-        self.readA(as_version::<_, SQL_OV_ODBC3_80>(StatementHandle), StringLengthPtr)
+        self.readA(
+            as_version::<_, SQL_OV_ODBC3_80>(StatementHandle),
+            StringLengthPtr,
+        )
     }
     fn readW(
         &mut self,
@@ -216,21 +234,18 @@ impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC4> for
         Self: AttrGet<A> + crate::UnicodeType,
         MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
-        self.readW(as_version::<_, SQL_OV_ODBC3_80>(StatementHandle), StringLengthPtr)
+        self.readW(
+            as_version::<_, SQL_OV_ODBC3_80>(StatementHandle),
+            StringLengthPtr,
+        )
     }
 }
-impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80> for [SQLCHAR] where
-    [SQLCHAR]: StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3>
+impl<'stmt, 'buf, A: Ident, CH: OdbcChar> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80> for OdbcStr<CH> where
+    OdbcStr<CH>: StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3>
 {
 }
-impl<'stmt, 'buf, A: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC4> for [SQLCHAR] where
-    [SQLCHAR]: StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80>
-{
-}
-
-// Implement StmtAttr for unicode character statement attributes
-impl<'stmt, 'buf, A: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V> for [SQLWCHAR] where
-    [SQLCHAR]: StmtAttr<'stmt, 'buf, A, V, NonBinary = True>
+impl<'stmt, 'buf, A: Ident, CH: OdbcChar> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC4> for OdbcStr<CH> where
+    OdbcStr<CH>: StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80>
 {
 }
 
@@ -238,30 +253,27 @@ impl<'stmt, 'buf, A: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V> for [SQL
 impl<'stmt, 'buf, A: Ident, T: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V> for MaybeUninit<T>
 where
     T: StmtAttr<'stmt, 'buf, A, V>,
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
-{
-}
-impl<'stmt, 'buf, A: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V> for [MaybeUninit<SQLCHAR>]
-where
-    [SQLCHAR]: StmtAttr<'stmt, 'buf, A, V>,
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+    Self: AttrLen<Self::DefinedBy, SQLINTEGER>,
 {
 }
 impl<'stmt, 'buf, A: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V>
-    for [MaybeUninit<SQLWCHAR>]
+    for OdbcStr<MaybeUninit<SQLCHAR>>
 where
-    [SQLWCHAR]: StmtAttr<'stmt, 'buf, A, V>,
-    Self: AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>,
+    OdbcStr<SQLCHAR>: StmtAttr<'stmt, 'buf, A, V>,
+{
+}
+impl<'stmt, 'buf, A: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V>
+    for OdbcStr<MaybeUninit<SQLWCHAR>>
+where
+    OdbcStr<SQLWCHAR>: StmtAttr<'stmt, 'buf, A, V>,
 {
 }
 
 // Implement StmtAttr for references to character statement attributes (used by AttrSet)
-impl<'stmt, 'buf, A: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V> for &[SQLCHAR] where
-    [SQLCHAR]: StmtAttr<'stmt, 'buf, A, V>
-{
-}
-impl<'stmt, 'buf, A: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V> for &[SQLWCHAR] where
-    [SQLWCHAR]: StmtAttr<'stmt, 'buf, A, V>
+impl<'stmt, 'buf, A: Ident, CH: OdbcChar, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V>
+    for &OdbcStr<CH>
+where
+    OdbcStr<CH>: StmtAttr<'stmt, 'buf, A, V>,
 {
 }
 
@@ -274,7 +286,6 @@ impl<'stmt, 'buf, A: Ident, V: OdbcVersion> StmtAttr<'stmt, 'buf, A, V> for &[SQ
 pub struct SQL_ATTR_QUERY_TIMEOUT;
 unsafe impl Attr<SQL_ATTR_QUERY_TIMEOUT> for SQLULEN {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_QUERY_TIMEOUT, SQL_OV_ODBC3> for SQLULEN {}
 unsafe impl AttrGet<SQL_ATTR_QUERY_TIMEOUT> for SQLULEN {}
@@ -286,7 +297,6 @@ unsafe impl AttrSet<SQL_ATTR_QUERY_TIMEOUT> for SQLULEN {}
 pub struct SQL_ATTR_MAX_ROWS;
 unsafe impl Attr<SQL_ATTR_MAX_ROWS> for SQLULEN {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_MAX_ROWS, SQL_OV_ODBC3> for SQLULEN {}
 unsafe impl AttrGet<SQL_ATTR_MAX_ROWS> for SQLULEN {}
@@ -298,7 +308,6 @@ unsafe impl AttrSet<SQL_ATTR_MAX_ROWS> for SQLULEN {}
 pub struct SQL_ATTR_NOSCAN;
 unsafe impl Attr<SQL_ATTR_NOSCAN> for Noscan {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_NOSCAN, SQL_OV_ODBC3> for Noscan {}
 unsafe impl AttrGet<SQL_ATTR_NOSCAN> for Noscan {}
@@ -310,7 +319,6 @@ unsafe impl AttrSet<SQL_ATTR_NOSCAN> for Noscan {}
 pub struct SQL_ATTR_MAX_LENGTH;
 unsafe impl Attr<SQL_ATTR_MAX_LENGTH> for SQLULEN {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_MAX_LENGTH, SQL_OV_ODBC3> for SQLULEN {}
 unsafe impl AttrGet<SQL_ATTR_MAX_LENGTH> for SQLULEN {}
@@ -323,7 +331,6 @@ pub struct SQL_ATTR_CURSOR_TYPE;
 // TODO: This attribute cannot be specified after the SQL statement has been prepared.
 unsafe impl Attr<SQL_ATTR_CURSOR_TYPE> for CursorType {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_CURSOR_TYPE, SQL_OV_ODBC3> for CursorType {}
 unsafe impl AttrGet<SQL_ATTR_CURSOR_TYPE> for CursorType {}
@@ -336,7 +343,6 @@ pub struct SQL_ATTR_CONCURRENCY;
 // TODO: This attribute cannot be specified for an open cursor
 unsafe impl Attr<SQL_ATTR_CONCURRENCY> for Concurrency {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_CONCURRENCY, SQL_OV_ODBC3> for Concurrency {}
 unsafe impl AttrGet<SQL_ATTR_CONCURRENCY> for Concurrency {}
@@ -348,7 +354,6 @@ unsafe impl AttrSet<SQL_ATTR_CONCURRENCY> for Concurrency {}
 pub struct SQL_ATTR_KEYSET_SIZE;
 unsafe impl Attr<SQL_ATTR_KEYSET_SIZE> for SQLULEN {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_KEYSET_SIZE, SQL_OV_ODBC3> for SQLULEN {}
 unsafe impl AttrGet<SQL_ATTR_KEYSET_SIZE> for SQLULEN {}
@@ -360,7 +365,6 @@ unsafe impl AttrSet<SQL_ATTR_KEYSET_SIZE> for SQLULEN {}
 pub struct SQL_ATTR_SIMULATE_CURSOR;
 unsafe impl Attr<SQL_ATTR_SIMULATE_CURSOR> for SimulateCursor {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_SIMULATE_CURSOR, SQL_OV_ODBC3> for SimulateCursor {}
 unsafe impl AttrGet<SQL_ATTR_SIMULATE_CURSOR> for SimulateCursor {}
@@ -372,7 +376,6 @@ unsafe impl AttrSet<SQL_ATTR_SIMULATE_CURSOR> for SimulateCursor {}
 pub struct SQL_ATTR_RETRIEVE_DATA;
 unsafe impl Attr<SQL_ATTR_RETRIEVE_DATA> for RetrieveData {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_RETRIEVE_DATA, SQL_OV_ODBC3> for RetrieveData {}
 unsafe impl AttrGet<SQL_ATTR_RETRIEVE_DATA> for RetrieveData {}
@@ -384,7 +387,6 @@ unsafe impl AttrSet<SQL_ATTR_RETRIEVE_DATA> for RetrieveData {}
 pub struct SQL_ATTR_USE_BOOKMARKS;
 unsafe impl Attr<SQL_ATTR_USE_BOOKMARKS> for UseBookmarks {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_USE_BOOKMARKS, SQL_OV_ODBC3> for UseBookmarks {}
 unsafe impl AttrGet<SQL_ATTR_USE_BOOKMARKS> for UseBookmarks {}
@@ -396,7 +398,6 @@ unsafe impl AttrSet<SQL_ATTR_USE_BOOKMARKS> for UseBookmarks {}
 pub struct SQL_ATTR_ENABLE_AUTO_IPD;
 unsafe impl Attr<SQL_ATTR_ENABLE_AUTO_IPD> for OdbcBool {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_ENABLE_AUTO_IPD, SQL_OV_ODBC3> for OdbcBool {}
 unsafe impl AttrGet<SQL_ATTR_ENABLE_AUTO_IPD> for OdbcBool {}
@@ -409,7 +410,6 @@ unsafe impl AttrSet<SQL_ATTR_ENABLE_AUTO_IPD> for OdbcBool {}
 pub struct SQL_ATTR_ROW_NUMBER;
 unsafe impl Attr<SQL_ATTR_ROW_NUMBER> for SQLULEN {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_ROW_NUMBER, SQL_OV_ODBC3> for SQLULEN {}
 unsafe impl AttrGet<SQL_ATTR_ROW_NUMBER> for SQLULEN {}
@@ -535,7 +535,6 @@ unsafe impl AttrGet<SQL_ATTR_ROW_NUMBER> for SQLULEN {}
 pub struct SQL_ATTR_APP_ROW_DESC;
 unsafe impl<V: OdbcVersion> Attr<SQL_ATTR_APP_ROW_DESC> for Option<&SQLHDESC<'_, AppDesc<'_>, V>> {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 unsafe impl<'stmt, 'buf, V: OdbcVersion> Attr<SQL_ATTR_APP_ROW_DESC>
     for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, V>>
@@ -543,9 +542,6 @@ unsafe impl<'stmt, 'buf, V: OdbcVersion> Attr<SQL_ATTR_APP_ROW_DESC>
     type DefinedBy = <Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>, V>> as Attr<
         SQL_ATTR_APP_ROW_DESC,
     >>::DefinedBy;
-    type NonBinary = <Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>, V>> as Attr<
-        SQL_ATTR_APP_ROW_DESC,
-    >>::NonBinary;
 }
 
 impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC3>
@@ -637,7 +633,6 @@ unsafe impl<V: OdbcVersion> Attr<SQL_ATTR_APP_PARAM_DESC>
     for Option<&SQLHDESC<'_, AppDesc<'_>, V>>
 {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 unsafe impl<'stmt, 'buf, V: OdbcVersion> Attr<SQL_ATTR_APP_PARAM_DESC>
     for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, V>>
@@ -645,9 +640,6 @@ unsafe impl<'stmt, 'buf, V: OdbcVersion> Attr<SQL_ATTR_APP_PARAM_DESC>
     type DefinedBy = <Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>, V>> as Attr<
         SQL_ATTR_APP_PARAM_DESC,
     >>::DefinedBy;
-    type NonBinary = <Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>, V>> as Attr<
-        SQL_ATTR_APP_PARAM_DESC,
-    >>::NonBinary;
 }
 impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC3>
     for MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, SQL_OV_ODBC3>>
@@ -740,7 +732,6 @@ unsafe impl<V: OdbcVersion> Attr<SQL_ATTR_IMP_ROW_DESC>
     for MaybeUninit<RefSQLHDESC<'_, ImplDesc<RowDesc>, V>>
 {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC3>
     for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<RowDesc>, SQL_OV_ODBC3>>
@@ -818,7 +809,6 @@ unsafe impl<V: OdbcVersion> Attr<SQL_ATTR_IMP_PARAM_DESC>
     for MaybeUninit<RefSQLHDESC<'_, ImplDesc<ParamDesc>, V>>
 {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC3>
     for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<ParamDesc>, SQL_OV_ODBC3>>
@@ -895,7 +885,6 @@ unsafe impl<V: OdbcVersion> AttrGet<SQL_ATTR_IMP_PARAM_DESC>
 pub struct SQL_ATTR_CURSOR_SCROLLABLE;
 unsafe impl Attr<SQL_ATTR_CURSOR_SCROLLABLE> for CursorScrollable {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_CURSOR_SCROLLABLE, SQL_OV_ODBC3> for CursorScrollable {}
 unsafe impl AttrGet<SQL_ATTR_CURSOR_SCROLLABLE> for CursorScrollable {}
@@ -907,7 +896,6 @@ unsafe impl AttrSet<SQL_ATTR_CURSOR_SCROLLABLE> for CursorScrollable {}
 pub struct SQL_ATTR_CURSOR_SENSITIVITY;
 unsafe impl Attr<SQL_ATTR_CURSOR_SENSITIVITY> for CursorSensitivity {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_CURSOR_SENSITIVITY, SQL_OV_ODBC3> for CursorSensitivity {}
 unsafe impl AttrGet<SQL_ATTR_CURSOR_SENSITIVITY> for CursorSensitivity {}
@@ -919,7 +907,6 @@ unsafe impl AttrSet<SQL_ATTR_CURSOR_SENSITIVITY> for CursorSensitivity {}
 pub struct SQL_ATTR_METADATA_ID;
 unsafe impl Attr<SQL_ATTR_METADATA_ID> for OdbcBool {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3> for OdbcBool {}
 unsafe impl AttrGet<SQL_ATTR_METADATA_ID> for OdbcBool {}
@@ -933,7 +920,6 @@ pub struct SQL_ATTR_ASYNC_ENABLE;
 // the statement attribute SQL_ATTR_ASYNC_ENABLE is read only
 unsafe impl Attr<SQL_ATTR_ASYNC_ENABLE> for AsyncEnable {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl StmtAttr<'_, '_, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3> for AsyncEnable {}
 unsafe impl AttrGet<SQL_ATTR_ASYNC_ENABLE> for AsyncEnable {}
@@ -997,11 +983,3 @@ pub struct CursorSensitivity;
 pub const SQL_UNSPECIFIED: CursorSensitivity = CursorSensitivity(0);
 pub const SQL_INSENSITIVE: CursorSensitivity = CursorSensitivity(1);
 pub const SQL_SENSITIVE: CursorSensitivity = CursorSensitivity(2);
-
-// TODO: These seem to be from v2.0
-#[deprecated]
-#[allow(non_camel_case_types)]
-enum StmtOption {
-    SQL_ROWSET_SIZE = 9,
-    SQL_GET_BOOKMARK = 13,
-}

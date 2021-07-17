@@ -20,7 +20,7 @@ use crate::{
     BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion, FreeStmtOption,
     FunctionId, IOType, Ident, IdentifierType, IntoSQLPOINTER, LockType, NullAllowed, Operation,
     Reserved, Scope, StrLenOrInd, UnicodeType, Unique, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN,
-    SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
+    SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR, OdbcStr
 };
 
 /// Allocates an environment, connection, statement, or descriptor handle.
@@ -172,8 +172,8 @@ pub fn SQLBindParameter<
 #[allow(non_snake_case)]
 pub fn SQLBrowseConnectA<'env, C: ConnState, V: OdbcVersion>(
     ConnectionHandle: SQLHDBC<'env, C, V>,
-    InConnectionString: &[SQLCHAR],
-    OutConnectionString: Option<&mut [MaybeUninit<SQLCHAR>]>,
+    InConnectionString: &OdbcStr<SQLCHAR>,
+    OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> (
     Result<SQLHDBC<'env, C4, V>, Result<SQLHDBC<'env, C3, V>, SQLHDBC<'env, C2, V>>>,
@@ -219,8 +219,8 @@ where
 #[allow(non_snake_case)]
 pub fn SQLBrowseConnectW<'env, C: ConnState, V: OdbcVersion>(
     ConnectionHandle: SQLHDBC<'env, C, V>,
-    InConnectionString: &[SQLWCHAR],
-    OutConnectionString: Option<&mut [MaybeUninit<SQLWCHAR>]>,
+    InConnectionString: &OdbcStr<SQLWCHAR>,
+    OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> (
     Result<SQLHDBC<'env, C4, V>, Result<SQLHDBC<'env, C3, V>, SQLHDBC<'env, C2, V>>>,
@@ -421,10 +421,10 @@ where
 #[allow(non_snake_case)]
 pub fn SQLColumnPrivilegesA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLCHAR],
-    SchemaName: &[SQLCHAR],
-    TableName: &[SQLCHAR],
-    ColumnName: &[SQLCHAR],
+    CatalogName: &OdbcStr<SQLCHAR>,
+    SchemaName: &OdbcStr<SQLCHAR>,
+    TableName: &OdbcStr<SQLCHAR>,
+    ColumnName: &OdbcStr<SQLCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -457,10 +457,10 @@ pub fn SQLColumnPrivilegesA<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLColumnPrivilegesW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLWCHAR],
-    SchemaName: &[SQLWCHAR],
-    TableName: &[SQLWCHAR],
-    ColumnName: &[SQLWCHAR],
+    CatalogName: &OdbcStr<SQLWCHAR>,
+    SchemaName: &OdbcStr<SQLWCHAR>,
+    TableName: &OdbcStr<SQLWCHAR>,
+    ColumnName: &OdbcStr<SQLWCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -493,10 +493,10 @@ pub fn SQLColumnPrivilegesW<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLColumnsA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLCHAR],
-    SchemaName: &[SQLCHAR],
-    TableName: &[SQLCHAR],
-    ColumnName: &[SQLCHAR],
+    CatalogName: &OdbcStr<SQLCHAR>,
+    SchemaName: &OdbcStr<SQLCHAR>,
+    TableName: &OdbcStr<SQLCHAR>,
+    ColumnName: &OdbcStr<SQLCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -529,10 +529,10 @@ pub fn SQLColumnsA<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLColumnsW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLWCHAR],
-    SchemaName: &[SQLWCHAR],
-    TableName: &[SQLWCHAR],
-    ColumnName: &[SQLWCHAR],
+    CatalogName: &OdbcStr<SQLWCHAR>,
+    SchemaName: &OdbcStr<SQLWCHAR>,
+    TableName: &OdbcStr<SQLWCHAR>,
+    ColumnName: &OdbcStr<SQLWCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -595,9 +595,9 @@ where
 #[allow(non_snake_case)]
 pub fn SQLConnectA<'env, V: OdbcVersion>(
     ConnectionHandle: SQLHDBC<'env, C2, V>,
-    ServerName: &[SQLCHAR],
-    UserName: &[SQLCHAR],
-    Authentication: &[SQLCHAR],
+    ServerName: &OdbcStr<SQLCHAR>,
+    UserName: &OdbcStr<SQLCHAR>,
+    Authentication: &OdbcStr<SQLCHAR>,
 ) -> (
     Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
     SQLRETURN,
@@ -636,9 +636,9 @@ pub fn SQLConnectA<'env, V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLConnectW<'env, V: OdbcVersion>(
     ConnectionHandle: SQLHDBC<'env, C2, V>,
-    ServerName: &[SQLWCHAR],
-    UserName: &[SQLWCHAR],
-    Authentication: &[SQLWCHAR],
+    ServerName: &OdbcStr<SQLWCHAR>,
+    UserName: &OdbcStr<SQLWCHAR>,
+    Authentication: &OdbcStr<SQLWCHAR>,
 ) -> (
     Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
     SQLRETURN,
@@ -705,9 +705,9 @@ where
 pub fn SQLDataSourcesA<V: OdbcVersion>(
     EnvironmentHandle: &SQLHENV<V>,
     Direction: SQLUSMALLINT,
-    ServerName: &mut [MaybeUninit<SQLCHAR>],
+    ServerName: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
     NameLength1Ptr: &mut MaybeUninit<SQLSMALLINT>,
-    Description: &mut [MaybeUninit<SQLCHAR>],
+    Description: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
     NameLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> SQLRETURN {
     let ServerName = ServerName.as_mut_raw_slice();
@@ -739,9 +739,9 @@ pub fn SQLDataSourcesA<V: OdbcVersion>(
 pub fn SQLDataSourcesW<V: OdbcVersion>(
     EnvironmentHandle: &SQLHENV<V>,
     Direction: SQLUSMALLINT,
-    ServerName: &mut [MaybeUninit<SQLWCHAR>],
+    ServerName: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
     NameLength1Ptr: &mut MaybeUninit<SQLSMALLINT>,
-    Description: &mut [MaybeUninit<SQLWCHAR>],
+    Description: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
     NameLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> SQLRETURN {
     let ServerName = ServerName.as_mut_raw_slice();
@@ -773,7 +773,7 @@ pub fn SQLDataSourcesW<V: OdbcVersion>(
 pub fn SQLDescribeColA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     ColumnNumber: SQLUSMALLINT,
-    ColumnName: &mut [MaybeUninit<SQLCHAR>],
+    ColumnName: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
     NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
     DataTypePtr: &mut MaybeUninit<SQLSMALLINT>,
     ColumnSizePtr: &mut MaybeUninit<SQLULEN>,
@@ -809,7 +809,7 @@ pub fn SQLDescribeColA<V: OdbcVersion>(
 pub fn SQLDescribeColW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     ColumnNumber: SQLUSMALLINT,
-    ColumnName: &mut [MaybeUninit<SQLWCHAR>],
+    ColumnName: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
     NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
     DataTypePtr: &mut MaybeUninit<SQLSMALLINT>,
     ColumnSizePtr: &mut MaybeUninit<SQLULEN>,
@@ -898,8 +898,8 @@ where
 pub fn SQLDriverConnectA<'env, V: OdbcVersion>(
     ConnectionHandle: SQLHDBC<'env, C2, V>,
     WindowHandle: Option<SQLHWND>,
-    InConnectionString: &[SQLCHAR],
-    OutConnectionString: Option<&mut [MaybeUninit<SQLCHAR>]>,
+    InConnectionString: &OdbcStr<SQLCHAR>,
+    OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
     DriverCompletion: DriverCompletion,
 ) -> (
@@ -943,8 +943,8 @@ pub fn SQLDriverConnectA<'env, V: OdbcVersion>(
 pub fn SQLDriverConnectW<'env, V: OdbcVersion>(
     ConnectionHandle: SQLHDBC<'env, C2, V>,
     WindowHandle: Option<SQLHWND>,
-    InConnectionString: &[SQLWCHAR],
-    OutConnectionString: Option<&mut [MaybeUninit<SQLWCHAR>]>,
+    InConnectionString: &OdbcStr<SQLWCHAR>,
+    OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
     StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
     DriverCompletion: DriverCompletion,
 ) -> (
@@ -988,9 +988,9 @@ pub fn SQLDriverConnectW<'env, V: OdbcVersion>(
 pub fn SQLDriversA<V: OdbcVersion>(
     EnvironmentHandle: &SQLHENV<V>,
     Direction: SQLUSMALLINT,
-    DriverDescription: &mut [MaybeUninit<SQLCHAR>],
+    DriverDescription: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
     DescriptionLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-    DriverAttributes: &mut [MaybeUninit<SQLCHAR>],
+    DriverAttributes: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
     AttributesLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> SQLRETURN {
     let DriverDescription = DriverDescription.as_mut_raw_slice();
@@ -1022,9 +1022,9 @@ pub fn SQLDriversA<V: OdbcVersion>(
 pub fn SQLDriversW<V: OdbcVersion>(
     EnvironmentHandle: &SQLHENV<V>,
     Direction: SQLUSMALLINT,
-    DriverDescription: &mut [MaybeUninit<SQLWCHAR>],
+    DriverDescription: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
     DescriptionLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-    DriverAttributes: &mut [MaybeUninit<SQLWCHAR>],
+    DriverAttributes: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
     AttributesLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> SQLRETURN {
     let DriverDescription = DriverDescription.as_mut_raw_slice();
@@ -1078,13 +1078,60 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
 #[inline]
 #[allow(non_snake_case)]
+#[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
 pub unsafe fn SQLExecDirectA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    StatementText: &[SQLCHAR],
+    StatementText: &OdbcStr<SQLCHAR>,
 ) -> SQLRETURN {
     let StatementText = StatementText.as_raw_slice();
 
     ffi::SQLExecDirectA(
+        StatementHandle.as_SQLHANDLE(),
+        StatementText.0,
+        StatementText.1,
+    )
+}
+
+/// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
+///
+/// For complete documentation on SQLExecDirectA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
+///
+/// # Returns
+/// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
+#[inline]
+#[allow(non_snake_case)]
+#[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
+pub fn SQLExecDirectA<V: OdbcVersion>(
+    StatementHandle: &SQLHSTMT<V>,
+    StatementText: &OdbcStr<SQLCHAR>,
+) -> SQLRETURN {
+    let StatementText = StatementText.as_raw_slice();
+
+    unsafe {
+        ffi::SQLExecDirectA(
+            StatementHandle.as_SQLHANDLE(),
+            StatementText.0,
+            StatementText.1,
+        )
+    }
+}
+
+/// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
+///
+/// For complete documentation on SQLExecDirectW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
+///
+/// # Returns
+/// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
+#[inline]
+#[allow(non_snake_case)]
+#[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
+pub unsafe fn SQLExecDirectW<V: OdbcVersion>(
+    StatementHandle: &SQLHSTMT<V>,
+    StatementText: &OdbcStr<SQLWCHAR>,
+) -> SQLRETURN {
+    let StatementText = StatementText.as_raw_slice();
+
+    ffi::SQLExecDirectW(
         StatementHandle.as_SQLHANDLE(),
         StatementText.0,
         StatementText.1,
@@ -1099,17 +1146,20 @@ pub unsafe fn SQLExecDirectA<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
 #[inline]
 #[allow(non_snake_case)]
-pub unsafe fn SQLExecDirectW<V: OdbcVersion>(
+#[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
+pub fn SQLExecDirectW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    StatementText: &[SQLWCHAR],
+    StatementText: &OdbcStr<SQLWCHAR>,
 ) -> SQLRETURN {
     let StatementText = StatementText.as_raw_slice();
 
-    ffi::SQLExecDirectW(
-        StatementHandle.as_SQLHANDLE(),
-        StatementText.0,
-        StatementText.1,
-    )
+    unsafe {
+        ffi::SQLExecDirectW(
+            StatementHandle.as_SQLHANDLE(),
+            StatementText.0,
+            StatementText.1,
+        )
+    }
 }
 
 /// Executes a prepared statement, using the current values of the parameter marker variables if any parameter markers exist in the statement.
@@ -1120,8 +1170,22 @@ pub unsafe fn SQLExecDirectW<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
 #[inline]
 #[allow(non_snake_case)]
+#[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
 pub unsafe fn SQLExecute<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
     ffi::SQLExecute(StatementHandle.as_SQLHANDLE())
+}
+
+/// Executes a prepared statement, using the current values of the parameter marker variables if any parameter markers exist in the statement.
+///
+/// For complete documentation on SQLExecute, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecute-function).
+///
+/// # Returns
+/// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
+#[inline]
+#[allow(non_snake_case)]
+#[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
+pub fn SQLExecute<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
+    unsafe {ffi::SQLExecute(StatementHandle.as_SQLHANDLE())}
 }
 
 /// Fetches the next rowset of data from the result set and returns data for all bound columns.
@@ -1132,8 +1196,22 @@ pub unsafe fn SQLExecute<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRE
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
+#[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
 pub unsafe fn SQLFetch<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
     ffi::SQLFetch(StatementHandle.as_SQLHANDLE())
+}
+
+/// Fetches the next rowset of data from the result set and returns data for all bound columns.
+///
+/// For complete documentation on SQLFetch, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetch-function).
+///
+/// # Returns
+/// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+#[inline]
+#[allow(non_snake_case)]
+#[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
+pub fn SQLFetch<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
+    unsafe {ffi::SQLFetch(StatementHandle.as_SQLHANDLE()) }
 }
 
 /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
@@ -1145,6 +1223,7 @@ pub unsafe fn SQLFetch<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETU
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
+#[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
 pub unsafe fn SQLFetchScroll<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     FetchOrientation: SQLSMALLINT,
@@ -1155,6 +1234,30 @@ pub unsafe fn SQLFetchScroll<V: OdbcVersion>(
         FetchOrientation,
         FetchOffset,
     )
+}
+
+/// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
+/// When working with an ODBC 2.x driver, the Driver Manager maps this function to **SQLExtendedFetch**. For more information, see Mapping Replacement Functions for Backward Compatibility of Applications.
+///
+/// For complete documentation on SQLFetchScroll, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetchscroll-function).
+///
+/// # Returns
+/// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+#[inline]
+#[allow(non_snake_case)]
+#[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
+pub fn SQLFetchScroll<V: OdbcVersion>(
+    StatementHandle: &SQLHSTMT<V>,
+    FetchOrientation: SQLSMALLINT,
+    FetchOffset: SQLLEN,
+) -> SQLRETURN {
+    unsafe {
+        ffi::SQLFetchScroll(
+            StatementHandle.as_SQLHANDLE(),
+            FetchOrientation,
+            FetchOffset,
+        )
+    }
 }
 
 /// Can return:
@@ -1173,12 +1276,12 @@ pub unsafe fn SQLFetchScroll<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLForeignKeysA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    PKCatalogName: &[SQLCHAR],
-    PKSchemaName: &[SQLCHAR],
-    PKTableName: &[SQLCHAR],
-    FKCatalogName: &[SQLCHAR],
-    FKSchemaName: &[SQLCHAR],
-    FKTableName: &[SQLCHAR],
+    PKCatalogName: &OdbcStr<SQLCHAR>,
+    PKSchemaName: &OdbcStr<SQLCHAR>,
+    PKTableName: &OdbcStr<SQLCHAR>,
+    FKCatalogName: &OdbcStr<SQLCHAR>,
+    FKSchemaName: &OdbcStr<SQLCHAR>,
+    FKTableName: &OdbcStr<SQLCHAR>,
 ) -> SQLRETURN {
     let PKCatalogName = PKCatalogName.as_raw_slice();
     let PKSchemaName = PKSchemaName.as_raw_slice();
@@ -1222,12 +1325,12 @@ pub fn SQLForeignKeysA<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLForeignKeysW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    PKCatalogName: &[SQLWCHAR],
-    PKSchemaName: &[SQLWCHAR],
-    PKTableName: &[SQLWCHAR],
-    FKCatalogName: &[SQLWCHAR],
-    FKSchemaName: &[SQLWCHAR],
-    FKTableName: &[SQLWCHAR],
+    PKCatalogName: &OdbcStr<SQLWCHAR>,
+    PKSchemaName: &OdbcStr<SQLWCHAR>,
+    PKTableName: &OdbcStr<SQLWCHAR>,
+    FKCatalogName: &OdbcStr<SQLWCHAR>,
+    FKSchemaName: &OdbcStr<SQLWCHAR>,
+    FKTableName: &OdbcStr<SQLWCHAR>,
 ) -> SQLRETURN {
     let PKCatalogName = PKCatalogName.as_raw_slice();
     let PKSchemaName = PKSchemaName.as_raw_slice();
@@ -1383,7 +1486,7 @@ where
 #[allow(non_snake_case)]
 pub fn SQLGetCursorNameA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CursorName: &mut [MaybeUninit<SQLCHAR>],
+    CursorName: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
     NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> SQLRETURN {
     let CursorName = CursorName.as_mut_raw_slice();
@@ -1409,7 +1512,7 @@ pub fn SQLGetCursorNameA<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLGetCursorNameW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CursorName: &mut [MaybeUninit<SQLWCHAR>],
+    CursorName: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
     NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> SQLRETURN {
     let CursorName = CursorName.as_mut_raw_slice();
@@ -1561,7 +1664,7 @@ where
 pub fn SQLGetDescRecA<'buf, ST: SqlType<V>, DT: DescType<'buf>, V: OdbcVersion>(
     DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
-    Name: Option<&mut [MaybeUninit<SQLCHAR>]>,
+    Name: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
     StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
     TypePtr: &mut MaybeUninit<ST>,
     SubTypePtr: &mut MaybeUninit<DatetimeIntervalCode>,
@@ -1601,7 +1704,7 @@ pub fn SQLGetDescRecA<'buf, ST: SqlType<V>, DT: DescType<'buf>, V: OdbcVersion>(
 pub fn SQLGetDescRecW<'buf, ST: SqlType<V>, DT: DescType<'buf>, V: OdbcVersion>(
     DescriptorHandle: &SQLHDESC<DT, V>,
     RecNumber: SQLSMALLINT,
-    Name: Option<&mut [MaybeUninit<SQLWCHAR>]>,
+    Name: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
     StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
     TypePtr: &mut MaybeUninit<ST>,
     SubTypePtr: &mut MaybeUninit<DatetimeIntervalCode>,
@@ -1733,7 +1836,7 @@ pub fn SQLGetDiagRecA<H: Handle>(
     RecNumber: std::num::NonZeroI16,
     SQLState: &mut MaybeUninit<SQLSTATE<SQLCHAR>>,
     NativeErrorPtr: &mut MaybeUninit<SQLINTEGER>,
-    MessageText: &mut [MaybeUninit<SQLCHAR>],
+    MessageText: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
     TextLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> SQLRETURN
 where
@@ -1771,7 +1874,7 @@ pub fn SQLGetDiagRecW<H: Handle>(
     RecNumber: std::num::NonZeroI16,
     SQLState: &mut MaybeUninit<SQLSTATE<SQLWCHAR>>,
     NativeErrorPtr: &mut MaybeUninit<SQLINTEGER>,
-    MessageText: &mut [MaybeUninit<SQLWCHAR>],
+    MessageText: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
     TextLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> SQLRETURN
 where
@@ -2064,8 +2167,8 @@ pub fn SQLMoreResults<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETUR
 #[allow(non_snake_case)]
 pub fn SQLNativeSqlA<V: OdbcVersion>(
     ConnectionHandle: &SQLHDBC<C4, V>,
-    InStatementText: &[SQLCHAR],
-    OutStatementText: &mut [MaybeUninit<SQLCHAR>],
+    InStatementText: &OdbcStr<SQLCHAR>,
+    OutStatementText: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
     TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
 ) -> SQLRETURN {
     let InStatementText = InStatementText.as_raw_slice();
@@ -2094,8 +2197,8 @@ pub fn SQLNativeSqlA<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLNativeSqlW<V: OdbcVersion>(
     ConnectionHandle: &SQLHDBC<C4, V>,
-    InStatementText: &[SQLWCHAR],
-    OutStatementText: &mut [MaybeUninit<SQLWCHAR>],
+    InStatementText: &OdbcStr<SQLWCHAR>,
+    OutStatementText: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
     TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
 ) -> SQLRETURN {
     let InStatementText = InStatementText.as_raw_slice();
@@ -2179,7 +2282,7 @@ pub fn SQLParamData<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLPrepareA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    StatementText: &[SQLCHAR],
+    StatementText: &OdbcStr<SQLCHAR>,
 ) -> SQLRETURN {
     let StatementText = StatementText.as_raw_slice();
 
@@ -2203,7 +2306,7 @@ pub fn SQLPrepareA<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLPrepareW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    StatementText: &[SQLWCHAR],
+    StatementText: &OdbcStr<SQLWCHAR>,
 ) -> SQLRETURN {
     let StatementText = StatementText.as_raw_slice();
 
@@ -2227,9 +2330,9 @@ pub fn SQLPrepareW<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLPrimaryKeysA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLCHAR],
-    SchemaName: &[SQLCHAR],
-    TableName: &[SQLCHAR],
+    CatalogName: &OdbcStr<SQLCHAR>,
+    SchemaName: &OdbcStr<SQLCHAR>,
+    TableName: &OdbcStr<SQLCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -2259,9 +2362,9 @@ pub fn SQLPrimaryKeysA<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLPrimaryKeysW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLWCHAR],
-    SchemaName: &[SQLWCHAR],
-    TableName: &[SQLWCHAR],
+    CatalogName: &OdbcStr<SQLWCHAR>,
+    SchemaName: &OdbcStr<SQLWCHAR>,
+    TableName: &OdbcStr<SQLWCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -2291,10 +2394,10 @@ pub fn SQLPrimaryKeysW<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLProcedureColumnsA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLCHAR],
-    SchemaName: &[SQLCHAR],
-    ProcName: &[SQLCHAR],
-    ColumnName: &[SQLCHAR],
+    CatalogName: &OdbcStr<SQLCHAR>,
+    SchemaName: &OdbcStr<SQLCHAR>,
+    ProcName: &OdbcStr<SQLCHAR>,
+    ColumnName: &OdbcStr<SQLCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -2327,10 +2430,10 @@ pub fn SQLProcedureColumnsA<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLProcedureColumnsW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLWCHAR],
-    SchemaName: &[SQLWCHAR],
-    ProcName: &[SQLWCHAR],
-    ColumnName: &[SQLWCHAR],
+    CatalogName: &OdbcStr<SQLWCHAR>,
+    SchemaName: &OdbcStr<SQLWCHAR>,
+    ProcName: &OdbcStr<SQLWCHAR>,
+    ColumnName: &OdbcStr<SQLWCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -2363,9 +2466,9 @@ pub fn SQLProcedureColumnsW<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLProceduresA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLCHAR],
-    SchemaName: &[SQLCHAR],
-    ProcName: &[SQLCHAR],
+    CatalogName: &OdbcStr<SQLCHAR>,
+    SchemaName: &OdbcStr<SQLCHAR>,
+    ProcName: &OdbcStr<SQLCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -2395,9 +2498,9 @@ pub fn SQLProceduresA<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLProceduresW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLWCHAR],
-    SchemaName: &[SQLWCHAR],
-    ProcName: &[SQLWCHAR],
+    CatalogName: &OdbcStr<SQLWCHAR>,
+    SchemaName: &OdbcStr<SQLWCHAR>,
+    ProcName: &OdbcStr<SQLWCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -2424,6 +2527,7 @@ pub fn SQLProceduresW<V: OdbcVersion>(
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
+#[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
 pub unsafe fn SQLPutData<TT: Ident, B: CData<TT, V>, V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     DataPtr: Option<&B>,
@@ -2435,8 +2539,31 @@ where
         (DataPtr.as_SQLPOINTER(), DataPtr.len())
     });
 
-    // TODO: This function is incredibly unsafe. How to know which type to provide and panic at runtime if incorrect?
     ffi::SQLPutData(StatementHandle.as_SQLHANDLE(), DataPtr.0, DataPtr.1)
+}
+
+/// Allows an application to send data for a parameter or column to the driver at statement execution time. This function can be used to send character or binary data values in parts to a column with a character, binary, or data source-specific data type (for example, parameters of the SQL_LONGVARBINARY or SQL_LONGVARCHAR types). **SQLPutData** supports binding to a Unicode C data type, even if the underlying driver does not support Unicode data.
+///
+/// For complete documentation on SQLPutData, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlputdata-function).
+///
+/// # Returns
+/// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+#[inline]
+#[allow(non_snake_case)]
+#[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
+// TODO: Remove unsafe keyword. How to know which type to provide and panic at runtime if incorrect?
+pub unsafe fn SQLPutData<TT: Ident, B: CData<TT, V>, V: OdbcVersion>(
+    StatementHandle: &SQLHSTMT<V>,
+    DataPtr: Option<&B>,
+) -> SQLRETURN
+where
+    B: AsSQLPOINTER + ?Sized,
+{
+    let DataPtr = DataPtr.map_or((ptr::null_mut(), 0), |DataPtr| {
+        (DataPtr.as_SQLPOINTER(), DataPtr.len())
+    });
+
+    unsafe {ffi::SQLPutData(StatementHandle.as_SQLHANDLE(), DataPtr.0, DataPtr.1)}
 }
 
 /// Returns the number of rows affected by an **UPDATE**, **INSERT**, or **DELETE** statement; an SQL_ADD, SQL_UPDATE_BY_BOOKMARK, or SQL_DELETE_BY_BOOKMARK operation in **SQLBulkOperations**; or an SQL_UPDATE or SQL_DELETE operation in **SQLSetPos**.
@@ -2530,7 +2657,7 @@ where
 #[allow(non_snake_case)]
 pub fn SQLSetCursorNameA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CursorName: &[SQLCHAR],
+    CursorName: &OdbcStr<SQLCHAR>,
 ) -> SQLRETURN {
     let CursorName = CursorName.as_raw_slice();
 
@@ -2550,7 +2677,7 @@ pub fn SQLSetCursorNameA<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLSetCursorNameW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CursorName: &[SQLWCHAR],
+    CursorName: &OdbcStr<SQLWCHAR>,
 ) -> SQLRETURN {
     let CursorName = CursorName.as_raw_slice();
 
@@ -2729,6 +2856,7 @@ where
 /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
 #[inline]
 #[allow(non_snake_case)]
+#[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
 pub unsafe fn SQLSetPos<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     RowNumber: SQLSETPOSIROW,
@@ -2741,6 +2869,31 @@ pub unsafe fn SQLSetPos<V: OdbcVersion>(
         Operation as SQLUSMALLINT,
         LockType as SQLUSMALLINT,
     )
+}
+
+/// Sets the cursor position in a rowset and allows an application to refresh data in the rowset or to update or delete data in the result set.
+///
+/// For complete documentation on SQLSetPos, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetpos-function).
+///
+/// # Returns
+/// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+#[inline]
+#[allow(non_snake_case)]
+#[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
+pub fn SQLSetPos<V: OdbcVersion>(
+    StatementHandle: &SQLHSTMT<V>,
+    RowNumber: SQLSETPOSIROW,
+    Operation: Operation,
+    LockType: LockType,
+) -> SQLRETURN {
+    unsafe {
+        ffi::SQLSetPos(
+            StatementHandle.as_SQLHANDLE(),
+            RowNumber,
+            Operation as SQLUSMALLINT,
+            LockType as SQLUSMALLINT,
+        )
+    }
 }
 
 /// Sets attributes related to a statement.
@@ -2836,9 +2989,9 @@ where
 pub fn SQLSpecialColumnsA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     IdentifierType: IdentifierType,
-    CatalogName: &[SQLCHAR],
-    SchemaName: &[SQLCHAR],
-    TableName: &[SQLCHAR],
+    CatalogName: &OdbcStr<SQLCHAR>,
+    SchemaName: &OdbcStr<SQLCHAR>,
+    TableName: &OdbcStr<SQLCHAR>,
     Scope: Scope,
     Nullable: NullAllowed,
 ) -> SQLRETURN {
@@ -2877,9 +3030,9 @@ pub fn SQLSpecialColumnsA<V: OdbcVersion>(
 pub fn SQLSpecialColumnsW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     IdentifierType: IdentifierType,
-    CatalogName: &[SQLWCHAR],
-    SchemaName: &[SQLWCHAR],
-    TableName: &[SQLWCHAR],
+    CatalogName: &OdbcStr<SQLWCHAR>,
+    SchemaName: &OdbcStr<SQLWCHAR>,
+    TableName: &OdbcStr<SQLWCHAR>,
     Scope: Scope,
     Nullable: NullAllowed,
 ) -> SQLRETURN {
@@ -2914,9 +3067,9 @@ pub fn SQLSpecialColumnsW<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLStatisticsA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLCHAR],
-    SchemaName: &[SQLCHAR],
-    TableName: &[SQLCHAR],
+    CatalogName: &OdbcStr<SQLCHAR>,
+    SchemaName: &OdbcStr<SQLCHAR>,
+    TableName: &OdbcStr<SQLCHAR>,
     Unique: Unique,
     Reserved: Reserved,
 ) -> SQLRETURN {
@@ -2950,9 +3103,9 @@ pub fn SQLStatisticsA<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLStatisticsW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLWCHAR],
-    SchemaName: &[SQLWCHAR],
-    TableName: &[SQLWCHAR],
+    CatalogName: &OdbcStr<SQLWCHAR>,
+    SchemaName: &OdbcStr<SQLWCHAR>,
+    TableName: &OdbcStr<SQLWCHAR>,
     Unique: Unique,
     Reserved: Reserved,
 ) -> SQLRETURN {
@@ -2986,9 +3139,9 @@ pub fn SQLStatisticsW<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLTablePrivilegesA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLCHAR],
-    SchemaName: &[SQLCHAR],
-    TableName: &[SQLCHAR],
+    CatalogName: &OdbcStr<SQLCHAR>,
+    SchemaName: &OdbcStr<SQLCHAR>,
+    TableName: &OdbcStr<SQLCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -3018,9 +3171,9 @@ pub fn SQLTablePrivilegesA<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLTablePrivilegesW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLWCHAR],
-    SchemaName: &[SQLWCHAR],
-    TableName: &[SQLWCHAR],
+    CatalogName: &OdbcStr<SQLWCHAR>,
+    SchemaName: &OdbcStr<SQLWCHAR>,
+    TableName: &OdbcStr<SQLWCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -3050,10 +3203,10 @@ pub fn SQLTablePrivilegesW<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLTablesA<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLCHAR],
-    SchemaName: &[SQLCHAR],
-    TableName: &[SQLCHAR],
-    TableType: &[SQLCHAR],
+    CatalogName: &OdbcStr<SQLCHAR>,
+    SchemaName: &OdbcStr<SQLCHAR>,
+    TableName: &OdbcStr<SQLCHAR>,
+    TableType: &OdbcStr<SQLCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -3086,10 +3239,10 @@ pub fn SQLTablesA<V: OdbcVersion>(
 #[allow(non_snake_case)]
 pub fn SQLTablesW<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
-    CatalogName: &[SQLWCHAR],
-    SchemaName: &[SQLWCHAR],
-    TableName: &[SQLWCHAR],
-    TableType: &[SQLWCHAR],
+    CatalogName: &OdbcStr<SQLWCHAR>,
+    SchemaName: &OdbcStr<SQLWCHAR>,
+    TableName: &OdbcStr<SQLWCHAR>,
+    TableType: &OdbcStr<SQLWCHAR>,
 ) -> SQLRETURN {
     let CatalogName = CatalogName.as_raw_slice();
     let SchemaName = SchemaName.as_raw_slice();
@@ -3115,6 +3268,8 @@ pub fn SQLTablesW<V: OdbcVersion>(
 use mockall::automock;
 #[cfg_attr(test, automock)]
 pub(crate) mod ffi {
+    #![allow(non_snake_case)]
+
     use crate::handle::{HDBC, HDESC, HENV, HSTMT, SQLHWND};
     use crate::{
         diag::SQLSTATE_SIZE, handle::SQLHANDLE, sqlreturn::SQLRETURN, RETCODE, SQLCHAR, SQLINTEGER,

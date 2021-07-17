@@ -1,15 +1,15 @@
 use crate::env::OdbcVersion;
-use crate::handle::{AppDesc, ImplDesc, RowDesc};
+use crate::handle::{AppDesc, ImplDesc, ParamDesc, RowDesc};
 use crate::{
     handle::SQLHDESC, Attr, AttrGet, AttrLen, AttrSet, Ident, IntoSQLPOINTER, OdbcBool,
-    OdbcDefined, True, SQLCHAR, SQLINTEGER, SQLLEN, SQLSMALLINT, SQLULEN, SQLUSMALLINT,
+    OdbcDefined, OdbcStr, SQLCHAR, SQLINTEGER, SQLLEN, SQLSMALLINT, SQLUINTEGER, SQLULEN,
+    SQLUSMALLINT,
 };
 use rs_odbc_derive::{odbc_type, Ident};
+use std::cell::UnsafeCell;
 
 // TODO: The statement attribute SQL_ATTR_USE_BOOKMARKS should always be set before calling SQLSetDescField to set bookmark fields. While this is not mandatory, it is strongly recommended.
-pub trait DescField<A: crate::Ident, DT>:
-    Attr<A> + AttrLen<Self::DefinedBy, Self::NonBinary, SQLINTEGER>
-{
+pub trait DescField<A: crate::Ident, DT>: Attr<A> + AttrLen<Self::DefinedBy, SQLINTEGER> {
     // TODO: Implement for buffers to bind their lifetimes
     fn update_handle<V: OdbcVersion>(&self, _: &SQLHDESC<DT, V>)
     where
@@ -40,7 +40,6 @@ pub struct SQL_DESC_ALLOC_TYPE;
 //// This is read-only attribute
 unsafe impl Attr<SQL_DESC_ALLOC_TYPE> for AllocType {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl<DT> DescField<SQL_DESC_ALLOC_TYPE, DT> for AllocType {}
 unsafe impl AttrGet<SQL_DESC_ALLOC_TYPE> for AllocType {}
@@ -51,7 +50,6 @@ unsafe impl AttrGet<SQL_DESC_ALLOC_TYPE> for AllocType {}
 pub struct SQL_DESC_ARRAY_SIZE;
 unsafe impl Attr<SQL_DESC_ARRAY_SIZE> for SQLULEN {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl DescField<SQL_DESC_ARRAY_SIZE, AppDesc<'_>> for SQLULEN {}
 unsafe impl AttrGet<SQL_DESC_ARRAY_SIZE> for SQLULEN {}
@@ -61,27 +59,32 @@ unsafe impl AttrSet<SQL_DESC_ARRAY_SIZE> for SQLULEN {}
 //#[identifier(SQLSMALLINT, 21)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DESC_ARRAY_STATUS_PTR;
-//unsafe impl<DT> Attr<SQL_DESC_ARRAY_STATUS_PTR, DT> for [SQLUSMALLINT] {
+//unsafe impl Attr<SQL_DESC_ARRAY_STATUS_PTR> for [UnsafeCell<SQLUSMALLINT>] {
 //    type DefinedBy = OdbcDefined;
-//    type NonBinary = True;
 //}
-//impl DescField<SQL_DESC_ARRAY_STATUS_PTR> for [SQLUSMALLINT] {}
-// TODO: This field can be made set-only
-//unsafe impl AttrGet<SQL_DESC_ARRAY_STATUS_PTR> for [SQLUSMALLINT] {}
-//unsafe impl AttrSet<SQL_DESC_ARRAY_STATUS_PTR> for [SQLUSMALLINT] {}
+//impl<DT> DescField<SQL_DESC_ARRAY_STATUS_PTR, DT> for [UnsafeCell<SQLUSMALLINT>] {}
+//unsafe impl AttrGet<SQL_DESC_ARRAY_STATUS_PTR> for [UnsafeCell<SQLUSMALLINT>] {}
+//unsafe impl AttrSet<SQL_DESC_ARRAY_STATUS_PTR> for &[UnsafeCell<SQLUSMALLINT>] {}
 
-// TODO: How can I support this. This is very unsafe
-//#[derive(Ident)]
-//#[identifier(SQLSMALLINT, 24)]
-//#[allow(non_camel_case_types)]
-//pub struct SQL_DESC_BIND_OFFSET_PTR;
-//unsafe impl Attr<SQL_DESC_BIND_OFFSET_PTR, AppDesc<'_>> for [SQLLEN] {
-//    type DefinedBy = OdbcDefined;
-//    type NonBinary = True;
-//}
-//impl<DT> DescField<SQL_DESC_BIND_OFFSET_PTR, DT> for [SQLLEN] {}
-//unsafe impl AttrGet<SQL_DESC_BIND_OFFSET_PTR> for [SQLLEN] {}
-//unsafe impl AttrSet<SQL_DESC_BIND_OFFSET_PTR> for [SQLLEN] {}
+#[derive(Ident)]
+#[identifier(SQLSMALLINT, 24)]
+#[allow(non_camel_case_types)]
+#[cfg(feature = "raw_api")]
+pub struct SQL_DESC_BIND_OFFSET_PTR;
+
+#[cfg(feature = "raw_api")]
+unsafe impl Attr<SQL_DESC_BIND_OFFSET_PTR> for UnsafeCell<SQLLEN> {
+    type DefinedBy = OdbcDefined;
+}
+
+#[cfg(feature = "raw_api")]
+impl DescField<SQL_DESC_BIND_OFFSET_PTR, AppDesc<'_>> for UnsafeCell<SQLLEN> {}
+
+#[cfg(feature = "raw_api")]
+unsafe impl AttrGet<SQL_DESC_BIND_OFFSET_PTR> for UnsafeCell<SQLLEN> {}
+
+#[cfg(feature = "raw_api")]
+unsafe impl AttrSet<SQL_DESC_BIND_OFFSET_PTR> for UnsafeCell<SQLLEN> {}
 
 // TODO: This is actually integer type
 //#[derive(Ident)]
@@ -90,7 +93,6 @@ unsafe impl AttrSet<SQL_DESC_ARRAY_SIZE> for SQLULEN {}
 //pub struct SQL_DESC_BIND_TYPE;
 //unsafe impl Attr<SQL_DESC_BIND_TYPE> for BindType {
 //    type DefinedBy = OdbcDefined;
-//    type NonBinary = True;
 //}
 //impl DescField<SQL_DESC_BIND_TYPE, AppDesc<'_>> for BindType {}
 //unsafe impl AttrGet<SQL_DESC_BIND_TYPE> for BindType {}
@@ -102,24 +104,27 @@ unsafe impl AttrSet<SQL_DESC_ARRAY_SIZE> for SQLULEN {}
 pub struct SQL_DESC_COUNT;
 unsafe impl Attr<SQL_DESC_COUNT> for SQLSMALLINT {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl<DT> DescField<SQL_DESC_COUNT, DT> for SQLSMALLINT {}
 unsafe impl AttrGet<SQL_DESC_COUNT> for SQLSMALLINT {}
 unsafe impl AttrSet<SQL_DESC_COUNT> for SQLSMALLINT {}
 
-// TODO: Can be both *SQLUINTEGER or *SQLULEN
 //#[derive(Ident)]
 //#[identifier(SQLSMALLINT, 34)]
 //#[allow(non_camel_case_types)]
 //pub struct SQL_DESC_ROWS_PROCESSED_PTR;
-//unsafe impl Attr<SQL_DESC_ROWS_PROCESSED_PTR> for  {
+//unsafe impl Attr<SQL_DESC_ROWS_PROCESSED_PTR> for [UnsafeCell<SQLUINTEGER>] {
 //    type DefinedBy = OdbcDefined;
-//    type NonBinary = True;
 //}
-//impl DescField<SQL_DESC_ROWS_PROCESSED_PTR, ImplDesc> for  {}
-//unsafe impl AttrGet<SQL_DESC_ROWS_PROCESSED_PTR> for  {}
-//unsafe impl AttrSet<SQL_DESC_ROWS_PROCESSED_PTR> for  {}
+//unsafe impl Attr<SQL_DESC_ROWS_PROCESSED_PTR> for [UnsafeCell<SQLULEN>] {
+//    type DefinedBy = OdbcDefined;
+//}
+//impl DescField<SQL_DESC_ROWS_PROCESSED_PTR, ImplDesc<ParamDesc>> for [UnsafeCell<SQLUINTEGER>] {}
+//impl DescField<SQL_DESC_ROWS_PROCESSED_PTR, ImplDesc<RowDesc>> for [UnsafeCell<SQLULEN>] {}
+//unsafe impl AttrGet<SQL_DESC_ROWS_PROCESSED_PTR> for [UnsafeCell<SQLUINTEGER>] {}
+//unsafe impl AttrGet<SQL_DESC_ROWS_PROCESSED_PTR> for [UnsafeCell<SQLULEN>] {}
+//unsafe impl AttrSet<SQL_DESC_ROWS_PROCESSED_PTR> for &[UnsafeCell<SQLUINTEGER>] {}
+//unsafe impl AttrSet<SQL_DESC_ROWS_PROCESSED_PTR> for &[UnsafeCell<SQLULEN>] {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////// Record fields ////////////////////////////////////
@@ -132,7 +137,6 @@ unsafe impl AttrSet<SQL_DESC_COUNT> for SQLSMALLINT {}
 pub struct SQL_DESC_AUTO_UNIQUE_VALUE;
 unsafe impl Attr<SQL_DESC_AUTO_UNIQUE_VALUE> for OdbcBool {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl DescField<SQL_DESC_AUTO_UNIQUE_VALUE, ImplDesc<RowDesc>> for OdbcBool {}
 unsafe impl AttrGet<SQL_DESC_AUTO_UNIQUE_VALUE> for OdbcBool {}
@@ -142,24 +146,22 @@ unsafe impl AttrGet<SQL_DESC_AUTO_UNIQUE_VALUE> for OdbcBool {}
 #[allow(non_camel_case_types)]
 //// This is read-only attribute
 pub struct SQL_DESC_BASE_COLUMN_NAME;
-unsafe impl Attr<SQL_DESC_BASE_COLUMN_NAME> for [SQLCHAR] {
+unsafe impl Attr<SQL_DESC_BASE_COLUMN_NAME> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
-impl DescField<SQL_DESC_BASE_COLUMN_NAME, ImplDesc<RowDesc>> for [SQLCHAR] {}
-unsafe impl AttrGet<SQL_DESC_BASE_COLUMN_NAME> for [SQLCHAR] {}
+impl DescField<SQL_DESC_BASE_COLUMN_NAME, ImplDesc<RowDesc>> for OdbcStr<SQLCHAR> {}
+unsafe impl AttrGet<SQL_DESC_BASE_COLUMN_NAME> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 23)]
 #[allow(non_camel_case_types)]
 //// This is read-only attribute
 pub struct SQL_DESC_BASE_TABLE_NAME;
-unsafe impl Attr<SQL_DESC_BASE_TABLE_NAME> for [SQLCHAR] {
+unsafe impl Attr<SQL_DESC_BASE_TABLE_NAME> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
-impl DescField<SQL_DESC_BASE_TABLE_NAME, ImplDesc<RowDesc>> for [SQLCHAR] {}
-unsafe impl AttrGet<SQL_DESC_BASE_TABLE_NAME> for [SQLCHAR] {}
+impl DescField<SQL_DESC_BASE_TABLE_NAME, ImplDesc<RowDesc>> for OdbcStr<SQLCHAR> {}
+unsafe impl AttrGet<SQL_DESC_BASE_TABLE_NAME> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 12)]
@@ -168,7 +170,6 @@ unsafe impl AttrGet<SQL_DESC_BASE_TABLE_NAME> for [SQLCHAR] {}
 pub struct SQL_DESC_CASE_SENSITIVE;
 unsafe impl Attr<SQL_DESC_CASE_SENSITIVE> for OdbcBool {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl DescField<SQL_DESC_CASE_SENSITIVE, ImplDesc<RowDesc>> for OdbcBool {}
 unsafe impl AttrGet<SQL_DESC_CASE_SENSITIVE> for OdbcBool {}
@@ -178,12 +179,11 @@ unsafe impl AttrGet<SQL_DESC_CASE_SENSITIVE> for OdbcBool {}
 #[allow(non_camel_case_types)]
 //// This is read-only attribute
 pub struct SQL_DESC_CATALOG_NAME;
-unsafe impl Attr<SQL_DESC_CATALOG_NAME> for [SQLCHAR] {
+unsafe impl Attr<SQL_DESC_CATALOG_NAME> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
-impl DescField<SQL_DESC_CATALOG_NAME, ImplDesc<RowDesc>> for [SQLCHAR] {}
-unsafe impl AttrGet<SQL_DESC_CATALOG_NAME> for [SQLCHAR] {}
+impl DescField<SQL_DESC_CATALOG_NAME, ImplDesc<RowDesc>> for OdbcStr<SQLCHAR> {}
+unsafe impl AttrGet<SQL_DESC_CATALOG_NAME> for OdbcStr<SQLCHAR> {}
 
 //#[derive(Ident)]
 //#[identifier(SQLSMALLINT, 2)]
@@ -191,7 +191,6 @@ unsafe impl AttrGet<SQL_DESC_CATALOG_NAME> for [SQLCHAR] {}
 //pub struct SQL_DESC_CONCISE_TYPE;
 //unsafe impl Attr<SQL_DESC_CONCISE_TYPE> for SqlType {
 //    type DefinedBy = OdbcDefined;
-//    type NonBinary = True;
 //}
 //impl<DT> DescField<SQL_DESC_CONCISE_TYPE, DT> for SqlType {}
 //unsafe impl AttrGet<SQL_DESC_CONCISE_TYPE> for SqlType {}
@@ -203,7 +202,6 @@ unsafe impl AttrGet<SQL_DESC_CATALOG_NAME> for [SQLCHAR] {}
 //pub struct SQL_DESC_DATA_PTR;
 //unsafe impl Attr<SQL_DESC_DATA_PTR> for  {
 //    type DefinedBy = OdbcDefined;
-//    type NonBinary = True;
 //}
 //impl<DT> DescField<SQL_DESC_DATA_PTR, DT> for  {}
 //unsafe impl AttrGet<SQL_DESC_DATA_PTR> for SQLPOINTER {}
@@ -215,7 +213,6 @@ unsafe impl AttrGet<SQL_DESC_CATALOG_NAME> for [SQLCHAR] {}
 //pub struct SQL_DESC_DATETIME_INTERVAL_CODE;
 //unsafe impl Attr<SQL_DESC_DATETIME_INTERVAL_CODE> for DatetimeIntervalCode {
 //    type DefinedBy = OdbcDefined;
-//    type NonBinary = True;
 //}
 //impl<DT> DescField<SQL_DESC_DATETIME_INTERVAL_CODE, DT> for DatetimeIntervalCode {}
 //unsafe impl AttrGet<SQL_DESC_DATETIME_INTERVAL_CODE> for DatetimeIntervalCode {}

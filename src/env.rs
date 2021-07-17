@@ -1,42 +1,49 @@
 use crate::{
-    Attr, AttrLen, AttrGet, AttrSet, Ident, OdbcDefined, True, SQLCHAR, SQLINTEGER,
-    SQLWCHAR, SQLUINTEGER,
+    Attr, AttrGet, AttrLen, AttrSet, Ident, OdbcChar, OdbcDefined, OdbcStr, SQLCHAR, SQLINTEGER,
+    SQLUINTEGER, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
 
 pub trait EnvAttr<A: Ident, V: OdbcVersion>:
-    Attr<A, DefinedBy = OdbcDefined> + AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>
+    Attr<A, DefinedBy = OdbcDefined> + AttrLen<OdbcDefined, SQLINTEGER>
 {
 }
 
 // Implement EnvAttr for all versions of environment attributes
 impl<A: Ident, T: Ident> EnvAttr<A, SQL_OV_ODBC3_80> for T where T: EnvAttr<A, SQL_OV_ODBC3> {}
 impl<A: Ident, T: Ident> EnvAttr<A, SQL_OV_ODBC4> for T where T: EnvAttr<A, SQL_OV_ODBC3_80> {}
-impl<A: Ident> EnvAttr<A, SQL_OV_ODBC3_80> for [SQLCHAR] where [SQLCHAR]: EnvAttr<A, SQL_OV_ODBC3> {}
-impl<A: Ident> EnvAttr<A, SQL_OV_ODBC4> for [SQLCHAR] where [SQLCHAR]: EnvAttr<A, SQL_OV_ODBC3_80> {}
-
-// Implement EnvAttr for unicode character environment attributes
-impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for [SQLWCHAR] where [SQLCHAR]: EnvAttr<A, V, NonBinary = True> {}
-
-// Implement EnvAttr for uninitialized environment attributes
-impl<A: Ident, T: Ident, V: OdbcVersion> EnvAttr<A, V> for MaybeUninit<T> where T: EnvAttr<A, V> {}
-impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for [MaybeUninit<SQLCHAR>]
-where
-    [SQLCHAR]: EnvAttr<A, V>,
-    Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
+impl<A: Ident, CH: OdbcChar> EnvAttr<A, SQL_OV_ODBC3_80> for OdbcStr<CH> where
+    OdbcStr<CH>: EnvAttr<A, SQL_OV_ODBC3>
 {
 }
-impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for [MaybeUninit<SQLWCHAR>]
+impl<A: Ident, CH: OdbcChar> EnvAttr<A, SQL_OV_ODBC4> for OdbcStr<CH> where
+    OdbcStr<CH>: EnvAttr<A, SQL_OV_ODBC3_80>
+{
+}
+
+// Implement EnvAttr for uninitialized environment attributes
+impl<A: Ident, T: Ident, V: OdbcVersion> EnvAttr<A, V> for MaybeUninit<T>
 where
-    [SQLWCHAR]: EnvAttr<A, V>,
-    Self: AttrLen<OdbcDefined, Self::NonBinary, SQLINTEGER>,
+    T: EnvAttr<A, V>,
+    Self: AttrLen<OdbcDefined, SQLINTEGER>,
+{
+}
+
+impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for OdbcStr<MaybeUninit<SQLCHAR>> where
+    OdbcStr<SQLCHAR>: EnvAttr<A, V>
+{
+}
+impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for OdbcStr<MaybeUninit<SQLWCHAR>> where
+    OdbcStr<SQLWCHAR>: EnvAttr<A, V>
 {
 }
 
 // Implement EnvAttr for references to character environment attributes (used by AttrSet)
-impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for &[SQLCHAR] where [SQLCHAR]: EnvAttr<A, V> {}
-impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for &[SQLWCHAR] where [SQLWCHAR]: EnvAttr<A, V> {}
+impl<A: Ident, CH: OdbcChar, V: OdbcVersion> EnvAttr<A, V> for &OdbcStr<CH> where
+    OdbcStr<CH>: EnvAttr<A, V>
+{
+}
 
 //=====================================================================================//
 //-------------------------------------Attributes--------------------------------------//
@@ -60,7 +67,6 @@ pub struct SQL_ATTR_ODBC_VERSION;
 pub struct SQL_ATTR_CP_MATCH;
 unsafe impl Attr<SQL_ATTR_CP_MATCH> for CpMatch {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl EnvAttr<SQL_ATTR_CP_MATCH, SQL_OV_ODBC3> for CpMatch {}
 unsafe impl AttrGet<SQL_ATTR_CP_MATCH> for CpMatch {}
@@ -72,7 +78,6 @@ unsafe impl AttrSet<SQL_ATTR_CP_MATCH> for CpMatch {}
 pub struct SQL_ATTR_CONNECTION_POOLING;
 unsafe impl Attr<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {
     type DefinedBy = OdbcDefined;
-    type NonBinary = True;
 }
 impl EnvAttr<SQL_ATTR_CONNECTION_POOLING, SQL_OV_ODBC3_80> for ConnectionPooling {}
 unsafe impl AttrGet<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {}
@@ -91,8 +96,7 @@ impl OdbcVersion for SQL_OV_ODBC3 {
 }
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
-pub enum SQL_OV_ODBC3_80 {
-}
+pub enum SQL_OV_ODBC3_80 {}
 impl OdbcVersion for SQL_OV_ODBC3_80 {
     const IDENTIFIER: SQLUINTEGER = 380;
 }

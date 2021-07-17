@@ -41,7 +41,7 @@ fn connect_to_test_db<'env>(
     let (conn, res) = SQLDriverConnectA(
         conn,
         None,
-        conn_string.as_bytes(),
+        conn_string.as_ref(),
         None,
         &mut outstrlen,
         SQL_DRIVER_COMPLETE,
@@ -96,8 +96,8 @@ fn db_connect() {
     let (conn, res) = SQLDriverConnectA(
         conn,
         None,
-        conn_string.as_bytes(),
-        Some(&mut outstr[..]),
+        conn_string.as_ref(),
+        Some(outstr[..].as_mut()),
         &mut outstrlen,
         SQL_DRIVER_COMPLETE,
     );
