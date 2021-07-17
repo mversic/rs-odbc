@@ -22,7 +22,7 @@ fn connect_to_test_db<'env>(
     let (conn, _) = SQLDriverConnectA(
         conn,
         None,
-        "".as_bytes(),
+        "".as_ref(),
         None,
         &mut outstrlen,
         SQL_DRIVER_COMPLETE,

@@ -1,10 +1,10 @@
-use crate::env::{SQL_OV_ODBC3_80, SQL_OV_ODBC4, OdbcVersion};
+use crate::env::{OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::sql_types::*;
 use crate::Ident;
 use crate::{
-    AsMutSQLPOINTER, AsSQLPOINTER, IntoSQLPOINTER, SQLBIGINT, SQLCHAR, SQLDOUBLE, SQLINTEGER,
-    SQLLEN, SQLPOINTER, SQLREAL, SQLSCHAR, SQLSMALLINT, SQLUBIGINT, SQLUINTEGER, SQLUSMALLINT,
-    SQLWCHAR, SQL_PARAM_INPUT, SQL_PARAM_INPUT_OUTPUT, SQL_PARAM_OUTPUT,
+    AsMutSQLPOINTER, AsSQLPOINTER, IntoSQLPOINTER, OdbcChar, OdbcStr, SQLBIGINT, SQLCHAR,
+    SQLDOUBLE, SQLINTEGER, SQLLEN, SQLPOINTER, SQLREAL, SQLSCHAR, SQLSMALLINT, SQLUBIGINT,
+    SQLUINTEGER, SQLUSMALLINT, SQLWCHAR, SQL_PARAM_INPUT, SQL_PARAM_INPUT_OUTPUT, SQL_PARAM_OUTPUT,
 };
 
 use std::cell::UnsafeCell;
@@ -22,7 +22,10 @@ pub trait CData<TT: Ident, V: OdbcVersion>: CDataLen {}
 // TODO: Do I need to disambiguate between BindCol and BindParameters deferred buffers
 /// Care must be taken because references to DeferredBuf might be written to. This usually
 /// means that DeferredBuf should only be implemented on &UnsafeCell<T> or &[UnsafeCell<T>].
-pub unsafe trait DeferredBuf<'buf, TT: Ident, V: OdbcVersion>: CDataLen + IntoSQLPOINTER {}
+pub unsafe trait DeferredBuf<'buf, TT: Ident, V: OdbcVersion>:
+    CDataLen + IntoSQLPOINTER
+{
+}
 
 #[repr(transparent)]
 pub struct StrLenOrInd(pub(crate) SQLLEN);
@@ -67,7 +70,7 @@ impl Ident for SQL_C_CHAR {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_CHAR);
 }
-impl<V: OdbcVersion> CData<SQL_C_CHAR, V> for [SQLCHAR] {}
+impl<V: OdbcVersion> CData<SQL_C_CHAR, V> for OdbcStr<SQLCHAR> {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_WCHAR;
@@ -75,7 +78,7 @@ impl Ident for SQL_C_WCHAR {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_WCHAR);
 }
-impl<V: OdbcVersion> CData<SQL_C_WCHAR, V> for [SQLWCHAR] {}
+impl<V: OdbcVersion> CData<SQL_C_WCHAR, V> for OdbcStr<SQLWCHAR> {}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_SSHORT;
@@ -171,7 +174,7 @@ impl Ident for SQL_C_BINARY {
     type Type = SQLSMALLINT;
     const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_BINARY);
 }
-impl<V: OdbcVersion> CData<SQL_C_BINARY, V> for [SQLCHAR] {}
+impl<V: OdbcVersion> CData<SQL_C_BINARY, V> for OdbcStr<SQLCHAR> {}
 
 // TODO: Weird?
 pub use SQL_C_BINARY as SQL_C_VARBOOKMARK;
@@ -231,7 +234,10 @@ impl Ident for SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE {
     type Type = SQLSMALLINT;
     const IDENTIFIER: SQLSMALLINT = SqlTypeV4::identifier(&SQL_TYPE_TIMESTAMP_WITH_TIMEZONE);
 }
-impl CData<SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE, SQL_OV_ODBC4> for SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT {}
+impl CData<SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE, SQL_OV_ODBC4>
+    for SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT
+{
+}
 
 #[allow(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_YEAR;
@@ -536,6 +542,11 @@ unsafe impl ScalarCType for SQLUBIGINT {}
 unsafe impl ScalarCType for SQL_TIME_WITH_TIMEZONE_STRUCT {}
 unsafe impl ScalarCType for SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT {}
 
+impl<T: OdbcChar> CDataLen for OdbcStr<T> {
+    fn len(&self) -> SQLLEN {
+        <[T] as CDataLen>::len(&self.0)
+    }
+}
 impl<T> CDataLen for [T] {
     fn len(&self) -> SQLLEN {
         self.len()
@@ -551,6 +562,11 @@ impl<T: ScalarCType> CDataLen for T {
 impl<T: ScalarCType> CDataLen for MaybeUninit<T> {
     fn len(&self) -> SQLLEN {
         0
+    }
+}
+impl<T: OdbcChar> CDataLen for &OdbcStr<T> {
+    fn len(&self) -> SQLLEN {
+        CDataLen::len(*self)
     }
 }
 impl<T> CDataLen for &[T] {
@@ -598,17 +614,21 @@ unsafe impl<T: ScalarCType> AsMutSQLPOINTER for MaybeUninit<T> {
 }
 
 impl<TT: Ident, T, V: OdbcVersion> CData<TT, V> for [MaybeUninit<T>] where [T]: CData<TT, V> {}
-impl<TT: Ident, T: ScalarCType, V: OdbcVersion> CData<TT, V> for MaybeUninit<T> where T: CData<TT, V> {}
+impl<TT: Ident, T: ScalarCType, V: OdbcVersion> CData<TT, V> for MaybeUninit<T> where T: CData<TT, V>
+{}
 
 unsafe impl<'buf, TT: Ident, T, V: OdbcVersion> DeferredBuf<'buf, TT, V> for &'buf [UnsafeCell<T>] where
     [T]: CData<TT, V>
 {
 }
-unsafe impl<'buf, TT: Ident, T: ScalarCType, V: OdbcVersion> DeferredBuf<'buf, TT, V> for &'buf UnsafeCell<T> where
-    T: CData<TT, V>
+unsafe impl<'buf, TT: Ident, T: ScalarCType, V: OdbcVersion> DeferredBuf<'buf, TT, V>
+    for &'buf UnsafeCell<T>
+where
+    T: CData<TT, V>,
 {
 }
 
+#[cfg(feature = "raw_api")]
 unsafe impl<'buf, TT: Ident, V: OdbcVersion> DeferredBuf<'buf, TT, V> for NonNull<c_void> {}
 
 //impl<T> ParameterDir<SQL_PARAM_INPUT> for [T] where [T]: DeferredBuf {}
