@@ -1,8 +1,7 @@
+use crate::attr::{Attr, AttrGet, AttrLen};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
-use crate::{
-    Attr, AttrGet, AttrLen, Ident, OdbcChar, OdbcDefined, OdbcStr, SQLCHAR, SQLSMALLINT,
-    SQLUINTEGER, SQLUSMALLINT, SQLWCHAR,
-};
+use crate::str::{OdbcChar, OdbcStr};
+use crate::{Ident, OdbcDefined, SQLCHAR, SQLSMALLINT, SQLUINTEGER, SQLUSMALLINT, SQLWCHAR};
 use rs_odbc_derive::{odbc_bitmask, odbc_type, Ident};
 use std::mem::MaybeUninit;
 

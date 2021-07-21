@@ -1,9 +1,12 @@
 use crate::api::ffi;
+use crate::str::{Ansi, Unicode, OdbcChar, OdbcStr};
+use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::handle::{AppDesc, AsSQLHANDLE, ImplDesc, ParamDesc, RowDesc, SQLHDESC};
+use crate::convert::{AsMutPtr, AsMutSQLPOINTER};
 use crate::{
-    handle::SQLHSTMT, sqlreturn::SQLRETURN, AsMutPtr, AsMutSQLPOINTER, Attr, AttrGet, AttrLen,
-    AttrSet, Ident, OdbcBool, OdbcChar, OdbcDefined, OdbcStr, SQLINTEGER, SQLPOINTER, SQLULEN, SQLCHAR, SQLWCHAR
+    handle::SQLHSTMT, sqlreturn::SQLRETURN, Ident, OdbcBool, OdbcDefined,
+    SQLCHAR, SQLINTEGER, SQLPOINTER, SQLULEN, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::{ManuallyDrop, MaybeUninit};
@@ -31,7 +34,7 @@ pub trait StmtAttr<'stmt, 'buf, A: Ident, V: OdbcVersion>:
     ) -> SQLRETURN
     where
         A: Ident<Type = SQLINTEGER>,
-        Self: AttrGet<A> + crate::AnsiType,
+        Self: AttrGet<A> + Ansi,
         MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
         let ValuePtrLen = self.len();
@@ -54,7 +57,7 @@ pub trait StmtAttr<'stmt, 'buf, A: Ident, V: OdbcVersion>:
     ) -> SQLRETURN
     where
         A: Ident<Type = SQLINTEGER>,
-        Self: AttrGet<A> + crate::UnicodeType,
+        Self: AttrGet<A> + Unicode,
         MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
         let ValuePtrLen = self.len();
@@ -174,7 +177,7 @@ where
     ) -> SQLRETURN
     where
         A: Ident<Type = SQLINTEGER>,
-        Self: AttrGet<A> + crate::AnsiType,
+        Self: AttrGet<A> + Ansi,
         MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
         self.readA(
@@ -189,7 +192,7 @@ where
     ) -> SQLRETURN
     where
         A: Ident<Type = SQLINTEGER>,
-        Self: AttrGet<A> + crate::UnicodeType,
+        Self: AttrGet<A> + Unicode,
         MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
         self.readW(
@@ -216,7 +219,7 @@ where
     ) -> SQLRETURN
     where
         A: Ident<Type = SQLINTEGER>,
-        Self: AttrGet<A> + crate::AnsiType,
+        Self: AttrGet<A> + Ansi,
         MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
         self.readA(
@@ -231,7 +234,7 @@ where
     ) -> SQLRETURN
     where
         A: Ident<Type = SQLINTEGER>,
-        Self: AttrGet<A> + crate::UnicodeType,
+        Self: AttrGet<A> + Unicode,
         MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
     {
         self.readW(

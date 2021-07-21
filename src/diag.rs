@@ -1,8 +1,11 @@
+use crate::attr::{Attr, AttrGet, AttrLen, AttrZeroAssert};
+use crate::convert::AsMutSQLPOINTER;
 use crate::env::OdbcVersion;
 use crate::handle::{Handle, SQLHSTMT};
+use crate::str::{OdbcChar, OdbcStr};
 use crate::{
-    sqlreturn::SQLRETURN, AsMutSQLPOINTER, Attr, AttrGet, AttrLen, AttrZeroAssert, Def, Ident,
-    OdbcDefined, OdbcChar, OdbcStr, Void, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLWCHAR,
+    sqlreturn::SQLRETURN, Def, Ident, OdbcDefined, Void, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER,
+    SQLSMALLINT, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
@@ -125,14 +128,12 @@ where
 {
 }
 
-impl<D: Ident, H: Handle> DiagField<D, H> for OdbcStr<MaybeUninit<SQLCHAR>>
-where
-    OdbcStr<SQLCHAR>: DiagField<D, H>,
+impl<D: Ident, H: Handle> DiagField<D, H> for OdbcStr<MaybeUninit<SQLCHAR>> where
+    OdbcStr<SQLCHAR>: DiagField<D, H>
 {
 }
-impl<D: Ident, H: Handle> DiagField<D, H> for OdbcStr<MaybeUninit<SQLWCHAR>>
-where
-    OdbcStr<SQLWCHAR>: DiagField<D, H>,
+impl<D: Ident, H: Handle> DiagField<D, H> for OdbcStr<MaybeUninit<SQLWCHAR>> where
+    OdbcStr<SQLWCHAR>: DiagField<D, H>
 {
 }
 

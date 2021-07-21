@@ -2,7 +2,8 @@
 use crate::api::ffi;
 use crate::c_types::DeferredBuf;
 use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
-use crate::{sqlreturn::SQL_SUCCESS, Ident, IntoSQLPOINTER, StrLenOrInd, SQLPOINTER, SQLSMALLINT};
+use crate::convert::IntoSQLPOINTER;
+use crate::{sqlreturn::SQL_SUCCESS, Ident, StrLenOrInd, SQLPOINTER, SQLSMALLINT};
 use mockall_double::double;
 use std::any::type_name;
 use std::cell::{Cell, UnsafeCell};
@@ -25,7 +26,7 @@ pub unsafe trait AsSQLHANDLE {
 }
 
 pub trait Handle {
-    type Ident: crate::Ident<Type = SQLSMALLINT>;
+    type Ident: Ident<Type = SQLSMALLINT>;
 }
 
 // TODO: Should be unsafe?
@@ -384,17 +385,18 @@ impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
         descriptor_handle.assume_init()
     }
 
+    // TODO: Don't bind (SQLPOINTER, SQLLEN) fat pointer when using raw_api
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<'buf, TT, V>>(
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(
         &self,
-        TargetValuePtr: Option<B>,
-    ) {
+        TargetValuePtr: Option<&'buf B>,
+    )  where B: ?Sized {
     }
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<'buf, TT, V>>(
+    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT, V>>(
         &self,
-        TargetValuePtr: Option<B>,
-    ) {
+        TargetValuePtr: Option<&'buf B>,
+    )  where B: ?Sized {
     }
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) fn bind_strlen_or_ind(
@@ -404,10 +406,10 @@ impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
     }
 
     #[cfg(feature = "odbc_debug")]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<'buf, TT, V>>(
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(
         &self,
-        TargetValuePtr: Option<B>,
-    ) {
+        TargetValuePtr: Option<&'buf B>,
+    )  where B: ?Sized {
         if let Some(explicit_ard) = self.explicit_ard.get() {
             // TODO:
             //explicit_ard.bind_col(TargetValuePtr);
@@ -417,10 +419,10 @@ impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
         }
     }
     #[cfg(feature = "odbc_debug")]
-    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<'buf, TT, V>>(
+    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT, V>>(
         &self,
-        TargetValuePtr: Option<B>,
-    ) {
+        TargetValuePtr: Option<&'buf B>,
+    )  where B: ?Sized {
         if let Some(explicit_apd) = self.explicit_apd.get() {
             // TODO:
             //explicit_apd.bind_param(TargetValuePtr);

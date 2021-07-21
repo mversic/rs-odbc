@@ -1,8 +1,10 @@
+use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::handle::{ConnState, C2, C4};
+use crate::str::{OdbcChar, OdbcStr};
 use crate::{
-    info::TxnIsolation, stmt::StmtAttr, Attr, AttrGet, AttrLen, AttrSet, Ident, OdbcBool, OdbcChar,
-    OdbcDefined, OdbcStr, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR,
+    info::TxnIsolation, stmt::StmtAttr, Ident, OdbcBool, OdbcDefined, SQLCHAR, SQLINTEGER,
+    SQLUINTEGER, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;

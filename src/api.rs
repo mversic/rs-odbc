@@ -4,6 +4,7 @@ use std::mem::MaybeUninit;
 use std::ptr;
 
 use crate::{
+    attr::{AttrGet, AttrSet},
     c_types::CData,
     c_types::DeferredBuf,
     col::ColAttr,
@@ -14,13 +15,15 @@ use crate::{
     handle::{BrowseConnect, ConnState, Disconnect, C2, C4, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
     info::InfoType,
     sql_types::SqlType,
+    str::{OdbcStr, Ansi, Unicode},
+    convert::{AsMutSQLPOINTER, AsSQLPOINTER, IntoSQLPOINTER, AsMutRawSlice, AsRawSlice, AsMutPtr},
     sqlreturn::{SQLRETURN, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_SUCCEEDED, SQL_SUCCESS},
     stmt::StmtAttr,
-    AnsiType, AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLPOINTER, AttrGet, AttrSet,
-    BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion, FreeStmtOption,
-    FunctionId, IOType, Ident, IdentifierType, IntoSQLPOINTER, LockType, NullAllowed, Operation,
-    Reserved, Scope, StrLenOrInd, UnicodeType, Unique, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN,
-    SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR, OdbcStr
+    BulkOperation, CompletionType,
+    DatetimeIntervalCode, DriverCompletion, FreeStmtOption, FunctionId, IOType, Ident,
+    IdentifierType, LockType, NullAllowed, Operation, Reserved, Scope, StrLenOrInd,
+    Unique, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW,
+    SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
 
 /// Allocates an environment, connection, statement, or descriptor handle.
@@ -68,21 +71,19 @@ where
 #[inline]
 #[must_use]
 #[allow(non_snake_case, unused_variables)]
-pub fn SQLBindCol<
-    'buf,
-    TT: Ident<Type = SQLSMALLINT>,
-    B: DeferredBuf<'buf, TT, V>,
-    V: OdbcVersion,
->(
+pub fn SQLBindCol<'buf, TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<TT, V>, V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<'_, '_, 'buf, V>,
     ColumnNumber: SQLUSMALLINT,
     TargetType: TT,
-    TargetValuePtr: Option<B>,
+    TargetValuePtr: Option<&'buf B>,
     StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
-) -> SQLRETURN {
+) -> SQLRETURN
+where
+    B: ?Sized,
+{
     let sql_return = unsafe {
         let TargetValuePtr = TargetValuePtr.map_or((ptr::null_mut(), 0), |TargetValuePtr| {
-            (TargetValuePtr.into_SQLPOINTER(), TargetValuePtr.len())
+            (TargetValuePtr.as_SQLPOINTER(), TargetValuePtr.len())
         });
 
         ffi::SQLBindCol(
@@ -119,7 +120,7 @@ pub fn SQLBindParameter<
     TT: Ident<Type = SQLSMALLINT>,
     // TODO: Check which type is used for ParameterType
     ST: SqlType<V>,
-    B: DeferredBuf<'buf, TT, V>,
+    B: DeferredBuf<TT, V>,
     V: OdbcVersion,
 >(
     StatementHandle: &SQLHSTMT<'_, '_, 'buf, V>,
@@ -129,13 +130,16 @@ pub fn SQLBindParameter<
     ParameterType: ST,
     ColumnSize: SQLULEN,
     DecimalDigits: SQLSMALLINT,
-    ParameterValuePtr: Option<B>,
+    ParameterValuePtr: Option<&'buf B>,
     StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
-) -> SQLRETURN {
+) -> SQLRETURN
+where
+    B: ?Sized,
+{
     let sql_return = unsafe {
         let ParameterValuePtr = ParameterValuePtr
             .map_or((ptr::null_mut(), 0), |ParameterValuePtr| {
-                (ParameterValuePtr.into_SQLPOINTER(), ParameterValuePtr.len())
+                (ParameterValuePtr.as_SQLPOINTER(), ParameterValuePtr.len())
             });
 
         ffi::SQLBindParameter(
@@ -268,9 +272,7 @@ pub fn SQLBulkOperations<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     Operation: BulkOperation,
 ) -> SQLRETURN {
-    unsafe {
-        ffi::SQLBulkOperations(StatementHandle.as_SQLHANDLE(), Operation as SQLUSMALLINT)
-    }
+    unsafe { ffi::SQLBulkOperations(StatementHandle.as_SQLHANDLE(), Operation as SQLUSMALLINT) }
 }
 
 /// Cancels the processing on a statement.
@@ -334,7 +336,7 @@ pub fn SQLColAttributeA<A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>, V: Odbc
     NumericAttributePtr: &mut MaybeUninit<SQLLEN>,
 ) -> SQLRETURN
 where
-    T: AttrGet<A> + AnsiType + ?Sized,
+    T: AttrGet<A> + Ansi + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
     // TODO: With MaybeUnint it's not possible to check that value is zeroed
@@ -381,7 +383,7 @@ pub fn SQLColAttributeW<A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>, V: Odbc
     NumericAttributePtr: &mut MaybeUninit<SQLLEN>,
 ) -> SQLRETURN
 where
-    T: AttrGet<A> + UnicodeType + ?Sized,
+    T: AttrGet<A> + Unicode + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
     // TODO: With MaybeUnint it's not possible to check that value is zeroed
@@ -1185,7 +1187,7 @@ pub unsafe fn SQLExecute<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRE
 #[allow(non_snake_case)]
 #[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
 pub fn SQLExecute<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
-    unsafe {ffi::SQLExecute(StatementHandle.as_SQLHANDLE())}
+    unsafe { ffi::SQLExecute(StatementHandle.as_SQLHANDLE()) }
 }
 
 /// Fetches the next rowset of data from the result set and returns data for all bound columns.
@@ -1211,7 +1213,7 @@ pub unsafe fn SQLFetch<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETU
 #[allow(non_snake_case)]
 #[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
 pub fn SQLFetch<V: OdbcVersion>(StatementHandle: &SQLHSTMT<V>) -> SQLRETURN {
-    unsafe {ffi::SQLFetch(StatementHandle.as_SQLHANDLE()) }
+    unsafe { ffi::SQLFetch(StatementHandle.as_SQLHANDLE()) }
 }
 
 /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
@@ -1409,7 +1411,7 @@ pub fn SQLGetConnectAttrA<
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrGet<A> + AnsiType + ?Sized,
+    T: AttrGet<A> + Ansi + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -1453,7 +1455,7 @@ pub fn SQLGetConnectAttrW<
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrGet<A> + UnicodeType + ?Sized,
+    T: AttrGet<A> + Unicode + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -1583,7 +1585,7 @@ pub fn SQLGetDescFieldA<
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrGet<A> + AnsiType + ?Sized,
+    T: AttrGet<A> + Ansi + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -1629,7 +1631,7 @@ pub fn SQLGetDescFieldW<
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrGet<A> + UnicodeType + ?Sized,
+    T: AttrGet<A> + Unicode + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -1752,7 +1754,7 @@ pub fn SQLGetDiagFieldA<H: Handle, D: Ident<Type = SQLSMALLINT>, T: DiagField<D,
 ) -> SQLRETURN
 where
     H: AsSQLHANDLE,
-    T: AttrGet<D> + AnsiType + ?Sized,
+    T: AttrGet<D> + Ansi + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
     let DiagInfoPtr = DiagInfoPtr.map_or((ptr::null_mut(), 0), |DiagInfoPtr| {
@@ -1796,7 +1798,7 @@ pub fn SQLGetDiagFieldW<H: Handle, D: Ident<Type = SQLSMALLINT>, T: DiagField<D,
 ) -> SQLRETURN
 where
     H: AsSQLHANDLE,
-    T: AttrGet<D> + UnicodeType + ?Sized,
+    T: AttrGet<D> + Unicode + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
     let DiagInfoPtr = DiagInfoPtr.map_or((ptr::null_mut(), 0), |DiagInfoPtr| {
@@ -1970,7 +1972,7 @@ pub fn SQLGetInfoA<I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>, V: OdbcVers
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrGet<I> + AnsiType + ?Sized,
+    T: AttrGet<I> + Ansi + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
     let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
@@ -2005,7 +2007,7 @@ pub fn SQLGetInfoW<I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>, V: OdbcVers
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrGet<I> + UnicodeType + ?Sized,
+    T: AttrGet<I> + Unicode + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
 {
     let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
@@ -2045,7 +2047,7 @@ pub fn SQLGetStmtAttrA<
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrGet<A> + AnsiType,
+    T: AttrGet<A> + Ansi,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     if let Some(ValuePtr) = ValuePtr {
@@ -2089,7 +2091,7 @@ pub fn SQLGetStmtAttrW<
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrGet<A> + UnicodeType + ?Sized,
+    T: AttrGet<A> + Unicode + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     if let Some(ValuePtr) = ValuePtr {
@@ -2250,9 +2252,7 @@ pub fn SQLNumResultCols<V: OdbcVersion>(
     StatementHandle: &SQLHSTMT<V>,
     ColumnCountPtr: &mut MaybeUninit<SQLSMALLINT>,
 ) -> SQLRETURN {
-    unsafe {
-        ffi::SQLNumResultCols(StatementHandle.as_SQLHANDLE(), ColumnCountPtr.as_mut_ptr())
-    }
+    unsafe { ffi::SQLNumResultCols(StatementHandle.as_SQLHANDLE(), ColumnCountPtr.as_mut_ptr()) }
 }
 
 /// Used together with **SQLPutData** to supply parameter data at statement execution time, and with **SQLGetData** to retrieve streamed output parameter data.
@@ -2563,7 +2563,7 @@ where
         (DataPtr.as_SQLPOINTER(), DataPtr.len())
     });
 
-    unsafe {ffi::SQLPutData(StatementHandle.as_SQLHANDLE(), DataPtr.0, DataPtr.1)}
+    unsafe { ffi::SQLPutData(StatementHandle.as_SQLHANDLE(), DataPtr.0, DataPtr.1) }
 }
 
 /// Returns the number of rows affected by an **UPDATE**, **INSERT**, or **DELETE** statement; an SQL_ADD, SQL_UPDATE_BY_BOOKMARK, or SQL_DELETE_BY_BOOKMARK operation in **SQLBulkOperations**; or an SQL_UPDATE or SQL_DELETE operation in **SQLSetPos**.
@@ -2602,7 +2602,7 @@ pub fn SQLSetConnectAttrA<
     ValuePtr: T,
 ) -> SQLRETURN
 where
-    T: AttrSet<A> + AnsiType,
+    T: AttrSet<A> + Ansi,
 {
     unsafe {
         ffi::SQLSetConnectAttrA(
@@ -2634,7 +2634,7 @@ pub fn SQLSetConnectAttrW<
     ValuePtr: T,
 ) -> SQLRETURN
 where
-    T: AttrSet<A> + UnicodeType,
+    T: AttrSet<A> + Unicode,
 {
     unsafe {
         ffi::SQLSetConnectAttrW(
@@ -2661,9 +2661,7 @@ pub fn SQLSetCursorNameA<V: OdbcVersion>(
 ) -> SQLRETURN {
     let CursorName = CursorName.as_raw_slice();
 
-    unsafe {
-        ffi::SQLSetCursorNameA(StatementHandle.as_SQLHANDLE(), CursorName.0, CursorName.1)
-    }
+    unsafe { ffi::SQLSetCursorNameA(StatementHandle.as_SQLHANDLE(), CursorName.0, CursorName.1) }
 }
 
 /// Associates a cursor name with an active statement. If an application does not call **SQLSetCursorName**, the driver generates cursor names as needed for SQL statement processing.
@@ -2681,9 +2679,7 @@ pub fn SQLSetCursorNameW<V: OdbcVersion>(
 ) -> SQLRETURN {
     let CursorName = CursorName.as_raw_slice();
 
-    unsafe {
-        ffi::SQLSetCursorNameW(StatementHandle.as_SQLHANDLE(), CursorName.0, CursorName.1)
-    }
+    unsafe { ffi::SQLSetCursorNameW(StatementHandle.as_SQLHANDLE(), CursorName.0, CursorName.1) }
 }
 
 /// Sets the value of a single field of a descriptor record.
@@ -2708,7 +2704,7 @@ pub fn SQLSetDescFieldA<
     ValuePtr: Option<T>,
 ) -> SQLRETURN
 where
-    T: AttrSet<A> + AnsiType,
+    T: AttrSet<A> + Ansi,
 {
     let sql_return = unsafe {
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -2753,7 +2749,7 @@ pub fn SQLSetDescFieldW<
     ValuePtr: Option<T>,
 ) -> SQLRETURN
 where
-    T: AttrSet<A> + UnicodeType,
+    T: AttrSet<A> + Unicode,
 {
     let sql_return = unsafe {
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -2917,7 +2913,7 @@ pub fn SQLSetStmtAttrA<
     ValuePtr: T,
 ) -> SQLRETURN
 where
-    T: AttrSet<A> + AnsiType,
+    T: AttrSet<A> + Ansi,
 {
     let sql_return = unsafe {
         ffi::SQLSetStmtAttrA(
@@ -2956,7 +2952,7 @@ pub fn SQLSetStmtAttrW<
     ValuePtr: T,
 ) -> SQLRETURN
 where
-    T: AttrSet<A> + UnicodeType,
+    T: AttrSet<A> + Unicode,
 {
     let sql_return = unsafe {
         ffi::SQLSetStmtAttrW(
@@ -3342,7 +3338,10 @@ pub(crate) mod ffi {
             StringLength2Ptr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLBulkOperations(StatementHandle: HSTMT, Operation: SQLUSMALLINT) -> SQLRETURN;
+        pub(crate) fn SQLBulkOperations(
+            StatementHandle: HSTMT,
+            Operation: SQLUSMALLINT,
+        ) -> SQLRETURN;
 
         pub(crate) fn SQLCancel(StatementHandle: HSTMT) -> SQLRETURN;
 

@@ -89,12 +89,12 @@ fn odbc_derive(ast: &mut syn::DeriveInput, inner_type: &Ident) -> TokenStream2 {
             }
 
             quote! {
-                unsafe impl crate::AsMutSQLPOINTER for #type_name {
+                unsafe impl crate::convert::AsMutSQLPOINTER for #type_name {
                     fn as_mut_SQLPOINTER(&mut self) -> crate::SQLPOINTER {
                         (self as *mut Self).cast()
                     }
                 }
-                unsafe impl crate::AsMutSQLPOINTER for std::mem::MaybeUninit<#type_name> {
+                unsafe impl crate::convert::AsMutSQLPOINTER for std::mem::MaybeUninit<#type_name> {
                     fn as_mut_SQLPOINTER(&mut self) -> crate::SQLPOINTER {
                         self.as_mut_ptr().cast()
                     }
@@ -139,13 +139,13 @@ fn odbc_derive(ast: &mut syn::DeriveInput, inner_type: &Ident) -> TokenStream2 {
             const IDENTIFIER: Self::Type = <crate::#inner_type as crate::Ident>::IDENTIFIER;
         }
 
-        unsafe impl crate::IntoSQLPOINTER for #type_name {
+        unsafe impl crate::convert::IntoSQLPOINTER for #type_name {
             fn into_SQLPOINTER(self) -> crate::SQLPOINTER {
                 Self::identifier(&self) as _
             }
         }
 
-        impl crate::AttrZeroAssert for #type_name {
+        impl crate::attr::AttrZeroAssert for #type_name {
             #[inline]
             fn assert_zeroed(&self) {
                 // TODO: Check implementation on types in lib.rs

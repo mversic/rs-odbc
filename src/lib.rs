@@ -1,7 +1,9 @@
 pub mod api;
+pub mod attr;
 pub mod c_types;
 pub mod col;
 pub mod conn;
+pub mod convert;
 pub mod desc;
 pub mod diag;
 pub mod env;
@@ -10,14 +12,12 @@ pub mod info;
 pub mod sql_types;
 pub mod sqlreturn;
 pub mod stmt;
+pub mod str;
 
 use rs_odbc_derive::odbc_type;
-use std::cell::UnsafeCell;
 use std::convert::TryFrom;
 use std::ffi::c_void;
 use std::fmt::Debug;
-use std::mem::MaybeUninit;
-use std::ops::{Deref, DerefMut};
 pub use {api::*, c_types::*, sql_types::*};
 pub use {
     BulkOperation::*, CompletionType::*, DriverCompletion::*, FreeStmtOption::*, FunctionId::*,
@@ -61,8 +61,14 @@ pub type SQLPOINTER = *mut c_void;
 
 #[derive(Debug, Clone, Copy)]
 // TODO: https://github.com/rust-lang/rust/issues/35121
-// Use uninhabited type ! when it is available in std
+// Use uninhabited type ! when it is available in stable
 pub enum Void {}
+
+pub trait Def {}
+pub enum OdbcDefined {}
+pub enum DriverDefined {}
+impl Def for OdbcDefined {}
+impl Def for DriverDefined {}
 
 const SQL_IS_POINTER: SQLSMALLINT = -4;
 const SQL_IS_UINTEGER: SQLSMALLINT = -5;
@@ -75,256 +81,6 @@ const SQL_IS_SMALLINT: SQLSMALLINT = -8;
 // WARNING: These are not mentioned in ODBC
 const SQL_IS_LEN: SQLSMALLINT = SQL_IS_INTEGER;
 const SQL_IS_ULEN: SQLSMALLINT = SQL_IS_UINTEGER;
-
-const SLICE_LEN_TOO_LARGE_MSG: &str = "Slice len too large";
-
-pub trait OdbcChar {}
-impl OdbcChar for SQLCHAR {}
-impl OdbcChar for SQLWCHAR {}
-
-#[repr(transparent)]
-pub struct OdbcStr<T>([T]);
-impl<T> Deref for OdbcStr<T> {
-    type Target = [T];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl<T> DerefMut for OdbcStr<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-impl AsRef<OdbcStr<SQLCHAR>> for str {
-    fn as_ref(&self) -> &OdbcStr<SQLCHAR> {
-        self.as_bytes().as_ref()
-    }
-}
-impl AsMut<OdbcStr<SQLCHAR>> for str {
-    fn as_mut(&mut self) -> &mut OdbcStr<SQLCHAR> {
-        unsafe { self.as_bytes_mut().as_mut() }
-    }
-}
-impl AsRef<OdbcStr<SQLCHAR>> for [SQLCHAR] {
-    fn as_ref(&self) -> &OdbcStr<SQLCHAR> {
-        unsafe { &*(self as *const [SQLCHAR] as *const OdbcStr<SQLCHAR>) }
-    }
-}
-impl AsMut<OdbcStr<SQLCHAR>> for [SQLCHAR] {
-    fn as_mut(&mut self) -> &mut OdbcStr<SQLCHAR> {
-        unsafe { &mut *(self as *mut [SQLCHAR] as *mut OdbcStr<SQLCHAR>) }
-    }
-}
-impl AsRef<OdbcStr<SQLWCHAR>> for [SQLWCHAR] {
-    fn as_ref(&self) -> &OdbcStr<SQLWCHAR> {
-        unsafe { &*(self as *const [SQLWCHAR] as *const OdbcStr<SQLWCHAR>) }
-    }
-}
-impl AsMut<OdbcStr<SQLWCHAR>> for [SQLWCHAR] {
-    fn as_mut(&mut self) -> &mut OdbcStr<SQLWCHAR> {
-        unsafe { &mut *(self as *mut [SQLWCHAR] as *mut OdbcStr<SQLWCHAR>) }
-    }
-}
-impl AsMut<OdbcStr<MaybeUninit<SQLCHAR>>> for [MaybeUninit<SQLCHAR>]
-where
-    [SQLCHAR]: AsMut<OdbcStr<SQLCHAR>>,
-{
-    fn as_mut(&mut self) -> &mut OdbcStr<MaybeUninit<SQLCHAR>> {
-        unsafe { &mut *(self as *mut [MaybeUninit<SQLCHAR>] as *mut OdbcStr<MaybeUninit<SQLCHAR>>) }
-    }
-}
-impl AsMut<OdbcStr<MaybeUninit<SQLWCHAR>>> for [MaybeUninit<SQLWCHAR>]
-where
-    [SQLWCHAR]: AsMut<OdbcStr<SQLWCHAR>>,
-{
-    fn as_mut(&mut self) -> &mut OdbcStr<MaybeUninit<SQLWCHAR>> {
-        unsafe {
-            &mut *(self as *mut [MaybeUninit<SQLWCHAR>] as *mut OdbcStr<MaybeUninit<SQLWCHAR>>)
-        }
-    }
-}
-
-/// Implementing types must support all possible values for T because
-/// any valid T value can be written to the obtained raw mut pointer
-pub unsafe trait AsMutPtr<T> {
-    fn as_mut_ptr(&mut self) -> *mut T;
-}
-
-unsafe impl<T> AsMutPtr<T> for MaybeUninit<T> {
-    fn as_mut_ptr(&mut self) -> *mut T {
-        self.as_mut_ptr()
-    }
-}
-unsafe impl<T: Ident> AsMutPtr<T> for MaybeUninit<Void> {
-    fn as_mut_ptr(&mut self) -> *mut T {
-        // SAFETY:
-        // Acording to the ODBC specification returning `self.as_mut_ptr().cast()` here
-        // should be fine. However non-compliant implementations might try to write
-        // to non-null pointers obtained through this method which would cause UB
-        std::ptr::null_mut()
-    }
-}
-// TODO: Why is this here?
-unsafe impl AsMutPtr<SQLLEN> for MaybeUninit<StrLenOrInd> {
-    fn as_mut_ptr(&mut self) -> *mut SQLLEN {
-        self.as_mut_ptr().cast()
-    }
-}
-unsafe impl AsMutPtr<SQLLEN> for UnsafeCell<StrLenOrInd> {
-    fn as_mut_ptr(&mut self) -> *mut SQLLEN {
-        self.get().cast()
-    }
-}
-
-/// Invariant: SQLPOINTER obtained through this trait is never written to
-pub unsafe trait IntoSQLPOINTER: Copy {
-    #[allow(non_snake_case)]
-    fn into_SQLPOINTER(self) -> SQLPOINTER;
-}
-unsafe impl IntoSQLPOINTER for SQLSMALLINT {
-    fn into_SQLPOINTER(self) -> SQLPOINTER {
-        SQLINTEGER::into_SQLPOINTER(self as SQLINTEGER)
-    }
-}
-unsafe impl IntoSQLPOINTER for SQLUSMALLINT {
-    fn into_SQLPOINTER(self) -> SQLPOINTER {
-        SQLUINTEGER::into_SQLPOINTER(self as SQLUINTEGER)
-    }
-}
-unsafe impl IntoSQLPOINTER for SQLINTEGER {
-    fn into_SQLPOINTER(self) -> SQLPOINTER {
-        self as SQLPOINTER
-    }
-}
-unsafe impl IntoSQLPOINTER for SQLUINTEGER {
-    fn into_SQLPOINTER(self) -> SQLPOINTER {
-        self as SQLPOINTER
-    }
-}
-unsafe impl IntoSQLPOINTER for SQLLEN {
-    fn into_SQLPOINTER(self) -> SQLPOINTER {
-        self as SQLPOINTER
-    }
-}
-unsafe impl IntoSQLPOINTER for SQLULEN {
-    fn into_SQLPOINTER(self) -> SQLPOINTER {
-        self as SQLPOINTER
-    }
-}
-unsafe impl<T> IntoSQLPOINTER for &[T] {
-    fn into_SQLPOINTER(self) -> SQLPOINTER {
-        // Casting from const to mutable raw pointer is safe because of the invariant
-        // that SQLPOINTER obtained through IntoSQLPOINTER will never be written to
-        (self.as_ptr() as *mut T).cast()
-    }
-}
-unsafe impl<CH: OdbcChar> IntoSQLPOINTER for &OdbcStr<CH> {
-    fn into_SQLPOINTER(self) -> SQLPOINTER {
-        // Casting from const to mutable raw pointer is safe because of the invariant
-        // that SQLPOINTER obtained through IntoSQLPOINTER will never be written to
-        (self.as_ptr() as *mut CH).cast()
-    }
-}
-#[cfg(feature = "raw_api")]
-unsafe impl IntoSQLPOINTER for std::ptr::NonNull<c_void> {
-    fn into_SQLPOINTER(self) -> SQLPOINTER {
-        self.as_ptr().cast()
-    }
-}
-
-/// Invariant: SQLPOINTER obtained through this trait is never written to
-pub unsafe trait AsSQLPOINTER {
-    #[allow(non_snake_case)]
-    fn as_SQLPOINTER(&self) -> SQLPOINTER;
-}
-unsafe impl<T> AsSQLPOINTER for OdbcStr<T> {
-    fn as_SQLPOINTER(&self) -> SQLPOINTER {
-        // Casting from const to mutable raw pointer is ok because of the invariant
-        // that SQLPOINTER obtained through AsSQLPOINTER will never be written to
-        (self.as_ptr() as *mut T).cast()
-    }
-}
-unsafe impl<T> AsSQLPOINTER for [T] {
-    fn as_SQLPOINTER(&self) -> SQLPOINTER {
-        // Casting from const to mutable raw pointer is ok because of the invariant
-        // that SQLPOINTER obtained through AsSQLPOINTER will never be written to
-        (self.as_ptr() as *mut T).cast()
-    }
-}
-
-pub unsafe trait AsMutSQLPOINTER {
-    #[allow(non_snake_case)]
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER;
-}
-// TODO: Why special implementation?
-unsafe impl AsMutSQLPOINTER for SQLLEN {
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        (self as *mut Self).cast()
-    }
-}
-// TODO: Why special implementation?
-unsafe impl AsMutSQLPOINTER for SQLULEN {
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        (self as *mut Self).cast()
-    }
-}
-unsafe impl<T> AsMutSQLPOINTER for OdbcStr<T> {
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        self.as_mut_ptr().cast()
-    }
-}
-unsafe impl<T> AsMutSQLPOINTER for [T] {
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        self.as_mut_ptr().cast()
-    }
-}
-
-pub trait AttrZeroAssert {
-    fn assert_zeroed(&self) {}
-}
-
-impl AttrZeroAssert for SQLSMALLINT {
-    fn assert_zeroed(&self) {
-        // TODO: Add custom message
-        assert_eq!(0, *self);
-    }
-}
-impl AttrZeroAssert for SQLUSMALLINT {
-    fn assert_zeroed(&self) {
-        // TODO: Add custom message
-        assert_eq!(0, *self);
-    }
-}
-impl AttrZeroAssert for SQLINTEGER {
-    fn assert_zeroed(&self) {
-        // TODO: Add custom message
-        assert_eq!(0, *self);
-    }
-}
-impl AttrZeroAssert for SQLUINTEGER {
-    fn assert_zeroed(&self) {
-        // TODO: Add custom message
-        assert_eq!(0, *self);
-    }
-}
-impl AttrZeroAssert for SQLLEN {
-    fn assert_zeroed(&self) {
-        // TODO: Add custom message
-        assert_eq!(0, *self);
-    }
-}
-impl AttrZeroAssert for SQLULEN {
-    fn assert_zeroed(&self) {
-        // TODO: Add custom message
-        assert_eq!(0, *self);
-    }
-}
-impl<T> AttrZeroAssert for MaybeUninit<T> {
-    // MaybeUninit must not be read
-}
-impl<T> AttrZeroAssert for OdbcStr<T> {}
-impl<T> AttrZeroAssert for [T] {}
 
 /// Implementing type must have the same representation as SQLPOINTER
 pub trait Ident {
@@ -381,246 +137,6 @@ impl<T> Ident for Option<&mut T> {
 
     const IDENTIFIER: Self::Type = SQL_IS_POINTER;
 }
-
-pub unsafe trait Attr<A: Ident> {
-    type DefinedBy: Def;
-}
-unsafe impl<A: Ident, T: Ident> Attr<A> for MaybeUninit<T>
-where
-    T: Attr<A>,
-{
-    type DefinedBy = T::DefinedBy;
-}
-unsafe impl<A: Ident> Attr<A> for OdbcStr<MaybeUninit<SQLCHAR>>
-where
-    OdbcStr<SQLCHAR>: Attr<A>,
-{
-    type DefinedBy = <OdbcStr<SQLCHAR> as Attr<A>>::DefinedBy;
-}
-unsafe impl<A: Ident> Attr<A> for OdbcStr<MaybeUninit<SQLWCHAR>>
-where
-    OdbcStr<SQLWCHAR>: Attr<A>,
-{
-    type DefinedBy = <OdbcStr<SQLWCHAR> as Attr<A>>::DefinedBy;
-}
-unsafe impl<A: Ident, CH: OdbcChar> Attr<A> for &OdbcStr<CH>
-where
-    OdbcStr<CH>: Attr<A>,
-{
-    type DefinedBy = <OdbcStr<CH> as Attr<A>>::DefinedBy;
-}
-
-// TODO: https://github.com/rust-lang/rust/issues/20400
-// Once this problem is resolved, it would be possible to modify AttrLen<AD, LEN>
-// into AttrLen<A, LEN> and do more precise blanket implementations like
-// impl<T: Attr<A>, LEN> AttrLen<A, LEN> for T {}
-pub unsafe trait AttrLen<AD: Def, LEN: Copy> {
-    /// Invariant: StrLen can only be LEN(for slices) or uninhabited type(for scalar types)
-    /// It is assumed that ODBC driver will never write to StrLen pointer for scalar types
-    type StrLen: Copy;
-
-    fn len(&self) -> LEN;
-}
-unsafe impl<AD: Def, LEN: Copy, T: Ident> AttrLen<AD, LEN> for T
-where
-    MaybeUninit<T>: AttrLen<AD, LEN>,
-    LEN: From<u8>,
-{
-    type StrLen = Void;
-
-    fn len(&self) -> LEN {
-        // Transmute is safe because MaybeUninit<T> has the same size and alignment as T
-        <MaybeUninit<_> as AttrLen<AD, LEN>>::len(unsafe { std::mem::transmute(self) })
-    }
-}
-unsafe impl<LEN: Copy, T: Ident> AttrLen<OdbcDefined, LEN> for MaybeUninit<T>
-where
-    LEN: From<u8>,
-{
-    type StrLen = Void;
-
-    fn len(&self) -> LEN {
-        LEN::from(0)
-    }
-}
-unsafe impl<LEN: Copy, T: Ident> AttrLen<DriverDefined, LEN> for MaybeUninit<T>
-where
-    T: AttrLen<OdbcDefined, LEN>,
-    LEN: From<T::Type>,
-{
-    type StrLen = Void;
-
-    fn len(&self) -> LEN {
-        LEN::from(T::IDENTIFIER)
-    }
-}
-unsafe impl<AD: Def, CH: OdbcChar, LEN: Copy> AttrLen<AD, LEN> for OdbcStr<CH>
-where
-    LEN: TryFrom<usize>,
-    LEN::Error: Debug,
-    OdbcStr<MaybeUninit<CH>>: AttrLen<AD, LEN>,
-{
-    type StrLen = <OdbcStr<MaybeUninit<CH>> as AttrLen<AD, LEN>>::StrLen;
-
-    fn len(&self) -> LEN {
-        // Transmute is safe because MaybeUninit<T> has the same size and alignment as T
-        <OdbcStr<MaybeUninit<CH>> as AttrLen<AD, LEN>>::len(unsafe { std::mem::transmute(self) })
-    }
-}
-unsafe impl<AD: Def, CH: OdbcChar, LEN: Copy> AttrLen<AD, LEN> for OdbcStr<MaybeUninit<CH>>
-where
-    LEN: TryFrom<usize> + std::ops::Mul<Output = LEN>,
-    LEN::Error: Debug,
-{
-    type StrLen = LEN;
-
-    fn len(&self) -> LEN {
-        // TODO: Check for multiplication overflow with checked_mul
-        slice_len::<_, LEN>(self)
-            * LEN::try_from(std::mem::size_of::<CH>()).expect(SLICE_LEN_TOO_LARGE_MSG)
-    }
-}
-unsafe impl<LEN: Copy> AttrLen<OdbcDefined, LEN> for [MaybeUninit<SQLCHAR>]
-where
-    LEN: TryFrom<usize>,
-    LEN::Error: Debug,
-{
-    type StrLen = LEN;
-
-    fn len(&self) -> LEN {
-        slice_len(self)
-    }
-}
-unsafe impl<LEN: Copy> AttrLen<DriverDefined, LEN> for [MaybeUninit<SQLCHAR>]
-where
-    LEN: TryFrom<usize>,
-{
-    type StrLen = LEN;
-
-    fn len(&self) -> LEN {
-        unimplemented!();
-    }
-}
-unsafe impl<AD: Def, LEN: Copy, T: Ident> AttrLen<AD, LEN> for [T]
-where
-    LEN: From<u8>,
-{
-    type StrLen = LEN;
-
-    fn len(&self) -> LEN {
-        unimplemented!()
-    }
-}
-unsafe impl<AD: Def, LEN: Copy, CH: OdbcChar> AttrLen<AD, LEN> for &OdbcStr<CH>
-where
-    OdbcStr<CH>: AttrLen<AD, LEN>,
-{
-    type StrLen = <OdbcStr<CH> as AttrLen<AD, LEN>>::StrLen;
-
-    fn len(&self) -> LEN {
-        AttrLen::len(*self)
-    }
-}
-unsafe impl<AD: Def, LEN: Copy, T> AttrLen<AD, LEN> for &[T]
-where
-    [T]: AttrLen<AD, LEN>,
-{
-    type StrLen = <[T] as AttrLen<AD, LEN>>::StrLen;
-
-    fn len(&self) -> LEN {
-        AttrLen::len(*self)
-    }
-}
-
-unsafe trait AsRawSlice<CH, LEN: Copy> {
-    fn as_raw_slice(&self) -> (*const CH, LEN);
-}
-unsafe impl<CH, LEN: TryFrom<usize>> AsRawSlice<CH, LEN> for OdbcStr<CH>
-where
-    LEN: Copy,
-    LEN::Error: Debug,
-{
-    fn as_raw_slice(&self) -> (*const CH, LEN) {
-        (self.as_ptr(), slice_len(self))
-    }
-}
-
-unsafe trait AsMutRawSlice<CH, LEN: Copy> {
-    fn as_mut_raw_slice(&mut self) -> (*mut CH, LEN);
-}
-unsafe impl<CH, LEN: TryFrom<usize>> AsMutRawSlice<SQLCHAR, LEN> for OdbcStr<CH>
-where
-    LEN: Copy,
-    LEN::Error: Debug,
-    OdbcStr<CH>: AnsiType,
-{
-    fn as_mut_raw_slice(&mut self) -> (*mut SQLCHAR, LEN) {
-        (self.as_mut_ptr().cast(), slice_len(self))
-    }
-}
-unsafe impl<CH, LEN: TryFrom<usize>> AsMutRawSlice<SQLWCHAR, LEN> for OdbcStr<CH>
-where
-    LEN: Copy,
-    LEN::Error: Debug,
-    OdbcStr<CH>: UnicodeType,
-{
-    fn as_mut_raw_slice(&mut self) -> (*mut SQLWCHAR, LEN) {
-        (self.as_mut_ptr().cast(), slice_len(self))
-    }
-}
-
-pub trait Bool {}
-#[derive(Debug)]
-pub struct True {}
-impl Bool for True {}
-#[derive(Debug)]
-pub struct False {}
-impl Bool for False {}
-pub trait Def {}
-pub enum OdbcDefined {}
-impl Def for OdbcDefined {}
-pub enum DriverDefined {}
-impl Def for DriverDefined {}
-
-pub unsafe trait AttrGet<A>: AsMutSQLPOINTER + AttrZeroAssert {}
-pub unsafe trait AttrSet<A>: IntoSQLPOINTER {}
-
-unsafe impl<A: Ident, T: Ident> AttrSet<A> for MaybeUninit<T>
-where
-    Self: IntoSQLPOINTER,
-    T: AttrSet<A>,
-{
-}
-unsafe impl<A: Ident, T: Ident> AttrGet<A> for MaybeUninit<T>
-where
-    Self: AsMutSQLPOINTER,
-    T: AttrGet<A>,
-{
-}
-unsafe impl<A: Ident> AttrGet<A> for OdbcStr<MaybeUninit<SQLCHAR>> where OdbcStr<SQLCHAR>: AttrGet<A>
-{}
-unsafe impl<A: Ident> AttrGet<A> for OdbcStr<MaybeUninit<SQLWCHAR>> where
-    OdbcStr<SQLWCHAR>: AttrGet<A>
-{
-}
-
-pub trait AnsiType {}
-pub trait UnicodeType {}
-
-impl<T: Ident> AnsiType for T {} // TODO: This accidently implements it for SQLWCHAR as well. May not be a problem?
-impl<T: Ident> UnicodeType for T {} // TODO: This accidently implements it for SQLWCHAR as well. May not be a problem?
-
-impl AnsiType for OdbcStr<SQLCHAR> {}
-impl UnicodeType for OdbcStr<SQLWCHAR> {}
-
-impl<T: Ident> AnsiType for MaybeUninit<T> where T: AnsiType {}
-impl<T: Ident> UnicodeType for MaybeUninit<T> where T: UnicodeType {}
-
-impl AnsiType for OdbcStr<MaybeUninit<SQLCHAR>> {}
-impl UnicodeType for OdbcStr<MaybeUninit<SQLWCHAR>> {}
-
-impl<CH: OdbcChar> AnsiType for &OdbcStr<CH> where OdbcStr<CH>: AnsiType {}
-impl<CH: OdbcChar> UnicodeType for &OdbcStr<CH> where OdbcStr<CH>: UnicodeType {}
 
 // TODO: Comapare attribute types: <attribute>(type, default)
 // SQL_ATTR_OUTPUT_NTS(u32, true), SQL_ATTR_AUTO_IPD(u32, _)
@@ -738,11 +254,6 @@ pub const SQL_PARAM_TYPE_UNKNOWN: IOType = IOType(0);
 pub const SQL_RESULT_COL: IOType = IOType(3);
 pub const SQL_RETURN_VALUE: IOType = IOType(5);
 
-//pub const fn SQL_LEN_BINARY_ATTR<LEN>(length: LEN) {
-//    const SQL_LEN_BINARY_ATTR_OFFSET: LEN = -100;
-//    -length + SQL_LEN_BINARY_ATTR_OFFSET
-//}
-
 // /// Specifies how many active connections a particular driver supports.
 //#define SQL_MAX_DRIVER_CONNECTIONS          0
 //#define SQL_MAXIMUM_DRIVER_CONNECTIONS      SQL_MAX_DRIVER_CONNECTIONS
@@ -828,11 +339,17 @@ pub enum FunctionId {
 //    SQL_FALSE
 //}
 
-// TODO: Make it const
-fn slice_len<T, LEN: TryFrom<usize>>(slice: &[T]) -> LEN
+//const SQL_LEN_DATA_AT_EXEC_OFFSET: usize = -100;
+//pub const fn SQL_LEN_DATA_AT_EXEC<LEN>(length: LEN) {
+//    (-length).checked_add(SQL_LEN_DATA_AT_EXEC_OFFSET).expect()
+//}
+
+// TODO: Make it const fn
+pub(crate) fn slice_len<T, LEN: TryFrom<usize>>(slice: &[T]) -> LEN
 where
     LEN::Error: Debug,
 {
+    const SLICE_LEN_TOO_LARGE_MSG: &str = "Slice len too large";
     LEN::try_from(slice.len()).expect(SLICE_LEN_TOO_LARGE_MSG)
 }
 
