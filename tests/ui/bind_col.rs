@@ -1,12 +1,11 @@
+use rs_odbc::c_types::SQL_C_SLONG;
 use rs_odbc::conn::C4;
 use rs_odbc::env::SQL_OV_ODBC3_80;
 use rs_odbc::handle::{
     SQLHDBC, SQLHENV, SQLHSTMT, SQL_HANDLE_DBC, SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE,
 };
-use rs_odbc::stmt::{RefSQLHDESC, SQL_ATTR_APP_ROW_DESC};
-use rs_odbc::{
-    SQLAllocHandle, SQLDriverConnectA, SQLFreeHandle, SQLGetStmtAttrA, SQL_DRIVER_COMPLETE,
-};
+use rs_odbc::{SQLAllocHandle, SQLBindCol, SQLDriverConnectA, SQLFreeHandle, SQL_DRIVER_COMPLETE};
+use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
 
 fn get_env_handle() -> SQLHENV<SQL_OV_ODBC3_80> {
@@ -39,14 +38,13 @@ fn main() {
     let mut env = get_env_handle();
     let conn = connect_to_test_db(&mut env);
     let mut stmt = MaybeUninit::uninit();
-    let mut desc = MaybeUninit::uninit();
 
     SQLAllocHandle(SQL_HANDLE_STMT, &conn, &mut stmt);
     let stmt: SQLHSTMT<_> = unsafe { stmt.assume_init() };
 
-    SQLGetStmtAttrA(&stmt, SQL_ATTR_APP_ROW_DESC, Some(&mut desc), None);
-    let desc: RefSQLHDESC<_, _> = unsafe { desc.assume_init() };
+    let val = UnsafeCell::new(12i32);
+    SQLBindCol(&stmt, 1, SQL_C_SLONG, Some(&val), None);
 
+    drop(val);
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
-    drop(desc);
 }

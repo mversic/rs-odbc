@@ -1,6 +1,5 @@
 use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
-use crate::handle::{ConnState, C2, C4};
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{
     info::TxnIsolation, stmt::StmtAttr, Ident, OdbcBool, OdbcDefined, SQLCHAR, SQLINTEGER,
@@ -8,6 +7,8 @@ use crate::{
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
+
+pub trait ConnState: private::ConnState {}
 
 /// C3 is not a valid state for setting or getting attributes
 pub trait ConnAttr<A: Ident, C: ConnState, V: OdbcVersion>:
@@ -23,6 +24,22 @@ pub trait ConnAttr<A: Ident, C: ConnState, V: OdbcVersion>:
     // TODO: Track active statements in debug mode because SQL_ATTR_ASYNC_ENABLE
     // can only be set when there are no active statements
 }
+
+/// Allocated
+#[derive(Debug)]
+pub enum C2 {}
+
+/// Need data
+#[derive(Debug)]
+pub enum C3 {}
+
+/// Connected
+#[derive(Debug)]
+pub enum C4 {}
+
+impl ConnState for C2 {}
+impl ConnState for C3 {}
+impl ConnState for C4 {}
 
 // Implement ConnAttr for all versions of connection attributes
 impl<A: Ident, T: Ident, C: ConnState> ConnAttr<A, C, SQL_OV_ODBC3_80> for T where
@@ -64,6 +81,41 @@ impl<A: Ident, C: ConnState, V: OdbcVersion> ConnAttr<A, C, V> for OdbcStr<Maybe
 impl<A: Ident, C: ConnState, CH: OdbcChar, V: OdbcVersion> ConnAttr<A, C, V> for &OdbcStr<CH> where
     OdbcStr<CH>: ConnAttr<A, C, V>
 {
+}
+
+mod private {
+    use super::{C2, C3, C4};
+    #[double]
+    use crate::api::ffi;
+    use crate::handle::{AsSQLHANDLE, SQLHDBC};
+    use crate::{env, sqlreturn};
+    use mockall_double::double;
+    use std::{any, thread};
+
+    pub trait ConnState {
+        // TODO: If drop impl specialization is allowed this fn will not be required
+        // Related to https://github.com/rust-lang/rust/issues/20400
+        fn disconnect<V: env::OdbcVersion>(handle: &mut SQLHDBC<Self, V>)
+        where
+            Self: super::ConnState + Sized,
+        {
+            let sql_return = unsafe { ffi::SQLDisconnect(handle.as_SQLHANDLE()) };
+
+            if sql_return != sqlreturn::SQL_SUCCESS && !thread::panicking() {
+                panic!(
+                    "{}: SQLDisconnect returned {:?}",
+                    any::type_name::<Self>(),
+                    sql_return
+                )
+            }
+        }
+    }
+
+    impl ConnState for C2 {
+        fn disconnect<V: env::OdbcVersion>(_: &mut SQLHDBC<Self, V>) {}
+    }
+    impl ConnState for C3 {}
+    impl ConnState for C4 {}
 }
 
 //=====================================================================================//

@@ -1,7 +1,7 @@
+use rs_odbc::conn::C4;
 use rs_odbc::env::SQL_OV_ODBC3_80;
 use rs_odbc::handle::{
-    C4, SQLHDBC, SQLHENV, SQLHSTMT, SQL_HANDLE_DBC, SQL_HANDLE_ENV, SQL_HANDLE_STMT,
-    SQL_NULL_HANDLE,
+    SQLHDBC, SQLHENV, SQLHSTMT, SQL_HANDLE_DBC, SQL_HANDLE_ENV, SQL_HANDLE_STMT, SQL_NULL_HANDLE,
 };
 use rs_odbc::{SQLAllocHandle, SQLDriverConnectA, SQLFreeHandle, SQL_DRIVER_COMPLETE};
 use std::mem::MaybeUninit;

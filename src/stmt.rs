@@ -1,13 +1,15 @@
+#[double]
 use crate::api::ffi;
-use crate::str::{Ansi, Unicode, OdbcChar, OdbcStr};
 use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
+use crate::convert::{AsMutPtr, AsMutSQLPOINTER};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::handle::{AppDesc, AsSQLHANDLE, ImplDesc, ParamDesc, RowDesc, SQLHDESC};
-use crate::convert::{AsMutPtr, AsMutSQLPOINTER};
+use crate::str::{Ansi, OdbcChar, OdbcStr, Unicode};
 use crate::{
-    handle::SQLHSTMT, sqlreturn::SQLRETURN, Ident, OdbcBool, OdbcDefined,
-    SQLCHAR, SQLINTEGER, SQLPOINTER, SQLULEN, SQLWCHAR,
+    handle::SQLHSTMT, sqlreturn::SQLRETURN, Ident, OdbcBool, OdbcDefined, SQLCHAR, SQLINTEGER,
+    SQLPOINTER, SQLULEN, SQLWCHAR,
 };
+use mockall_double::double;
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::ops::{Deref, DerefMut};

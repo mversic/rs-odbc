@@ -1,8 +1,9 @@
 #[double]
 use crate::api::ffi;
 use crate::c_types::DeferredBuf;
-use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
+use crate::conn::{ConnState, C2, C3, C4};
 use crate::convert::IntoSQLPOINTER;
+use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::{sqlreturn::SQL_SUCCESS, Ident, StrLenOrInd, SQLPOINTER, SQLSMALLINT};
 use mockall_double::double;
 use std::any::type_name;
@@ -20,13 +21,13 @@ use std::mem::ManuallyDrop;
 #[cfg(feature = "odbc_debug")]
 use std::mem::MaybeUninit;
 
+pub trait Handle {
+    type Ident: Ident<Type = SQLSMALLINT>;
+}
+
 pub unsafe trait AsSQLHANDLE {
     #[allow(non_snake_case)]
     fn as_SQLHANDLE(&self) -> SQLHANDLE;
-}
-
-pub trait Handle {
-    type Ident: Ident<Type = SQLSMALLINT>;
 }
 
 // TODO: Should be unsafe?
@@ -249,20 +250,6 @@ impl<C: ConnState, V: OdbcVersion> Drop for SQLHDBC<'_, C, V> {
     }
 }
 
-pub trait ConnState: private::ConnState {}
-/// Allocated
-#[derive(Debug)]
-pub enum C2 {}
-/// Need data
-#[derive(Debug)]
-pub enum C3 {}
-/// Connected
-#[derive(Debug)]
-pub enum C4 {}
-impl ConnState for C2 {}
-impl ConnState for C3 {}
-impl ConnState for C4 {}
-
 impl<'env, OC: ConnState, V: OdbcVersion> SQLHDBC<'env, OC, V> {
     pub(crate) fn disconnect(self) -> SQLHDBC<'env, C2, V> {
         let handle = ManuallyDrop::new(self);
@@ -387,16 +374,18 @@ impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
 
     // TODO: Don't bind (SQLPOINTER, SQLLEN) fat pointer when using raw_api
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(
-        &self,
-        TargetValuePtr: Option<&'buf B>,
-    )  where B: ?Sized {
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    where
+        B: ?Sized,
+    {
     }
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT, V>>(
         &self,
         TargetValuePtr: Option<&'buf B>,
-    )  where B: ?Sized {
+    ) where
+        B: ?Sized,
+    {
     }
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) fn bind_strlen_or_ind(
@@ -406,10 +395,10 @@ impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
     }
 
     #[cfg(feature = "odbc_debug")]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(
-        &self,
-        TargetValuePtr: Option<&'buf B>,
-    )  where B: ?Sized {
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    where
+        B: ?Sized,
+    {
         if let Some(explicit_ard) = self.explicit_ard.get() {
             // TODO:
             //explicit_ard.bind_col(TargetValuePtr);
@@ -422,7 +411,9 @@ impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
     pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT, V>>(
         &self,
         TargetValuePtr: Option<&'buf B>,
-    )  where B: ?Sized {
+    ) where
+        B: ?Sized,
+    {
         if let Some(explicit_apd) = self.explicit_apd.get() {
             // TODO:
             //explicit_apd.bind_param(TargetValuePtr);
@@ -603,35 +594,6 @@ impl<V: OdbcVersion, T> Drop for SQLHDESC<'_, T, V> {
 // TODO: Check https://github.com/microsoft/ODBC-Specification/blob/b7ef71fba508ed010cd979428efae3091b732d75/Windows/inc/sqltypes.h
 // This is unixOBDC value
 pub type SQLHWND = SQLPOINTER;
-
-mod private {
-    use super::*;
-
-    pub trait ConnState {
-        // TODO: If drop impl specialization is allowed this fn will not be required
-        // Related to https://github.com/rust-lang/rust/issues/20400
-        fn disconnect<V: OdbcVersion>(handle: &mut SQLHDBC<Self, V>)
-        where
-            Self: super::ConnState + Sized,
-        {
-            let sql_return = unsafe { ffi::SQLDisconnect(handle.as_SQLHANDLE()) };
-
-            if sql_return != SQL_SUCCESS && !panicking() {
-                panic!(
-                    "{}: SQLDisconnect returned {:?}",
-                    type_name::<Self>(),
-                    sql_return
-                )
-            }
-        }
-    }
-
-    impl ConnState for C2 {
-        fn disconnect<V: OdbcVersion>(_: &mut SQLHDBC<Self, V>) {}
-    }
-    impl ConnState for C3 {}
-    impl ConnState for C4 {}
-}
 
 #[cfg(test)]
 mod test {

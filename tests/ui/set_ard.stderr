@@ -1,10 +1,10 @@
 error[E0505]: cannot move out of `desc` because it is borrowed
-  --> $DIR/set_ard.rs:51:36
+  --> $DIR/set_ard.rs:52:36
    |
-49 |     SQLSetStmtAttrA(&stmt, SQL_ATTR_APP_ROW_DESC, Some(&desc));
+50 |     SQLSetStmtAttrA(&stmt, SQL_ATTR_APP_ROW_DESC, Some(&desc));
    |                                                        ----- borrow of `desc` occurs here
-50 |
-51 |     SQLFreeHandle(SQL_HANDLE_DESC, desc);
+51 |
+52 |     SQLFreeHandle(SQL_HANDLE_DESC, desc);
    |                                    ^^^^ move out of `desc` occurs here
-52 |     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+53 |     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
    |                                    ---- borrow later used here
