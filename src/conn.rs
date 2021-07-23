@@ -1,5 +1,6 @@
 use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
+use crate::handle::SQLHDBC;
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{
     info::TxnIsolation, stmt::StmtAttr, Ident, OdbcBool, OdbcDefined, SQLCHAR, SQLINTEGER,
@@ -24,6 +25,10 @@ pub trait ConnAttr<A: Ident, C: ConnState, V: OdbcVersion>:
     // TODO: Track active statements in debug mode because SQL_ATTR_ASYNC_ENABLE
     // can only be set when there are no active statements
 }
+
+// TODO: Where to keep these two traits? here in api.rs or handle.rs?
+pub trait BrowseConnect {}
+pub trait Disconnect {}
 
 /// Allocated
 #[derive(Debug)]
@@ -82,6 +87,11 @@ impl<A: Ident, C: ConnState, CH: OdbcChar, V: OdbcVersion> ConnAttr<A, C, V> for
     OdbcStr<CH>: ConnAttr<A, C, V>
 {
 }
+
+impl<V: OdbcVersion> BrowseConnect for SQLHDBC<'_, C2, V> {}
+impl<V: OdbcVersion> BrowseConnect for SQLHDBC<'_, C3, V> {}
+impl<V: OdbcVersion> Disconnect for SQLHDBC<'_, C3, V> {}
+impl<V: OdbcVersion> Disconnect for SQLHDBC<'_, C4, V> {}
 
 mod private {
     use super::{C2, C3, C4};

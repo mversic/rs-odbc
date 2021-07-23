@@ -3,6 +3,7 @@ use crate::api::ffi;
 use crate::c_types::DeferredBuf;
 use crate::conn::{ConnState, C2, C3, C4};
 use crate::convert::IntoSQLPOINTER;
+use crate::desc::{AppDesc, DescType, ImplDesc, IPD, IRD};
 use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::{sqlreturn::SQL_SUCCESS, Ident, StrLenOrInd, SQLPOINTER, SQLSMALLINT};
 use mockall_double::double;
@@ -37,28 +38,9 @@ pub unsafe trait Allocate<'src>: Handle + Drop {
     fn from_raw(handle: SQLHANDLE) -> Self;
 }
 
-pub trait SQLCancelHandle {}
 pub trait SQLCompleteAsyncHandle {}
 pub trait SQLEndTranHandle {}
-
-#[derive(Debug)]
-pub enum RowDesc {}
-#[derive(Debug)]
-pub enum ParamDesc {}
-
-pub trait DescType<'buf> {}
-
-#[derive(Debug)]
-pub struct ImplDesc<T> {
-    desc_type: PhantomData<T>,
-}
-impl<T> DescType<'_> for ImplDesc<T> {}
-
-#[derive(Debug)]
-pub struct AppDesc<'buf> {
-    pub(crate) data_ptrs: PhantomData<&'buf ()>,
-}
-impl<'buf> DescType<'buf> for AppDesc<'buf> {}
+pub trait SQLCancelHandle {}
 
 #[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 1)]
@@ -80,6 +62,11 @@ pub struct SQL_HANDLE_STMT;
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_DESC;
 
+// TODO: Check https://github.com/microsoft/ODBC-Specification/blob/b7ef71fba508ed010cd979428efae3091b732d75/Windows/inc/sqltypes.h
+// Try placing it into src/api/ffi.rs?
+// This is unixOBDC value
+pub type SQLHWND = SQLPOINTER;
+
 // TODO: But must it not be a void* in the end? It is void* in unixODBC
 // TODO: Check https://github.com/microsoft/ODBC-Specification/blob/b7ef71fba508ed010cd979428efae3091b732d75/Windows/inc/sqltypes.h
 #[repr(C)]
@@ -94,12 +81,6 @@ pub struct RawHandle {
 // This type must not be public ever because of the issues around Drop
 #[allow(non_camel_case_types)]
 pub type SQLHANDLE = *mut RawHandle;
-
-// TODO: Keep these?
-pub type HENV = SQLHANDLE;
-pub type HDBC = SQLHANDLE;
-pub type HSTMT = SQLHANDLE;
-pub type HDESC = SQLHANDLE;
 
 #[allow(non_camel_case_types)]
 pub struct SQL_NULL_HANDLE;
@@ -282,12 +263,6 @@ impl<'env, OC: ConnState, V: OdbcVersion> SQLHDBC<'env, OC, V> {
         }
     }
 }
-pub trait Disconnect<'env, V: OdbcVersion> {}
-pub trait BrowseConnect<'env, V: OdbcVersion> {}
-impl<'env, V: OdbcVersion> BrowseConnect<'env, V> for SQLHDBC<'env, C2, V> {}
-impl<'env, V: OdbcVersion> BrowseConnect<'env, V> for SQLHDBC<'env, C3, V> {}
-impl<'env, V: OdbcVersion> Disconnect<'env, V> for SQLHDBC<'env, C3, V> {}
-impl<'env, V: OdbcVersion> Disconnect<'env, V> for SQLHDBC<'env, C4, V> {}
 
 /// Statement handle consists of all of the information associated with a SQL statement,
 /// such as any result sets created by the statement and parameters used in the execution
@@ -329,9 +304,9 @@ pub struct SQLHSTMT<'conn, 'stmt, 'buf, V: OdbcVersion> {
     #[cfg(feature = "odbc_debug")]
     pub(crate) apd: ManuallyDrop<SQLHDESC<'stmt, AppDesc<'buf>, V>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) ird: ManuallyDrop<SQLHDESC<'stmt, ImplDesc<RowDesc>, V>>,
+    pub(crate) ird: ManuallyDrop<SQLHDESC<'stmt, ImplDesc<IRD>, V>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) ipd: ManuallyDrop<SQLHDESC<'stmt, ImplDesc<ParamDesc>, V>>,
+    pub(crate) ipd: ManuallyDrop<SQLHDESC<'stmt, ImplDesc<IPD>, V>>,
 
     #[allow(dead_code)]
     #[cfg(not(feature = "odbc_debug"))]
@@ -345,9 +320,9 @@ pub struct SQLHSTMT<'conn, 'stmt, 'buf, V: OdbcVersion> {
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) apd: PhantomData<SQLHDESC<'stmt, AppDesc<'buf>, V>>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) ird: PhantomData<SQLHDESC<'stmt, ImplDesc<RowDesc>, V>>,
+    pub(crate) ird: PhantomData<SQLHDESC<'stmt, ImplDesc<IRD>, V>>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) ipd: PhantomData<SQLHDESC<'stmt, ImplDesc<ParamDesc>, V>>,
+    pub(crate) ipd: PhantomData<SQLHDESC<'stmt, ImplDesc<IPD>, V>>,
 }
 impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
     #[cfg(feature = "odbc_debug")]
@@ -537,9 +512,9 @@ pub struct SQLHDESC<'conn, T, V: OdbcVersion> {
 
     #[cfg(feature = "odbc_debug")]
     // TODO: Implement properly
-    pub(crate) data: PhantomData<T>,
+    pub(crate) inner: PhantomData<T>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) data: PhantomData<T>,
+    pub(crate) inner: PhantomData<T>,
 }
 impl<'buf, V: OdbcVersion, T: DescType<'buf>> SQLHDESC<'_, T, V> {
     fn from_raw(handle: SQLHANDLE) -> Self {
@@ -549,7 +524,7 @@ impl<'buf, V: OdbcVersion, T: DescType<'buf>> SQLHDESC<'_, T, V> {
             parent: PhantomData,
             version: PhantomData,
 
-            data: PhantomData,
+            inner: PhantomData,
         }
     }
 }
@@ -591,13 +566,10 @@ impl<V: OdbcVersion, T> Drop for SQLHDESC<'_, T, V> {
     }
 }
 
-// TODO: Check https://github.com/microsoft/ODBC-Specification/blob/b7ef71fba508ed010cd979428efae3091b732d75/Windows/inc/sqltypes.h
-// This is unixOBDC value
-pub type SQLHWND = SQLPOINTER;
-
 #[cfg(test)]
 mod test {
     #![allow(non_snake_case)]
+
     use super::*;
 
     #[test]

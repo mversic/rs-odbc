@@ -217,8 +217,8 @@ unsafe impl IntoSQLPOINTER for SQLULEN {
     }
 }
 #[cfg(feature = "raw_api")]
-unsafe impl IntoSQLPOINTER for (SQLPOINTER, SQLLEN) {
-    fn into_SQLPOINTER(self) -> SQLPOINTER {
+unsafe impl AsSQLPOINTER for (SQLPOINTER, SQLLEN) {
+    fn into_SQLPOINTER(&self) -> SQLPOINTER {
         self.0
     }
 }

@@ -2,8 +2,9 @@
 use crate::api::ffi;
 use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
 use crate::convert::{AsMutPtr, AsMutSQLPOINTER};
+use crate::desc::{AppDesc, ImplDesc, IPD, IRD};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
-use crate::handle::{AppDesc, AsSQLHANDLE, ImplDesc, ParamDesc, RowDesc, SQLHDESC};
+use crate::handle::{AsSQLHANDLE, SQLHDESC};
 use crate::str::{Ansi, OdbcChar, OdbcStr, Unicode};
 use crate::{
     handle::SQLHSTMT, sqlreturn::SQLRETURN, Ident, OdbcBool, OdbcDefined, SQLCHAR, SQLINTEGER,
@@ -106,7 +107,7 @@ fn get_apd<'stmt, 'buf, V: OdbcVersion>(
 
 #[cfg(feature = "odbc_debug")]
 fn get_ird<'stmt, V: OdbcVersion>(
-    desc: &mut MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<RowDesc>, V>>,
+    desc: &mut MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<IRD>, V>>,
     StatementHandle: &'stmt SQLHSTMT<V>,
 ) -> SQLRETURN {
     *desc = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ird));
@@ -115,7 +116,7 @@ fn get_ird<'stmt, V: OdbcVersion>(
 
 #[cfg(feature = "odbc_debug")]
 fn get_ipd<'stmt, V: OdbcVersion>(
-    desc: &mut MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<ParamDesc>, V>>,
+    desc: &mut MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<IPD>, V>>,
     StatementHandle: &'stmt SQLHSTMT<V>,
 ) -> SQLRETURN {
     *desc = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ipd));
@@ -734,12 +735,12 @@ unsafe impl<V: OdbcVersion> AttrSet<SQL_ATTR_APP_PARAM_DESC>
 // This is read-only attribute
 pub struct SQL_ATTR_IMP_ROW_DESC;
 unsafe impl<V: OdbcVersion> Attr<SQL_ATTR_IMP_ROW_DESC>
-    for MaybeUninit<RefSQLHDESC<'_, ImplDesc<RowDesc>, V>>
+    for MaybeUninit<RefSQLHDESC<'_, ImplDesc<IRD>, V>>
 {
     type DefinedBy = OdbcDefined;
 }
 impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC3>
-    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<RowDesc>, SQL_OV_ODBC3>>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<IRD>, SQL_OV_ODBC3>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
@@ -760,7 +761,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC3>
     }
 }
 impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC3_80>
-    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<RowDesc>, SQL_OV_ODBC3_80>>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<IRD>, SQL_OV_ODBC3_80>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
@@ -780,7 +781,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC3_80>
     }
 }
 impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC4>
-    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<RowDesc>, SQL_OV_ODBC4>>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<IRD>, SQL_OV_ODBC4>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
@@ -801,7 +802,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC4>
 }
 
 unsafe impl<V: OdbcVersion> AttrGet<SQL_ATTR_IMP_ROW_DESC>
-    for MaybeUninit<RefSQLHDESC<'_, ImplDesc<RowDesc>, V>>
+    for MaybeUninit<RefSQLHDESC<'_, ImplDesc<IRD>, V>>
 {
 }
 
@@ -811,12 +812,12 @@ unsafe impl<V: OdbcVersion> AttrGet<SQL_ATTR_IMP_ROW_DESC>
 // This is read-only attribute
 pub struct SQL_ATTR_IMP_PARAM_DESC;
 unsafe impl<V: OdbcVersion> Attr<SQL_ATTR_IMP_PARAM_DESC>
-    for MaybeUninit<RefSQLHDESC<'_, ImplDesc<ParamDesc>, V>>
+    for MaybeUninit<RefSQLHDESC<'_, ImplDesc<IPD>, V>>
 {
     type DefinedBy = OdbcDefined;
 }
 impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC3>
-    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<ParamDesc>, SQL_OV_ODBC3>>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<IPD>, SQL_OV_ODBC3>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
@@ -837,7 +838,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC3>
     }
 }
 impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC3_80>
-    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<ParamDesc>, SQL_OV_ODBC3_80>>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<IPD>, SQL_OV_ODBC3_80>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
@@ -858,7 +859,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC3_80>
     }
 }
 impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC4>
-    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<ParamDesc>, SQL_OV_ODBC4>>
+    for MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<IPD>, SQL_OV_ODBC4>>
 {
     #[cfg(feature = "odbc_debug")]
     fn readA(
@@ -880,7 +881,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC4>
 }
 
 unsafe impl<V: OdbcVersion> AttrGet<SQL_ATTR_IMP_PARAM_DESC>
-    for MaybeUninit<RefSQLHDESC<'_, ImplDesc<ParamDesc>, V>>
+    for MaybeUninit<RefSQLHDESC<'_, ImplDesc<IPD>, V>>
 {
 }
 

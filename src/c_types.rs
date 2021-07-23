@@ -16,6 +16,11 @@ use crate::SQLPOINTER;
 
 pub trait CData<TT: Ident, V: OdbcVersion>: CDataLen {}
 
+/// Care must be taken because references to DeferredBuf might be written to. This usually
+/// means that DeferredBuf should only be implemented on &UnsafeCell<T> or &[UnsafeCell<T>].
+// TODO: Do I need to disambiguate between BindCol and BindParameters deferred buffers
+pub unsafe trait DeferredBuf<TT: Ident, V: OdbcVersion>: CDataLen + AsSQLPOINTER {}
+
 impl<TT: Ident, T: ScalarCType, V: OdbcVersion> CData<TT, V> for MaybeUninit<T> where T: CData<TT, V>
 {}
 
@@ -25,11 +30,6 @@ impl<TT: Ident, T: OdbcChar, V: OdbcVersion> CData<TT, V> for OdbcStr<MaybeUnini
     OdbcStr<T>: CData<TT, V>
 {
 }
-
-/// Care must be taken because references to DeferredBuf might be written to. This usually
-/// means that DeferredBuf should only be implemented on &UnsafeCell<T> or &[UnsafeCell<T>].
-// TODO: Do I need to disambiguate between BindCol and BindParameters deferred buffers
-pub unsafe trait DeferredBuf<TT: Ident, V: OdbcVersion>: CDataLen + AsSQLPOINTER {}
 
 unsafe impl<TT: Ident, T: ScalarCType, V: OdbcVersion> DeferredBuf<TT, V> for UnsafeCell<T> where
     T: CData<TT, V>

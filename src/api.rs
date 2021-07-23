@@ -8,12 +8,12 @@ use crate::{
     c_types::CData,
     c_types::DeferredBuf,
     col::ColAttr,
-    conn::{ConnAttr, ConnState, C2, C3, C4},
+    conn::{ConnAttr, ConnState, C2, C3, C4, BrowseConnect, Disconnect},
     convert::{AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLPOINTER, IntoSQLPOINTER},
-    desc::DescField,
+    desc::{DescField, DescType},
     diag::{DiagField, SQLSTATE},
     env::{EnvAttr, OdbcVersion},
-    handle::{BrowseConnect, Disconnect, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
+    handle::{SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
     info::InfoType,
     sql_types::SqlType,
     sqlreturn::{SQLRETURN, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_SUCCEEDED, SQL_SUCCESS},
@@ -183,7 +183,7 @@ pub fn SQLBrowseConnectA<'env, C: ConnState, V: OdbcVersion>(
     SQLRETURN,
 )
 where
-    SQLHDBC<'env, C, V>: BrowseConnect<'env, V>,
+    SQLHDBC<'env, C, V>: BrowseConnect,
 {
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
@@ -230,7 +230,7 @@ pub fn SQLBrowseConnectW<'env, C: ConnState, V: OdbcVersion>(
     SQLRETURN,
 )
 where
-    SQLHDBC<'env, C, V>: BrowseConnect<'env, V>,
+    SQLHDBC<'env, C, V>: BrowseConnect,
 {
     let InConnectionString = InConnectionString.as_raw_slice();
     let OutConnectionString =
@@ -876,7 +876,7 @@ pub fn SQLDisconnect<'env, C: ConnState, V: OdbcVersion>(
     ConnectionHandle: SQLHDBC<'env, C, V>,
 ) -> (Result<SQLHDBC<'env, C2, V>, SQLHDBC<'env, C, V>>, SQLRETURN)
 where
-    SQLHDBC<'env, C, V>: Disconnect<'env, V>,
+    SQLHDBC<'env, C, V>: Disconnect,
 {
     let sql_return = unsafe { ffi::SQLDisconnect(ConnectionHandle.as_SQLHANDLE()) };
 
@@ -3263,22 +3263,19 @@ pub fn SQLTablesW<V: OdbcVersion>(
 use mockall::automock;
 #[cfg_attr(test, automock)]
 pub(crate) mod ffi {
-    #![allow(non_snake_case)]
-
-    use crate::handle::{HDBC, HDESC, HENV, HSTMT, SQLHWND};
+    use crate::handle::SQLHWND;
     use crate::{
         diag::SQLSTATE_SIZE, handle::SQLHANDLE, sqlreturn::SQLRETURN, RETCODE, SQLCHAR, SQLINTEGER,
         SQLLEN, SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
     };
 
-    // TODO: Replace these two types with SQLPOINTER once library is stabilized
-    // they are used to avoid provenance related errors during initial development
+    type HENV = SQLHANDLE;
+    type HDBC = SQLHANDLE;
+    type HSTMT = SQLHANDLE;
+    type HDESC = SQLHANDLE;
+
     type ConstSQLPOINTER = *const std::ffi::c_void;
     type MutSQLPOINTER = *mut std::ffi::c_void;
-    impl crate::Ident for ConstSQLPOINTER {
-        type Type = SQLSMALLINT;
-        const IDENTIFIER: Self::Type = crate::SQL_IS_POINTER;
-    }
 
     // TODO: static linking is not supported for windows
     #[cfg_attr(windows, link(name = "odbc32", kind = "dylib"))]
@@ -3291,13 +3288,15 @@ pub(crate) mod ffi {
         link(name = "odbc", kind = "dylib")
     )]
     extern "system" {
-        pub(crate) fn SQLAllocHandle(
+        #[allow(non_snake_case)]
+        pub fn SQLAllocHandle(
             HandleType: SQLSMALLINT,
             InputHandle: SQLHANDLE,
             OutputHandlePtr: *mut SQLHANDLE,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLBindCol(
+        #[allow(non_snake_case)]
+        pub fn SQLBindCol(
             StatementHandle: HSTMT,
             ColumnNumber: SQLUSMALLINT,
             TargetType: SQLSMALLINT,
@@ -3306,7 +3305,8 @@ pub(crate) mod ffi {
             StrLen_or_IndPtr: *mut SQLLEN,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLBindParameter(
+        #[allow(non_snake_case)]
+        pub fn SQLBindParameter(
             StatementHandle: HSTMT,
             ParameterNumber: SQLUSMALLINT,
             InputOutputType: SQLSMALLINT,
@@ -3319,7 +3319,8 @@ pub(crate) mod ffi {
             StrLen_or_IndPtr: *const SQLLEN,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLBrowseConnectA(
+        #[allow(non_snake_case)]
+        pub fn SQLBrowseConnectA(
             ConnectionHandle: HDBC,
             InConnectionString: *const SQLCHAR,
             StringLength1: SQLSMALLINT,
@@ -3328,7 +3329,8 @@ pub(crate) mod ffi {
             StringLength2Ptr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLBrowseConnectW(
+        #[allow(non_snake_case)]
+        pub fn SQLBrowseConnectW(
             ConnectionHandle: HDBC,
             InConnectionString: *const SQLWCHAR,
             StringLength1: SQLSMALLINT,
@@ -3337,18 +3339,23 @@ pub(crate) mod ffi {
             StringLength2Ptr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLBulkOperations(
+        #[allow(non_snake_case)]
+        pub fn SQLBulkOperations(
             StatementHandle: HSTMT,
             Operation: SQLUSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLCancel(StatementHandle: HSTMT) -> SQLRETURN;
+        #[allow(non_snake_case)]
+        pub fn SQLCancel(StatementHandle: HSTMT) -> SQLRETURN;
 
-        pub(crate) fn SQLCancelHandle(HandleType: SQLSMALLINT, Handle: SQLHANDLE) -> SQLRETURN;
+        #[allow(non_snake_case)]
+        pub fn SQLCancelHandle(HandleType: SQLSMALLINT, Handle: SQLHANDLE) -> SQLRETURN;
 
-        pub(crate) fn SQLCloseCursor(StatementHandle: HSTMT) -> SQLRETURN;
+        #[allow(non_snake_case)]
+        pub fn SQLCloseCursor(StatementHandle: HSTMT) -> SQLRETURN;
 
-        pub(crate) fn SQLColAttributeA(
+        #[allow(non_snake_case)]
+        pub fn SQLColAttributeA(
             StatementHandle: HSTMT,
             ColumnNumber: SQLUSMALLINT,
             FieldIdentifier: SQLUSMALLINT,
@@ -3358,7 +3365,8 @@ pub(crate) mod ffi {
             NumericAttributePtr: *mut SQLLEN,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLColAttributeW(
+        #[allow(non_snake_case)]
+        pub fn SQLColAttributeW(
             StatementHandle: HSTMT,
             ColumnNumber: SQLUSMALLINT,
             FieldIdentifier: SQLUSMALLINT,
@@ -3368,7 +3376,8 @@ pub(crate) mod ffi {
             NumericAttributePtr: *mut SQLLEN,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLColumnPrivilegesA(
+        #[allow(non_snake_case)]
+        pub fn SQLColumnPrivilegesA(
             StatementHandle: HSTMT,
             CatalogName: *const SQLCHAR,
             NameLength1: SQLSMALLINT,
@@ -3380,7 +3389,8 @@ pub(crate) mod ffi {
             NameLength4: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLColumnPrivilegesW(
+        #[allow(non_snake_case)]
+        pub fn SQLColumnPrivilegesW(
             StatementHandle: HSTMT,
             CatalogName: *const SQLWCHAR,
             NameLength1: SQLSMALLINT,
@@ -3392,7 +3402,8 @@ pub(crate) mod ffi {
             NameLength4: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLColumnsA(
+        #[allow(non_snake_case)]
+        pub fn SQLColumnsA(
             StatementHandle: HSTMT,
             CatalogName: *const SQLCHAR,
             NameLength1: SQLSMALLINT,
@@ -3404,7 +3415,8 @@ pub(crate) mod ffi {
             NameLength4: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLColumnsW(
+        #[allow(non_snake_case)]
+        pub fn SQLColumnsW(
             StatementHandle: HSTMT,
             CatalogName: *const SQLWCHAR,
             NameLength1: SQLSMALLINT,
@@ -3416,13 +3428,15 @@ pub(crate) mod ffi {
             NameLength4: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLCompleteAsync(
+        #[allow(non_snake_case)]
+        pub fn SQLCompleteAsync(
             HandleType: SQLSMALLINT,
             Handle: SQLHANDLE,
             AsyncRetCodePtr: *mut RETCODE,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLConnectA(
+        #[allow(non_snake_case)]
+        pub fn SQLConnectA(
             ConnectionHandle: HDBC,
             ServerName: *const SQLCHAR,
             NameLength1: SQLSMALLINT,
@@ -3432,7 +3446,8 @@ pub(crate) mod ffi {
             NameLength3: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLConnectW(
+        #[allow(non_snake_case)]
+        pub fn SQLConnectW(
             ConnectionHandle: HDBC,
             ServerName: *const SQLWCHAR,
             NameLength1: SQLSMALLINT,
@@ -3442,9 +3457,11 @@ pub(crate) mod ffi {
             NameLength3: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLCopyDesc(SourceDescHandle: HDESC, TargetDescHandle: HDESC) -> SQLRETURN;
+        #[allow(non_snake_case)]
+        pub fn SQLCopyDesc(SourceDescHandle: HDESC, TargetDescHandle: HDESC) -> SQLRETURN;
 
-        pub(crate) fn SQLDataSourcesA(
+        #[allow(non_snake_case)]
+        pub fn SQLDataSourcesA(
             EnvironmentHandle: HENV,
             Direction: SQLUSMALLINT,
             ServerName: *mut SQLCHAR,
@@ -3455,7 +3472,8 @@ pub(crate) mod ffi {
             NameLength2Ptr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLDataSourcesW(
+        #[allow(non_snake_case)]
+        pub fn SQLDataSourcesW(
             EnvironmentHandle: HENV,
             Direction: SQLUSMALLINT,
             ServerName: *mut SQLWCHAR,
@@ -3466,7 +3484,8 @@ pub(crate) mod ffi {
             NameLength2Ptr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLDescribeColA(
+        #[allow(non_snake_case)]
+        pub fn SQLDescribeColA(
             StatementHandle: HSTMT,
             ColumnNumber: SQLUSMALLINT,
             ColumnName: *mut SQLCHAR,
@@ -3478,7 +3497,8 @@ pub(crate) mod ffi {
             NullablePtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLDescribeColW(
+        #[allow(non_snake_case)]
+        pub fn SQLDescribeColW(
             StatementHandle: HSTMT,
             ColumnNumber: SQLUSMALLINT,
             ColumnName: *mut SQLWCHAR,
@@ -3490,7 +3510,8 @@ pub(crate) mod ffi {
             NullablePtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLDescribeParam(
+        #[allow(non_snake_case)]
+        pub fn SQLDescribeParam(
             StatementHandle: HSTMT,
             ParameterNumber: SQLUSMALLINT,
             DataTypePtr: *mut SQLSMALLINT,
@@ -3499,9 +3520,11 @@ pub(crate) mod ffi {
             NullablePtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLDisconnect(ConnectionHandle: HDBC) -> SQLRETURN;
+        #[allow(non_snake_case)]
+        pub fn SQLDisconnect(ConnectionHandle: HDBC) -> SQLRETURN;
 
-        pub(crate) fn SQLDriverConnectA(
+        #[allow(non_snake_case)]
+        pub fn SQLDriverConnectA(
             ConnectionHandle: HDBC,
             WindowHandle: SQLHWND,
             InConnectionString: *const SQLCHAR,
@@ -3512,7 +3535,8 @@ pub(crate) mod ffi {
             DriverCompletion: SQLUSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLDriverConnectW(
+        #[allow(non_snake_case)]
+        pub fn SQLDriverConnectW(
             ConnectionHandle: HDBC,
             WindowHandle: SQLHWND,
             InConnectionString: *const SQLWCHAR,
@@ -3523,7 +3547,8 @@ pub(crate) mod ffi {
             DriverCompletion: SQLUSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLDriversA(
+        #[allow(non_snake_case)]
+        pub fn SQLDriversA(
             EnvironmentHandle: HENV,
             Direction: SQLUSMALLINT,
             DriverDescription: *mut SQLCHAR,
@@ -3534,7 +3559,8 @@ pub(crate) mod ffi {
             AttributesLengthPtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLDriversW(
+        #[allow(non_snake_case)]
+        pub fn SQLDriversW(
             EnvironmentHandle: HENV,
             Direction: SQLUSMALLINT,
             DriverDescription: *mut SQLWCHAR,
@@ -3545,35 +3571,42 @@ pub(crate) mod ffi {
             AttributesLengthPtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLEndTran(
+        #[allow(non_snake_case)]
+        pub fn SQLEndTran(
             HandleType: SQLSMALLINT,
             Handle: SQLHANDLE,
             CompletionType: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLExecDirectA(
+        #[allow(non_snake_case)]
+        pub fn SQLExecDirectA(
             StatementHandle: HSTMT,
             StatementText: *const SQLCHAR,
             TextLength: SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLExecDirectW(
+        #[allow(non_snake_case)]
+        pub fn SQLExecDirectW(
             StatementHandle: HSTMT,
             StatementText: *const SQLWCHAR,
             TextLength: SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLExecute(StatementHandle: HSTMT) -> SQLRETURN;
+        #[allow(non_snake_case)]
+        pub fn SQLExecute(StatementHandle: HSTMT) -> SQLRETURN;
 
-        pub(crate) fn SQLFetch(StatementHandle: HSTMT) -> SQLRETURN;
+        #[allow(non_snake_case)]
+        pub fn SQLFetch(StatementHandle: HSTMT) -> SQLRETURN;
 
-        pub(crate) fn SQLFetchScroll(
+        #[allow(non_snake_case)]
+        pub fn SQLFetchScroll(
             StatementHandle: HSTMT,
             FetchOrientation: SQLSMALLINT,
             FetchOffset: SQLLEN,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLForeignKeysA(
+        #[allow(non_snake_case)]
+        pub fn SQLForeignKeysA(
             StatementHandle: HSTMT,
             PKCatalogName: *const SQLCHAR,
             NameLength1: SQLSMALLINT,
@@ -3589,7 +3622,8 @@ pub(crate) mod ffi {
             NameLength6: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLForeignKeysW(
+        #[allow(non_snake_case)]
+        pub fn SQLForeignKeysW(
             StatementHandle: HSTMT,
             PKCatalogName: *const SQLWCHAR,
             NameLength1: SQLSMALLINT,
@@ -3605,11 +3639,14 @@ pub(crate) mod ffi {
             NameLength6: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLFreeHandle(HandleType: SQLSMALLINT, Handle: SQLHANDLE) -> SQLRETURN;
+        #[allow(non_snake_case)]
+        pub fn SQLFreeHandle(HandleType: SQLSMALLINT, Handle: SQLHANDLE) -> SQLRETURN;
 
-        pub(crate) fn SQLFreeStmt(StatementHandle: HSTMT, Option: SQLUSMALLINT) -> SQLRETURN;
+        #[allow(non_snake_case)]
+        pub fn SQLFreeStmt(StatementHandle: HSTMT, Option: SQLUSMALLINT) -> SQLRETURN;
 
-        pub(crate) fn SQLGetConnectAttrA(
+        #[allow(non_snake_case)]
+        pub fn SQLGetConnectAttrA(
             ConnectionHandle: HDBC,
             Attribute: SQLINTEGER,
             ValuePtr: MutSQLPOINTER,
@@ -3617,7 +3654,8 @@ pub(crate) mod ffi {
             StringLengthPtr: *mut SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetConnectAttrW(
+        #[allow(non_snake_case)]
+        pub fn SQLGetConnectAttrW(
             ConnectionHandle: HDBC,
             Attribute: SQLINTEGER,
             ValuePtr: MutSQLPOINTER,
@@ -3625,21 +3663,24 @@ pub(crate) mod ffi {
             StringLengthPtr: *mut SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetCursorNameA(
+        #[allow(non_snake_case)]
+        pub fn SQLGetCursorNameA(
             StatementHandle: HSTMT,
             CursorName: *mut SQLCHAR,
             BufferLength: SQLSMALLINT,
             NameLengthPtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetCursorNameW(
+        #[allow(non_snake_case)]
+        pub fn SQLGetCursorNameW(
             StatementHandle: HSTMT,
             CursorName: *mut SQLWCHAR,
             BufferLength: SQLSMALLINT,
             NameLengthPtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetData(
+        #[allow(non_snake_case)]
+        pub fn SQLGetData(
             StatementHandle: HSTMT,
             Col_or_Param_Num: SQLUSMALLINT,
             TargetType: SQLSMALLINT,
@@ -3648,7 +3689,8 @@ pub(crate) mod ffi {
             StrLen_or_IndPtr: *mut SQLLEN,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetDescFieldA(
+        #[allow(non_snake_case)]
+        pub fn SQLGetDescFieldA(
             DescriptorHandle: HDESC,
             RecNumber: SQLSMALLINT,
             FieldIdentifier: SQLSMALLINT,
@@ -3657,7 +3699,8 @@ pub(crate) mod ffi {
             StringLengthPtr: *mut SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetDescFieldW(
+        #[allow(non_snake_case)]
+        pub fn SQLGetDescFieldW(
             DescriptorHandle: HDESC,
             RecNumber: SQLSMALLINT,
             FieldIdentifier: SQLSMALLINT,
@@ -3666,7 +3709,8 @@ pub(crate) mod ffi {
             StringLengthPtr: *mut SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetDescRecA(
+        #[allow(non_snake_case)]
+        pub fn SQLGetDescRecA(
             DescriptorHandle: HDESC,
             RecNumber: SQLSMALLINT,
             Name: *mut SQLCHAR,
@@ -3680,7 +3724,8 @@ pub(crate) mod ffi {
             NullablePtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetDescRecW(
+        #[allow(non_snake_case)]
+        pub fn SQLGetDescRecW(
             DescriptorHandle: HDESC,
             RecNumber: SQLSMALLINT,
             Name: *mut SQLWCHAR,
@@ -3694,7 +3739,8 @@ pub(crate) mod ffi {
             NullablePtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetDiagFieldA(
+        #[allow(non_snake_case)]
+        pub fn SQLGetDiagFieldA(
             HandleType: SQLSMALLINT,
             Handle: SQLHANDLE,
             RecNumber: SQLSMALLINT,
@@ -3704,7 +3750,8 @@ pub(crate) mod ffi {
             StringLengthPtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetDiagFieldW(
+        #[allow(non_snake_case)]
+        pub fn SQLGetDiagFieldW(
             HandleType: SQLSMALLINT,
             Handle: SQLHANDLE,
             RecNumber: SQLSMALLINT,
@@ -3714,7 +3761,8 @@ pub(crate) mod ffi {
             StringLengthPtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetDiagRecA(
+        #[allow(non_snake_case)]
+        pub fn SQLGetDiagRecA(
             HandleType: SQLSMALLINT,
             Handle: SQLHANDLE,
             RecNumber: SQLSMALLINT,
@@ -3725,7 +3773,8 @@ pub(crate) mod ffi {
             TextLengthPtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetDiagRecW(
+        #[allow(non_snake_case)]
+        pub fn SQLGetDiagRecW(
             HandleType: SQLSMALLINT,
             Handle: SQLHANDLE,
             RecNumber: SQLSMALLINT,
@@ -3736,7 +3785,8 @@ pub(crate) mod ffi {
             TextLengthPtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetEnvAttr(
+        #[allow(non_snake_case)]
+        pub fn SQLGetEnvAttr(
             EnvironmentHandle: HENV,
             Attribute: SQLINTEGER,
             ValuePtr: MutSQLPOINTER,
@@ -3744,13 +3794,15 @@ pub(crate) mod ffi {
             StringLengthPtr: *mut SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetFunctions(
+        #[allow(non_snake_case)]
+        pub fn SQLGetFunctions(
             ConnectionHandle: HDBC,
             FunctionId: SQLUSMALLINT,
             SupportedPtr: *mut SQLUSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetInfoA(
+        #[allow(non_snake_case)]
+        pub fn SQLGetInfoA(
             ConnectionHandle: HDBC,
             InfoType: SQLUSMALLINT,
             InfoValuePtr: MutSQLPOINTER,
@@ -3758,7 +3810,8 @@ pub(crate) mod ffi {
             StringLengthPtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetInfoW(
+        #[allow(non_snake_case)]
+        pub fn SQLGetInfoW(
             ConnectionHandle: HDBC,
             InfoType: SQLUSMALLINT,
             InfoValuePtr: MutSQLPOINTER,
@@ -3766,7 +3819,8 @@ pub(crate) mod ffi {
             StringLengthPtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetStmtAttrA(
+        #[allow(non_snake_case)]
+        pub fn SQLGetStmtAttrA(
             StatementHandle: HSTMT,
             Attribute: SQLINTEGER,
             ValuePtr: MutSQLPOINTER,
@@ -3774,7 +3828,8 @@ pub(crate) mod ffi {
             StringLengthPtr: *mut SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetStmtAttrW(
+        #[allow(non_snake_case)]
+        pub fn SQLGetStmtAttrW(
             StatementHandle: HSTMT,
             Attribute: SQLINTEGER,
             ValuePtr: MutSQLPOINTER,
@@ -3782,13 +3837,17 @@ pub(crate) mod ffi {
             StringLengthPtr: *mut SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLGetTypeInfoA(StatementHandle: HSTMT, DataType: SQLSMALLINT) -> SQLRETURN;
+        #[allow(non_snake_case)]
+        pub fn SQLGetTypeInfoA(StatementHandle: HSTMT, DataType: SQLSMALLINT) -> SQLRETURN;
 
-        pub(crate) fn SQLGetTypeInfoW(StatementHandle: HSTMT, DataType: SQLSMALLINT) -> SQLRETURN;
+        #[allow(non_snake_case)]
+        pub fn SQLGetTypeInfoW(StatementHandle: HSTMT, DataType: SQLSMALLINT) -> SQLRETURN;
 
-        pub(crate) fn SQLMoreResults(StatementHandle: HSTMT) -> SQLRETURN;
+        #[allow(non_snake_case)]
+        pub fn SQLMoreResults(StatementHandle: HSTMT) -> SQLRETURN;
 
-        pub(crate) fn SQLNativeSqlA(
+        #[allow(non_snake_case)]
+        pub fn SQLNativeSqlA(
             ConnectionHandle: HDBC,
             InStatementText: *const SQLCHAR,
             TextLength1: SQLINTEGER,
@@ -3797,7 +3856,8 @@ pub(crate) mod ffi {
             TextLength2Ptr: *mut SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLNativeSqlW(
+        #[allow(non_snake_case)]
+        pub fn SQLNativeSqlW(
             ConnectionHandle: HDBC,
             InStatementText: *const SQLWCHAR,
             TextLength1: SQLINTEGER,
@@ -3806,34 +3866,40 @@ pub(crate) mod ffi {
             TextLength2Ptr: *mut SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLNumParams(
+        #[allow(non_snake_case)]
+        pub fn SQLNumParams(
             StatementHandle: HSTMT,
             ParameterCountPtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLNumResultCols(
+        #[allow(non_snake_case)]
+        pub fn SQLNumResultCols(
             StatementHandle: HSTMT,
             ColumnCountPtr: *mut SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLParamData(
+        #[allow(non_snake_case)]
+        pub fn SQLParamData(
             StatementHandle: HSTMT,
             ValuePtrPtr: *mut MutSQLPOINTER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLPrepareA(
+        #[allow(non_snake_case)]
+        pub fn SQLPrepareA(
             StatementHandle: HSTMT,
             StatementText: *const SQLCHAR,
             TextLength: SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLPrepareW(
+        #[allow(non_snake_case)]
+        pub fn SQLPrepareW(
             StatementHandle: HSTMT,
             StatementText: *const SQLWCHAR,
             TextLength: SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLPrimaryKeysA(
+        #[allow(non_snake_case)]
+        pub fn SQLPrimaryKeysA(
             StatementHandle: HSTMT,
             CatalogName: *const SQLCHAR,
             NameLength1: SQLSMALLINT,
@@ -3843,7 +3909,8 @@ pub(crate) mod ffi {
             NameLength3: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLPrimaryKeysW(
+        #[allow(non_snake_case)]
+        pub fn SQLPrimaryKeysW(
             StatementHandle: HSTMT,
             CatalogName: *const SQLWCHAR,
             NameLength1: SQLSMALLINT,
@@ -3853,7 +3920,8 @@ pub(crate) mod ffi {
             NameLength3: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLProcedureColumnsA(
+        #[allow(non_snake_case)]
+        pub fn SQLProcedureColumnsA(
             StatementHandle: HSTMT,
             CatalogName: *const SQLCHAR,
             NameLength1: SQLSMALLINT,
@@ -3865,7 +3933,8 @@ pub(crate) mod ffi {
             NameLength4: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLProcedureColumnsW(
+        #[allow(non_snake_case)]
+        pub fn SQLProcedureColumnsW(
             StatementHandle: HSTMT,
             CatalogName: *const SQLWCHAR,
             NameLength1: SQLSMALLINT,
@@ -3877,7 +3946,8 @@ pub(crate) mod ffi {
             NameLength4: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLProceduresA(
+        #[allow(non_snake_case)]
+        pub fn SQLProceduresA(
             StatementHandle: HSTMT,
             CatalogName: *const SQLCHAR,
             NameLength1: SQLSMALLINT,
@@ -3887,7 +3957,8 @@ pub(crate) mod ffi {
             NameLength3: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLProceduresW(
+        #[allow(non_snake_case)]
+        pub fn SQLProceduresW(
             StatementHandle: HSTMT,
             CatalogName: *const SQLWCHAR,
             NameLength1: SQLSMALLINT,
@@ -3897,41 +3968,48 @@ pub(crate) mod ffi {
             NameLength3: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLPutData(
+        #[allow(non_snake_case)]
+        pub fn SQLPutData(
             StatementHandle: HSTMT,
             DataPtr: ConstSQLPOINTER,
             StrLen_or_Ind: SQLLEN,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLRowCount(StatementHandle: HSTMT, RowCountPtr: *mut SQLLEN) -> SQLRETURN;
+        #[allow(non_snake_case)]
+        pub fn SQLRowCount(StatementHandle: HSTMT, RowCountPtr: *mut SQLLEN) -> SQLRETURN;
 
-        pub(crate) fn SQLSetConnectAttrA(
+        #[allow(non_snake_case)]
+        pub fn SQLSetConnectAttrA(
             ConnectionHandle: HDBC,
             Attribute: SQLINTEGER,
             ValuePtr: ConstSQLPOINTER,
             StringLength: SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLSetConnectAttrW(
+        #[allow(non_snake_case)]
+        pub fn SQLSetConnectAttrW(
             ConnectionHandle: HDBC,
             Attribute: SQLINTEGER,
             ValuePtr: ConstSQLPOINTER,
             StringLength: SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLSetCursorNameA(
+        #[allow(non_snake_case)]
+        pub fn SQLSetCursorNameA(
             StatementHandle: HSTMT,
             CursorName: *const SQLCHAR,
             NameLength: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLSetCursorNameW(
+        #[allow(non_snake_case)]
+        pub fn SQLSetCursorNameW(
             StatementHandle: HSTMT,
             CursorName: *const SQLWCHAR,
             NameLength: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLSetDescFieldA(
+        #[allow(non_snake_case)]
+        pub fn SQLSetDescFieldA(
             DescriptorHandle: HDESC,
             RecNumber: SQLSMALLINT,
             FieldIdentifier: SQLSMALLINT,
@@ -3939,7 +4017,8 @@ pub(crate) mod ffi {
             BufferLength: SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLSetDescFieldW(
+        #[allow(non_snake_case)]
+        pub fn SQLSetDescFieldW(
             DescriptorHandle: HDESC,
             RecNumber: SQLSMALLINT,
             FieldIdentifier: SQLSMALLINT,
@@ -3947,7 +4026,8 @@ pub(crate) mod ffi {
             BufferLength: SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLSetDescRec(
+        #[allow(non_snake_case)]
+        pub fn SQLSetDescRec(
             DescriptorHandle: HDESC,
             RecNumber: SQLSMALLINT,
             Type: SQLSMALLINT,
@@ -3960,35 +4040,40 @@ pub(crate) mod ffi {
             IndicatorPtr: *mut SQLLEN,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLSetEnvAttr(
+        #[allow(non_snake_case)]
+        pub fn SQLSetEnvAttr(
             EnvironmentHandle: HENV,
             Attribute: SQLINTEGER,
             ValuePtr: ConstSQLPOINTER,
             StringLength: SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLSetPos(
+        #[allow(non_snake_case)]
+        pub fn SQLSetPos(
             StatementHandle: HSTMT,
             RowNumber: SQLSETPOSIROW,
             Operation: SQLUSMALLINT,
             LockType: SQLUSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLSetStmtAttrA(
+        #[allow(non_snake_case)]
+        pub fn SQLSetStmtAttrA(
             StatementHandle: HSTMT,
             Attribute: SQLINTEGER,
             ValuePtr: ConstSQLPOINTER,
             StringLength: SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLSetStmtAttrW(
+        #[allow(non_snake_case)]
+        pub fn SQLSetStmtAttrW(
             StatementHandle: HSTMT,
             Attribute: SQLINTEGER,
             ValuePtr: ConstSQLPOINTER,
             StringLength: SQLINTEGER,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLSpecialColumnsA(
+        #[allow(non_snake_case)]
+        pub fn SQLSpecialColumnsA(
             StatementHandle: HSTMT,
             IdentifierType: SQLSMALLINT,
             CatalogName: *const SQLCHAR,
@@ -4001,7 +4086,8 @@ pub(crate) mod ffi {
             Nullable: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLSpecialColumnsW(
+        #[allow(non_snake_case)]
+        pub fn SQLSpecialColumnsW(
             StatementHandle: HSTMT,
             IdentifierType: SQLSMALLINT,
             CatalogName: *const SQLWCHAR,
@@ -4014,7 +4100,8 @@ pub(crate) mod ffi {
             Nullable: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLStatisticsA(
+        #[allow(non_snake_case)]
+        pub fn SQLStatisticsA(
             StatementHandle: HSTMT,
             CatalogName: *const SQLCHAR,
             NameLength1: SQLSMALLINT,
@@ -4026,7 +4113,8 @@ pub(crate) mod ffi {
             Reserved: SQLUSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLStatisticsW(
+        #[allow(non_snake_case)]
+        pub fn SQLStatisticsW(
             StatementHandle: HSTMT,
             CatalogName: *const SQLWCHAR,
             NameLength1: SQLSMALLINT,
@@ -4038,7 +4126,8 @@ pub(crate) mod ffi {
             Reserved: SQLUSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLTablePrivilegesA(
+        #[allow(non_snake_case)]
+        pub fn SQLTablePrivilegesA(
             StatementHandle: HSTMT,
             CatalogName: *const SQLCHAR,
             NameLength1: SQLSMALLINT,
@@ -4048,7 +4137,8 @@ pub(crate) mod ffi {
             NameLength3: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLTablePrivilegesW(
+        #[allow(non_snake_case)]
+        pub fn SQLTablePrivilegesW(
             StatementHandle: HSTMT,
             CatalogName: *const SQLWCHAR,
             NameLength1: SQLSMALLINT,
@@ -4058,7 +4148,8 @@ pub(crate) mod ffi {
             NameLength3: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLTablesA(
+        #[allow(non_snake_case)]
+        pub fn SQLTablesA(
             StatementHandle: HSTMT,
             CatalogName: *const SQLCHAR,
             NameLength1: SQLSMALLINT,
@@ -4070,7 +4161,8 @@ pub(crate) mod ffi {
             NameLength4: SQLSMALLINT,
         ) -> SQLRETURN;
 
-        pub(crate) fn SQLTablesW(
+        #[allow(non_snake_case)]
+        pub fn SQLTablesW(
             StatementHandle: HSTMT,
             CatalogName: *const SQLWCHAR,
             NameLength1: SQLSMALLINT,
