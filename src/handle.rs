@@ -1,46 +1,28 @@
 #[double]
 use crate::api::ffi;
+use crate::api::{Allocate, Handle};
 use crate::c_types::DeferredBuf;
 use crate::conn::{ConnState, C2, C3, C4};
 use crate::convert::IntoSQLPOINTER;
 use crate::desc::{AppDesc, DescType, ImplDesc, IPD, IRD};
-use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
-use crate::{sqlreturn::SQL_SUCCESS, Ident, StrLenOrInd, SQLPOINTER, SQLSMALLINT};
-use mockall_double::double;
-use std::any::type_name;
-use std::cell::{Cell, UnsafeCell};
-use std::marker::PhantomData;
-use std::thread::panicking;
-
+use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION};
 #[cfg(feature = "odbc_debug")]
 use crate::stmt::{
     SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC, SQL_ATTR_IMP_ROW_DESC,
 };
-#[cfg(feature = "odbc_debug")]
-use crate::SQLINTEGER;
+use crate::{sqlreturn::SQL_SUCCESS, Ident, StrLenOrInd, SQLPOINTER};
+use mockall_double::double;
+use std::any::type_name;
+use std::cell::{Cell, UnsafeCell};
+use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
-#[cfg(feature = "odbc_debug")]
-use std::mem::MaybeUninit;
+use std::thread::panicking;
 
-pub trait Handle {
-    type Ident: Ident<Type = SQLSMALLINT>;
-}
-
+// TODO: Move to convert.rs?
 pub unsafe trait AsSQLHANDLE {
     #[allow(non_snake_case)]
     fn as_SQLHANDLE(&self) -> SQLHANDLE;
 }
-
-// TODO: Should be unsafe?
-// TODO: Where to require Drop? I could make a generic Drop implementation, hmmmm
-pub unsafe trait Allocate<'src>: Handle + Drop {
-    type SrcHandle: AsSQLHANDLE;
-    fn from_raw(handle: SQLHANDLE) -> Self;
-}
-
-pub trait SQLCompleteAsyncHandle {}
-pub trait SQLEndTranHandle {}
-pub trait SQLCancelHandle {}
 
 #[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 1)]
@@ -111,23 +93,21 @@ pub struct SQLHENV<V: OdbcVersion> {
 impl<V: OdbcVersion> Handle for SQLHENV<V> {
     type Ident = SQL_HANDLE_ENV;
 }
-unsafe impl<V: OdbcVersion> Allocate<'_> for SQLHENV<V> {
+impl<V: OdbcVersion> Allocate<'_> for SQLHENV<V> {
     type SrcHandle = SQL_NULL_HANDLE;
 
-    fn from_raw(handle: SQLHANDLE) -> Self {
+    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
         let val = Self {
             handle,
             version: PhantomData,
         };
 
-        let sql_return = unsafe {
-            ffi::SQLSetEnvAttr(
-                val.as_SQLHANDLE(),
-                SQL_ATTR_ODBC_VERSION::IDENTIFIER,
-                V::IDENTIFIER.into_SQLPOINTER(),
-                0, // TODO: Use AttrLen::len()
-            )
-        };
+        let sql_return = ffi::SQLSetEnvAttr(
+            val.as_SQLHANDLE(),
+            SQL_ATTR_ODBC_VERSION::IDENTIFIER,
+            V::IDENTIFIER.into_SQLPOINTER(),
+            0, // TODO: Use AttrLen::len()
+        );
 
         if sql_return != SQL_SUCCESS {
             panic!(
@@ -159,7 +139,6 @@ impl<V: OdbcVersion> Drop for SQLHENV<V> {
         }
     }
 }
-impl<V: OdbcVersion> SQLEndTranHandle for SQLHENV<V> {}
 
 /// Connection handle identifies a structure that contains connection information, such as the following:
 /// * The state of the connection
@@ -191,10 +170,10 @@ pub struct SQLHDBC<'env, C: ConnState, V: OdbcVersion> {
 impl<C: ConnState, V: OdbcVersion> Handle for SQLHDBC<'_, C, V> {
     type Ident = SQL_HANDLE_DBC;
 }
-unsafe impl<'env, V: OdbcVersion> Allocate<'env> for SQLHDBC<'env, C2, V> {
+impl<'env, V: OdbcVersion> Allocate<'env> for SQLHDBC<'env, C2, V> {
     type SrcHandle = SQLHENV<V>;
 
-    fn from_raw(handle: SQLHANDLE) -> Self {
+    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
         Self {
             handle,
 
@@ -204,11 +183,6 @@ unsafe impl<'env, V: OdbcVersion> Allocate<'env> for SQLHDBC<'env, C2, V> {
         }
     }
 }
-impl SQLCancelHandle for SQLHDBC<'_, C4, SQL_OV_ODBC3_80> {}
-impl SQLCancelHandle for SQLHDBC<'_, C4, SQL_OV_ODBC4> {}
-impl SQLCompleteAsyncHandle for SQLHDBC<'_, C4, SQL_OV_ODBC3_80> {}
-impl SQLCompleteAsyncHandle for SQLHDBC<'_, C4, SQL_OV_ODBC4> {}
-impl<V: OdbcVersion> SQLEndTranHandle for SQLHDBC<'_, C4, V> {}
 unsafe impl<C: ConnState, V: OdbcVersion> AsSQLHANDLE for SQLHDBC<'_, C, V> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.handle
@@ -288,41 +262,41 @@ impl<'env, OC: ConnState, V: OdbcVersion> SQLHDBC<'env, OC, V> {
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/statement-handles
 #[derive(Debug)]
 #[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
-pub struct SQLHSTMT<'conn, 'stmt, 'buf, V: OdbcVersion> {
+pub struct SQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion> {
     pub(crate) handle: SQLHANDLE,
 
     parent: PhantomData<&'conn ()>,
     version: PhantomData<V>,
 
     #[cfg(feature = "odbc_debug")]
-    pub(crate) explicit_ard: Cell<Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>, V>>>,
+    pub(crate) explicit_ard: Cell<Option<&'desc SQLHDESC<'desc, AppDesc<'buf>, V>>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) explicit_apd: Cell<Option<&'stmt SQLHDESC<'stmt, AppDesc<'buf>, V>>>,
+    pub(crate) explicit_apd: Cell<Option<&'desc SQLHDESC<'desc, AppDesc<'buf>, V>>>,
 
     #[cfg(feature = "odbc_debug")]
-    pub(crate) ard: ManuallyDrop<SQLHDESC<'stmt, AppDesc<'buf>, V>>,
+    pub(crate) ard: ManuallyDrop<SQLHDESC<'desc, AppDesc<'buf>, V>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) apd: ManuallyDrop<SQLHDESC<'stmt, AppDesc<'buf>, V>>,
+    pub(crate) apd: ManuallyDrop<SQLHDESC<'desc, AppDesc<'buf>, V>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) ird: ManuallyDrop<SQLHDESC<'stmt, ImplDesc<IRD>, V>>,
+    pub(crate) ird: ManuallyDrop<SQLHDESC<'desc, ImplDesc<IRD>, V>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) ipd: ManuallyDrop<SQLHDESC<'stmt, ImplDesc<IPD>, V>>,
+    pub(crate) ipd: ManuallyDrop<SQLHDESC<'desc, ImplDesc<IPD>, V>>,
 
     #[allow(dead_code)]
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) explicit_ard: Cell<PhantomData<&'stmt SQLHDESC<'stmt, AppDesc<'buf>, V>>>,
+    pub(crate) explicit_ard: Cell<PhantomData<&'desc SQLHDESC<'desc, AppDesc<'buf>, V>>>,
     #[allow(dead_code)]
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) explicit_apd: Cell<PhantomData<&'stmt SQLHDESC<'stmt, AppDesc<'buf>, V>>>,
+    pub(crate) explicit_apd: Cell<PhantomData<&'desc SQLHDESC<'desc, AppDesc<'buf>, V>>>,
 
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) ard: PhantomData<SQLHDESC<'stmt, AppDesc<'buf>, V>>,
+    pub(crate) ard: PhantomData<SQLHDESC<'desc, AppDesc<'buf>, V>>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) apd: PhantomData<SQLHDESC<'stmt, AppDesc<'buf>, V>>,
+    pub(crate) apd: PhantomData<SQLHDESC<'desc, AppDesc<'buf>, V>>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) ird: PhantomData<SQLHDESC<'stmt, ImplDesc<IRD>, V>>,
+    pub(crate) ird: PhantomData<SQLHDESC<'desc, ImplDesc<IRD>, V>>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) ipd: PhantomData<SQLHDESC<'stmt, ImplDesc<IPD>, V>>,
+    pub(crate) ipd: PhantomData<SQLHDESC<'desc, ImplDesc<IPD>, V>>,
 }
 impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
     #[cfg(feature = "odbc_debug")]
@@ -409,12 +383,12 @@ impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
 impl<V: OdbcVersion> Handle for SQLHSTMT<'_, '_, '_, V> {
     type Ident = SQL_HANDLE_STMT;
 }
-unsafe impl<'conn, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V> {
+impl<'conn, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V> {
     // Valid because SQLHDBC is covariant
     type SrcHandle = SQLHDBC<'conn, C4, V>;
 
     #[cfg(feature = "odbc_debug")]
-    fn from_raw(handle: SQLHANDLE) -> Self {
+    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
         unsafe {
             let ard = SQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_ROW_DESC>(handle);
             let apd = SQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_PARAM_DESC>(handle);
@@ -439,7 +413,7 @@ unsafe impl<'conn, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V
     }
 
     #[cfg(not(feature = "odbc_debug"))]
-    fn from_raw(handle: SQLHANDLE) -> Self {
+    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
         Self {
             handle,
 
@@ -456,10 +430,6 @@ unsafe impl<'conn, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V
         }
     }
 }
-impl SQLCancelHandle for SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3_80> {}
-impl SQLCancelHandle for SQLHSTMT<'_, '_, '_, SQL_OV_ODBC4> {}
-impl SQLCompleteAsyncHandle for SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3_80> {}
-impl SQLCompleteAsyncHandle for SQLHSTMT<'_, '_, '_, SQL_OV_ODBC4> {}
 unsafe impl<V: OdbcVersion> AsSQLHANDLE for SQLHSTMT<'_, '_, '_, V> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.handle
@@ -516,8 +486,14 @@ pub struct SQLHDESC<'conn, T, V: OdbcVersion> {
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) inner: PhantomData<T>,
 }
-impl<'buf, V: OdbcVersion, T: DescType<'buf>> SQLHDESC<'_, T, V> {
-    fn from_raw(handle: SQLHANDLE) -> Self {
+impl<'buf, V: OdbcVersion, T: DescType<'buf>> Handle for SQLHDESC<'_, T, V> {
+    type Ident = SQL_HANDLE_DESC;
+}
+impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'buf>, V> {
+    // Valid because SQLHDBC is covariant
+    type SrcHandle = SQLHDBC<'conn, C4, V>;
+
+    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
         Self {
             handle,
 
@@ -526,17 +502,6 @@ impl<'buf, V: OdbcVersion, T: DescType<'buf>> SQLHDESC<'_, T, V> {
 
             inner: PhantomData,
         }
-    }
-}
-impl<'buf, V: OdbcVersion, T: DescType<'buf>> Handle for SQLHDESC<'_, T, V> {
-    type Ident = SQL_HANDLE_DESC;
-}
-unsafe impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'buf>, V> {
-    // Valid because SQLHDBC is covariant
-    type SrcHandle = SQLHDBC<'conn, C4, V>;
-
-    fn from_raw(handle: SQLHANDLE) -> Self {
-        SQLHDESC::from_raw(handle)
     }
 }
 unsafe impl<V: OdbcVersion, T> AsSQLHANDLE for SQLHDESC<'_, T, V> {
@@ -570,6 +535,7 @@ impl<V: OdbcVersion, T> Drop for SQLHDESC<'_, T, V> {
 mod test {
     #![allow(non_snake_case)]
 
+    use crate::env::SQL_OV_ODBC3_80;
     use super::*;
 
     #[test]
@@ -586,7 +552,7 @@ mod test {
             .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == raw_handle)
             .return_const(SQL_SUCCESS);
 
-        SQLHDBC::<C2, SQL_OV_ODBC3_80>::from_raw(raw_handle);
+        unsafe { SQLHDBC::<C2, SQL_OV_ODBC3_80>::from_raw(raw_handle) };
     }
 
     #[test]
@@ -607,7 +573,7 @@ mod test {
             .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == raw_handle)
             .return_const(SQL_SUCCESS);
 
-        SQLHDBC::<_, SQL_OV_ODBC3_80>::from_raw(raw_handle).need_data();
+        unsafe { SQLHDBC::<_, SQL_OV_ODBC3_80>::from_raw(raw_handle) }.need_data();
     }
 
     #[test]
@@ -628,7 +594,7 @@ mod test {
             .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == raw_handle)
             .return_const(SQL_SUCCESS);
 
-        SQLHDBC::<_, SQL_OV_ODBC3_80>::from_raw(raw_handle).connect();
+        unsafe { SQLHDBC::<_, SQL_OV_ODBC3_80>::from_raw(raw_handle) }.connect();
     }
 
     // TODO: Mockall is buggy and these tests fail more often
