@@ -7,7 +7,7 @@ use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::handle::{AsSQLHANDLE, SQLHDESC};
 use crate::str::{Ansi, OdbcChar, OdbcStr, Unicode};
 use crate::{
-    handle::SQLHSTMT, sqlreturn::SQLRETURN, Ident, OdbcBool, OdbcDefined, SQLCHAR, SQLINTEGER,
+    handle::UnsafeSQLHSTMT, sqlreturn::SQLRETURN, Ident, OdbcBool, OdbcDefined, SQLCHAR, SQLINTEGER,
     SQLPOINTER, SQLULEN, SQLWCHAR,
 };
 use mockall_double::double;
@@ -24,7 +24,7 @@ pub trait StmtAttr<'stmt, 'buf, A: Ident, V: OdbcVersion>:
     // TODO: Can I use here descriptor and statement defined on different connections??? This
     // should not be allowed If this is true, then I need to use unelided lifetime 'conn to
     // tie the lifetimes. Will that solve the problem?
-    fn update_handle(&self, _: &SQLHSTMT<'_, 'stmt, 'buf, V>)
+    fn update_handle(&self, _: &UnsafeSQLHSTMT<'_, 'stmt, 'buf, V>)
     where
         Self: AttrSet<A>,
     {
@@ -32,7 +32,7 @@ pub trait StmtAttr<'stmt, 'buf, A: Ident, V: OdbcVersion>:
 
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, V>,
         StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN
     where
@@ -55,7 +55,7 @@ pub trait StmtAttr<'stmt, 'buf, A: Ident, V: OdbcVersion>:
 
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, V>,
         StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN
     where
@@ -80,7 +80,7 @@ pub trait StmtAttr<'stmt, 'buf, A: Ident, V: OdbcVersion>:
 #[cfg(feature = "odbc_debug")]
 fn get_ard<'stmt, 'buf, V: OdbcVersion>(
     desc: &mut MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, V>>,
-    StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
+    StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, V>,
 ) -> SQLRETURN {
     if let Some(explicit_ard) = StatementHandle.explicit_ard.get() {
         *desc = MaybeUninit::new(RefSQLHDESC(explicit_ard));
@@ -94,7 +94,7 @@ fn get_ard<'stmt, 'buf, V: OdbcVersion>(
 #[cfg(feature = "odbc_debug")]
 fn get_apd<'stmt, 'buf, V: OdbcVersion>(
     desc: &mut MaybeUninit<RefSQLHDESC<'stmt, AppDesc<'buf>, V>>,
-    StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, V>,
+    StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, V>,
 ) -> SQLRETURN {
     if let Some(explicit_apd) = StatementHandle.explicit_apd.get() {
         *desc = MaybeUninit::new(RefSQLHDESC(explicit_apd));
@@ -108,7 +108,7 @@ fn get_apd<'stmt, 'buf, V: OdbcVersion>(
 #[cfg(feature = "odbc_debug")]
 fn get_ird<'stmt, V: OdbcVersion>(
     desc: &mut MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<IRD>, V>>,
-    StatementHandle: &'stmt SQLHSTMT<V>,
+    StatementHandle: &'stmt UnsafeSQLHSTMT<V>,
 ) -> SQLRETURN {
     *desc = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ird));
     SQL_SUCCESS
@@ -117,7 +117,7 @@ fn get_ird<'stmt, V: OdbcVersion>(
 #[cfg(feature = "odbc_debug")]
 fn get_ipd<'stmt, V: OdbcVersion>(
     desc: &mut MaybeUninit<RefSQLHDESC<'stmt, ImplDesc<IPD>, V>>,
-    StatementHandle: &'stmt SQLHSTMT<V>,
+    StatementHandle: &'stmt UnsafeSQLHSTMT<V>,
 ) -> SQLRETURN {
     *desc = MaybeUninit::new(RefSQLHDESC(&StatementHandle.ipd));
     SQL_SUCCESS
@@ -155,9 +155,9 @@ impl<'conn, T, V: OdbcVersion> DerefMut for RefSQLHDESC<'conn, T, V> {
 }
 
 fn as_version<'a, 'conn, 'stmt, 'buf, IV: OdbcVersion, OV: OdbcVersion>(
-    StatementHandle: &'a SQLHSTMT<'conn, 'stmt, 'buf, IV>,
-) -> &'a SQLHSTMT<'conn, 'stmt, 'buf, OV> {
-    // This is valid because SQLHSTMT is either repr(transparent) or repr(C)
+    StatementHandle: &'a UnsafeSQLHSTMT<'conn, 'stmt, 'buf, IV>,
+) -> &'a UnsafeSQLHSTMT<'conn, 'stmt, 'buf, OV> {
+    // This is valid because UnsafeSQLHSTMT is either repr(transparent) or repr(C)
     unsafe { std::mem::transmute(StatementHandle) }
 }
 
@@ -166,7 +166,7 @@ impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80> 
 where
     T: StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3>,
 {
-    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, SQL_OV_ODBC3_80>)
+    fn update_handle(&self, StatementHandle: &UnsafeSQLHSTMT<'_, 'stmt, 'buf, SQL_OV_ODBC3_80>)
     where
         T: AttrSet<A>,
     {
@@ -175,7 +175,7 @@ where
 
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
         StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN
     where
@@ -190,7 +190,7 @@ where
     }
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
         StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN
     where
@@ -208,7 +208,7 @@ impl<'stmt, 'buf, A: Ident, T: Ident> StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC4> for
 where
     T: StmtAttr<'stmt, 'buf, A, SQL_OV_ODBC3_80>,
 {
-    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, SQL_OV_ODBC4>)
+    fn update_handle(&self, StatementHandle: &UnsafeSQLHSTMT<'_, 'stmt, 'buf, SQL_OV_ODBC4>)
     where
         T: AttrSet<A>,
     {
@@ -217,7 +217,7 @@ where
 
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
         StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN
     where
@@ -232,7 +232,7 @@ where
     }
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
         StringLengthPtr: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN
     where
@@ -556,7 +556,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC3>
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ard(self, StatementHandle)
@@ -565,7 +565,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC3>
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ard(self, StatementHandle)
@@ -577,7 +577,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC3_80>
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ard(self, StatementHandle)
@@ -586,7 +586,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC3_80>
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ard(self, StatementHandle)
@@ -598,7 +598,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC4>
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ard(self, StatementHandle)
@@ -607,7 +607,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, SQL_OV_ODBC4>
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ard(self, StatementHandle)
@@ -618,7 +618,7 @@ impl<'stmt, 'buf, V: OdbcVersion> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_ROW_DESC, V
     for Option<&'stmt SQLHDESC<'_, AppDesc<'buf>, V>>
 {
     #[cfg(feature = "odbc_debug")]
-    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, V>) {
+    fn update_handle(&self, StatementHandle: &UnsafeSQLHSTMT<'_, 'stmt, 'buf, V>) {
         StatementHandle.explicit_ard.set(*self);
     }
 }
@@ -653,7 +653,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC3>
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_apd(self, StatementHandle)
@@ -662,7 +662,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC3>
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_apd(self, StatementHandle)
@@ -674,7 +674,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC3_80
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_apd(self, StatementHandle)
@@ -683,7 +683,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC3_80
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC3_80>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_apd(self, StatementHandle)
@@ -695,7 +695,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC4>
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_apd(self, StatementHandle)
@@ -704,7 +704,7 @@ impl<'stmt, 'buf> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC, SQL_OV_ODBC4>
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, SQL_OV_ODBC4>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_apd(self, StatementHandle)
@@ -715,7 +715,7 @@ impl<'stmt, 'buf, V: OdbcVersion> StmtAttr<'stmt, 'buf, SQL_ATTR_APP_PARAM_DESC,
     for Option<&'stmt SQLHDESC<'_, AppDesc<'buf>, V>>
 {
     #[cfg(feature = "odbc_debug")]
-    fn update_handle(&self, StatementHandle: &SQLHSTMT<'_, 'stmt, 'buf, V>) {
+    fn update_handle(&self, StatementHandle: &UnsafeSQLHSTMT<'_, 'stmt, 'buf, V>) {
         StatementHandle.explicit_apd.set(*self);
     }
 }
@@ -745,7 +745,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC3>
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ird(self, StatementHandle)
@@ -754,7 +754,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC3>
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ird(self, StatementHandle)
@@ -766,7 +766,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC3_80>
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3_80>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<SQL_OV_ODBC3_80>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ird(self, StatementHandle)
@@ -774,7 +774,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC3_80>
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3_80>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<SQL_OV_ODBC3_80>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ird(self, StatementHandle)
@@ -786,7 +786,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC4>
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC4>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<SQL_OV_ODBC4>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ird(self, StatementHandle)
@@ -794,7 +794,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_ROW_DESC, SQL_OV_ODBC4>
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC4>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<SQL_OV_ODBC4>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ird(self, StatementHandle)
@@ -822,7 +822,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC3>
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ipd(self, StatementHandle)
@@ -831,7 +831,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC3>
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<SQL_OV_ODBC3>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ipd(self, StatementHandle)
@@ -843,7 +843,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC3_80>
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3_80>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<SQL_OV_ODBC3_80>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ipd(self, StatementHandle)
@@ -852,7 +852,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC3_80>
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC3_80>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<SQL_OV_ODBC3_80>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ipd(self, StatementHandle)
@@ -864,7 +864,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC4>
     #[cfg(feature = "odbc_debug")]
     fn readA(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC4>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<SQL_OV_ODBC4>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ipd(self, StatementHandle)
@@ -873,7 +873,7 @@ impl<'stmt> StmtAttr<'stmt, '_, SQL_ATTR_IMP_PARAM_DESC, SQL_OV_ODBC4>
     #[cfg(feature = "odbc_debug")]
     fn readW(
         &mut self,
-        StatementHandle: &'stmt SQLHSTMT<SQL_OV_ODBC4>,
+        StatementHandle: &'stmt UnsafeSQLHSTMT<SQL_OV_ODBC4>,
         _: Option<&mut MaybeUninit<Self::StrLen>>,
     ) -> SQLRETURN {
         get_ipd(self, StatementHandle)

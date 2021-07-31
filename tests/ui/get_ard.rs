@@ -35,6 +35,6 @@ fn main() {
     stmt.SQLGetStmtAttrA(SQL_ATTR_APP_ROW_DESC, Some(&mut desc), None);
     let desc: RefSQLHDESC<_, _> = unsafe { desc.assume_init() };
 
-    let _ = stmt.SQLFreeHandle();
+    stmt.SQLFreeHandle();
     drop(desc);
 }

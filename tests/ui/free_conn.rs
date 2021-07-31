@@ -27,6 +27,6 @@ fn main() {
     let env = get_env_handle();
     let conn = connect_to_test_db(&env);
 
-    let _ = env.SQLFreeHandle();
-    let _ = conn.SQLFreeHandle();
+    env.SQLFreeHandle();
+    conn.SQLFreeHandle();
 }

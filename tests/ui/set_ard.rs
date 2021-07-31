@@ -36,6 +36,6 @@ fn main() {
 
     stmt.SQLSetStmtAttrA(SQL_ATTR_APP_ROW_DESC, Some(&desc));
 
-    let _ = desc.SQLFreeHandle();
-    let _ = stmt.SQLFreeHandle();
+    desc.SQLFreeHandle();
+    stmt.SQLFreeHandle();
 }

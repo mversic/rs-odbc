@@ -1,10 +1,10 @@
 error[E0505]: cannot move out of `stmt` because it is borrowed
-  --> $DIR/get_ard.rs:38:13
+  --> $DIR/get_ard.rs:38:5
    |
 35 |     stmt.SQLGetStmtAttrA(SQL_ATTR_APP_ROW_DESC, Some(&mut desc), None);
    |     ---- borrow of `stmt` occurs here
 ...
-38 |     let _ = stmt.SQLFreeHandle();
-   |             ^^^^ move out of `stmt` occurs here
+38 |     stmt.SQLFreeHandle();
+   |     ^^^^ move out of `stmt` occurs here
 39 |     drop(desc);
    |          ---- borrow later used here

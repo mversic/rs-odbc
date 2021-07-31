@@ -30,6 +30,6 @@ fn main() {
     let (desc, _) = SQLHDESC::SQLAllocHandle(&conn);
     let desc = desc.unwrap();
 
-    let _ = conn.SQLFreeHandle();
-    let _ = desc.SQLFreeHandle();
+    conn.SQLFreeHandle();
+    desc.SQLFreeHandle();
 }

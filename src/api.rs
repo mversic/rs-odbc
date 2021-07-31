@@ -13,10 +13,10 @@ use crate::{
     desc::{DescField, DescType},
     diag::{DiagField, SQLSTATE},
     env::{EnvAttr, OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4},
-    handle::{SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
+    handle::{SQLHDBC, UnsafeSQLHDESC, SQLHENV, SQLHDESC, SQLHSTMT, UnsafeSQLHSTMT},
     info::InfoType,
     sql_types::SqlType,
-    sqlreturn::{SQLRETURN, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_SUCCEEDED, SQL_SUCCESS},
+    sqlreturn::{SQLRETURN, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_SUCCEEDED},
     stmt::StmtAttr,
     str::{Ansi, OdbcStr, Unicode},
     BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion, FreeStmtOption,
@@ -27,7 +27,7 @@ use crate::{
 
 // TODO: Should be unsafe?
 // TODO: Where to require Drop? I could make a generic Drop implementation, hmmmm
-pub trait Allocate<'src>: Handle + Drop {
+pub trait Allocate<'src>: Handle {
     type SrcHandle: AsSQLHANDLE;
 
     /// Creates handle from a raw pointer
@@ -227,14 +227,12 @@ pub trait Handle: AsSQLHANDLE + Sized {
     ///
     /// For complete documentation on SQLFreeHandle, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfreehandle-function).
     ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_ERROR, or SQL_INVALID_HANDLE.
+    /// # Panics
+    ///
+    /// Panics if the DM returns value other than SQL_SUCCESS
     #[inline]
-    #[must_use]
     #[allow(non_snake_case)]
-    fn SQLFreeHandle(self) -> SQLRETURN {
-        SQL_SUCCESS
-    }
+    fn SQLFreeHandle(self) {}
 }
 
 impl<V: OdbcVersion> SQLHENV<V> {
@@ -1073,6 +1071,1009 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     where
         B: ?Sized,
     {
+        self.0.SQLBindCol(ColumnNumber, TargetType, TargetValuePtr, StrLen_or_IndPtr)
+    }
+
+    /// Binds a buffer to a parameter marker in an SQL statement. **SQLBindParameter** supports binding to a Unicode C data type, even if the underlying driver does not support Unicode data.
+    ///
+    /// For complete documentation on SQLBindParameter, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlbindparameter-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLBindParameter<
+        TT: Ident<Type = SQLSMALLINT>,
+        // TODO: Check which type is used for ParameterType
+        ST: SqlType<V>,
+        B: DeferredBuf<TT, V>,
+    >(
+        &self,
+        ParameterNumber: SQLUSMALLINT,
+        InputOutputType: IOType,
+        ValueType: TT,
+        ParameterType: ST,
+        ColumnSize: SQLULEN,
+        DecimalDigits: SQLSMALLINT,
+        ParameterValuePtr: Option<&'buf B>,
+        StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
+    ) -> SQLRETURN
+    where
+        B: ?Sized,
+    {
+        self.0.SQLBindParameter(ParameterNumber, InputOutputType, ValueType, ParameterType, ColumnSize, DecimalDigits, ParameterValuePtr, StrLen_or_IndPtr)
+    }
+
+    /// Performs bulk insertions and bulk bookmark operations, including update, delete, and fetch by bookmark.
+    ///
+    /// For complete documentation on SQLBulkOperations, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlbulkoperations-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLBulkOperations(&self, Operation: BulkOperation) -> SQLRETURN {
+        self.0.SQLBulkOperations(Operation)
+    }
+
+    /// Cancels the processing on a statement.
+    /// To cancel processing on a connection or statement, use SQLCancelHandle Function.
+    ///
+    /// For complete documentation on SQLCancel, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcancel-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLCancel(&self) -> SQLRETURN {
+        self.0.SQLCancel()
+    }
+
+    /// Closes a cursor that has been opened on a statement and discards pending results.
+    ///
+    /// For complete documentation on SQLCloseCursor, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlclosecursor-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLCloseCursor(&self) -> SQLRETURN {
+        self.0.SQLCloseCursor()
+    }
+
+    /// Returns descriptor information for a column in a result set. Descriptor information is returned as a character string, a descriptor-dependent value, or an integer value.
+    ///
+    /// For complete documentation on SQLColAttributeA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcolattribute-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLColAttributeA<A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
+        &self,
+        ColumnNumber: SQLUSMALLINT,
+        FieldIdentifier: A,
+        CharacterAttributePtr: Option<&mut T>,
+        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
+        NumericAttributePtr: &mut MaybeUninit<SQLLEN>,
+    ) -> SQLRETURN
+    where
+        T: AttrGet<A> + Ansi + ?Sized,
+        MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
+    {
+        self.0.SQLColAttributeA(ColumnNumber, FieldIdentifier, CharacterAttributePtr, StringLengthPtr, NumericAttributePtr)
+    }
+
+    /// Returns descriptor information for a column in a result set. Descriptor information is returned as a character string, a descriptor-dependent value, or an integer value.
+    ///
+    /// For complete documentation on SQLColAttributeW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcolattribute-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLColAttributeW<A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
+        &self,
+        ColumnNumber: SQLUSMALLINT,
+        FieldIdentifier: A,
+        CharacterAttributePtr: Option<&mut T>,
+        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
+        NumericAttributePtr: &mut MaybeUninit<SQLLEN>,
+    ) -> SQLRETURN
+    where
+        T: AttrGet<A> + Unicode + ?Sized,
+        MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
+    {
+        self.0.SQLColAttributeW(ColumnNumber, FieldIdentifier, CharacterAttributePtr, StringLengthPtr, NumericAttributePtr)
+    }
+
+    /// Returns a list of columns and associated privileges for the specified table. The driver returns the information as a result set on the specified `self`.
+    ///
+    /// For complete documentation on SQLColumnPrivilegesA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcolumnprivileges-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLColumnPrivilegesA(
+        &self,
+        CatalogName: &OdbcStr<SQLCHAR>,
+        SchemaName: &OdbcStr<SQLCHAR>,
+        TableName: &OdbcStr<SQLCHAR>,
+        ColumnName: &OdbcStr<SQLCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLColumnPrivilegesA(CatalogName, SchemaName, TableName, ColumnName)
+    }
+
+    /// Returns a list of columns and associated privileges for the specified table. The driver returns the information as a result set on the specified `self`.
+    ///
+    /// For complete documentation on SQLColumnPrivilegesW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcolumnprivileges-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLColumnPrivilegesW(
+        &self,
+        CatalogName: &OdbcStr<SQLWCHAR>,
+        SchemaName: &OdbcStr<SQLWCHAR>,
+        TableName: &OdbcStr<SQLWCHAR>,
+        ColumnName: &OdbcStr<SQLWCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLColumnPrivilegesW(CatalogName, SchemaName, TableName, ColumnName)
+    }
+
+    /// Returns the list of column names in specified tables. The driver returns this information as a result set on the specified `self`.
+    ///
+    /// For complete documentation on SQLColumnsA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcolumns-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLColumnsA(
+        &self,
+        CatalogName: &OdbcStr<SQLCHAR>,
+        SchemaName: &OdbcStr<SQLCHAR>,
+        TableName: &OdbcStr<SQLCHAR>,
+        ColumnName: &OdbcStr<SQLCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLColumnsA(CatalogName, SchemaName, TableName, ColumnName)
+    }
+
+    /// Returns the list of column names in specified tables. The driver returns this information as a result set on the specified `self`.
+    ///
+    /// For complete documentation on SQLColumnsW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcolumns-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLColumnsW(
+        &self,
+        CatalogName: &OdbcStr<SQLWCHAR>,
+        SchemaName: &OdbcStr<SQLWCHAR>,
+        TableName: &OdbcStr<SQLWCHAR>,
+        ColumnName: &OdbcStr<SQLWCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLColumnsW(CatalogName, SchemaName, TableName, ColumnName)
+    }
+
+    /// Returns the result descriptor - column name,type, column size, decimal digits, and nullability - for one column in the result set. This information also is available in the fields of the IRD.
+    ///
+    /// For complete documentation on SQLDescribeColA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldescribecol-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLDescribeColA(
+        &self,
+        ColumnNumber: SQLUSMALLINT,
+        ColumnName: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
+        NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        DataTypePtr: &mut MaybeUninit<SQLSMALLINT>,
+        ColumnSizePtr: &mut MaybeUninit<SQLULEN>,
+        DecimalDigitsPtr: &mut MaybeUninit<SQLSMALLINT>,
+        NullablePtr: &mut MaybeUninit<NullAllowed>,
+    ) -> SQLRETURN {
+        self.0.SQLDescribeColA(ColumnNumber, ColumnName, NameLengthPtr, DataTypePtr, ColumnSizePtr, DecimalDigitsPtr, NullablePtr)
+    }
+
+    /// Returns the result descriptor - column name,type, column size, decimal digits, and nullability - for one column in the result set. This information also is available in the fields of the IRD.
+    ///
+    /// For complete documentation on SQLDescribeColW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldescribecol-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLDescribeColW(
+        &self,
+        ColumnNumber: SQLUSMALLINT,
+        ColumnName: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
+        NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        DataTypePtr: &mut MaybeUninit<SQLSMALLINT>,
+        ColumnSizePtr: &mut MaybeUninit<SQLULEN>,
+        DecimalDigitsPtr: &mut MaybeUninit<SQLSMALLINT>,
+        NullablePtr: &mut MaybeUninit<NullAllowed>,
+    ) -> SQLRETURN {
+        self.0.SQLDescribeColW(ColumnNumber, ColumnName, NameLengthPtr, DataTypePtr, ColumnSizePtr, DecimalDigitsPtr, NullablePtr)
+    }
+
+    /// Returns the description of a parameter marker associated with a prepared SQL statement. This information is also available in the fields of the IPD.
+    ///
+    /// For complete documentation on SQLDescribeParam, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldescribeparam-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLDescribeParam(
+        &self,
+        ParameterNumber: SQLUSMALLINT,
+        DataTypePtr: &mut MaybeUninit<SQLSMALLINT>,
+        ParameterSizePtr: &mut MaybeUninit<SQLULEN>,
+        DecimalDigitsPtr: &mut MaybeUninit<SQLSMALLINT>,
+        NullablePtr: &mut MaybeUninit<NullAllowed>,
+    ) -> SQLRETURN {
+        self.0.SQLDescribeParam(ParameterNumber, DataTypePtr, ParameterSizePtr, DecimalDigitsPtr, NullablePtr)
+    }
+
+    /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
+    ///
+    /// For complete documentation on SQLExecDirectA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn SQLExecDirectA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
+        unsafe {self.0.SQLExecDirectA(StatementText)}
+    }
+
+    /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
+    ///
+    /// For complete documentation on SQLExecDirectW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn SQLExecDirectW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
+        unsafe{self.0.SQLExecDirectW(StatementText)}
+    }
+
+    /// Executes a prepared statement, using the current values of the parameter marker variables if any parameter markers exist in the statement.
+    ///
+    /// For complete documentation on SQLExecute, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecute-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn SQLExecute(&self) -> SQLRETURN {
+        unsafe {self.0.SQLExecute()}
+    }
+
+    /// Fetches the next rowset of data from the result set and returns data for all bound columns.
+    ///
+    /// For complete documentation on SQLFetch, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetch-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn SQLFetch(&self) -> SQLRETURN {
+        unsafe {self.0.SQLFetch()}
+    }
+
+    /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
+    /// When working with an ODBC 2.x driver, the Driver Manager maps this function to **SQLExtendedFetch**. For more information, see Mapping Replacement Functions for Backward Compatibility of Applications.
+    ///
+    /// For complete documentation on SQLFetchScroll, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetchscroll-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn SQLFetchScroll(
+        &self,
+        FetchOrientation: SQLSMALLINT,
+        FetchOffset: SQLLEN,
+    ) -> SQLRETURN {
+        unsafe {self.0.SQLFetchScroll(FetchOrientation, FetchOffset)}
+    }
+
+    /// Can return:
+    ///
+    /// * A list of foreign keys in the specified table (columns in the specified table that refer to primary keys in other tables).
+    /// * A list of foreign keys in other tables that refer to the primary key in the specified table.
+    ///
+    /// The driver returns each list as a result set on the specified statement.
+    ///
+    /// For complete documentation on SQLForeignKeysA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlforeignkeys-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLForeignKeysA(
+        &self,
+        PKCatalogName: &OdbcStr<SQLCHAR>,
+        PKSchemaName: &OdbcStr<SQLCHAR>,
+        PKTableName: &OdbcStr<SQLCHAR>,
+        FKCatalogName: &OdbcStr<SQLCHAR>,
+        FKSchemaName: &OdbcStr<SQLCHAR>,
+        FKTableName: &OdbcStr<SQLCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLForeignKeysA(PKCatalogName, PKSchemaName, PKTableName, FKCatalogName, FKSchemaName, FKTableName)
+    }
+
+    /// Can return:
+    ///
+    /// * A list of foreign keys in the specified table (columns in the specified table that refer to primary keys in other tables).
+    /// * A list of foreign keys in other tables that refer to the primary key in the specified table.
+    ///
+    /// The driver returns each list as a result set on the specified statement.
+    ///
+    /// For complete documentation on SQLForeignKeysW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlforeignkeys-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLForeignKeysW(
+        &self,
+        PKCatalogName: &OdbcStr<SQLWCHAR>,
+        PKSchemaName: &OdbcStr<SQLWCHAR>,
+        PKTableName: &OdbcStr<SQLWCHAR>,
+        FKCatalogName: &OdbcStr<SQLWCHAR>,
+        FKSchemaName: &OdbcStr<SQLWCHAR>,
+        FKTableName: &OdbcStr<SQLWCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLForeignKeysW(PKCatalogName, PKSchemaName, PKTableName, FKCatalogName, FKSchemaName, FKTableName)
+    }
+
+    /// Stops processing associated with a specific statement, closes any open cursors associated with the statement, discards pending results, or, optionally, frees all resources associated with the statement handle.
+    ///
+    /// For complete documentation on SQLFreeStmt, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfreestmt-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLFreeStmt(&self, Option: FreeStmtOption) -> SQLRETURN {
+        self.0.SQLFreeStmt(Option)
+    }
+
+    /// Returns the cursor name associated with a specified statement.
+    ///
+    /// For complete documentation on SQLGetCursorNameA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetcursorname-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLGetCursorNameA(
+        &self,
+        CursorName: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
+        NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+    ) -> SQLRETURN {
+        self.0.SQLGetCursorNameA(CursorName, NameLengthPtr)
+    }
+
+    /// Returns the cursor name associated with a specified statement.
+    ///
+    /// For complete documentation on SQLGetCursorNameW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetcursorname-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLGetCursorNameW(
+        &self,
+        CursorName: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
+        NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+    ) -> SQLRETURN {
+        self.0.SQLGetCursorNameW(CursorName, NameLengthPtr)
+    }
+
+    /// Retrieves data for a single column in the result set or for a single parameter after **SQLParamData** returns SQL_PARAM_DATA_AVAILABLE. It can be called multiple times to retrieve variable-length data in parts.
+    ///
+    /// For complete documentation on SQLGetData, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdata-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[allow(non_snake_case, unused_variables)]
+    #[must_use]
+    // TODO: This function must be unsafe if SQL_ARD_TYPE and SQL_APD_TYPE are allowed to be used
+    pub fn SQLGetData<TT: Ident<Type = SQLSMALLINT>, B: CData<TT, V>>(
+        &self,
+        Col_or_Param_Num: SQLUSMALLINT,
+        TargetType: TT,
+        TargetValuePtr: &mut B,
+        StrLen_or_IndPtr: Option<&mut MaybeUninit<StrLenOrInd>>,
+    ) -> SQLRETURN
+    where
+        B: AsMutSQLPOINTER + ?Sized,
+        MaybeUninit<StrLenOrInd>: AsMutPtr<SQLLEN>,
+    {
+        self.0.SQLGetData(Col_or_Param_Num, TargetType, TargetValuePtr, StrLen_or_IndPtr)
+    }
+
+    /// Returns the current setting of a statement attribute.
+    ///
+    /// For complete documentation on SQLGetStmtAttrA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetstmtattr-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLGetStmtAttrA<'stmt, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'stmt, 'buf, A, V>>(
+        &'stmt self,
+        Attribute: A,
+        ValuePtr: Option<&mut T>,
+        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
+    ) -> SQLRETURN
+    where
+        T: AttrGet<A> + Ansi,
+        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+    {
+        self.0.SQLGetStmtAttrA(Attribute, ValuePtr, StringLengthPtr)
+    }
+
+    /// Returns the current setting of a statement attribute.
+    ///
+    /// For complete documentation on SQLGetStmtAttrW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetstmtattr-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLGetStmtAttrW<'stmt, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'stmt, 'buf, A, V>>(
+        &'stmt self,
+        Attribute: A,
+        ValuePtr: Option<&mut T>,
+        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
+    ) -> SQLRETURN
+    where
+        T: AttrGet<A> + Unicode + ?Sized,
+        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+    {
+        self.0.SQLGetStmtAttrW(Attribute, ValuePtr, StringLengthPtr)
+    }
+
+    /// Returns information about data types supported by the data source. The driver returns the information in the form of an SQL result set. The data types are intended for use in Data Definition Language (DDL) statements.
+    ///
+    /// For complete documentation on SQLGetTypeInfoA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgettypeinfo-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLGetTypeInfoA<ST: SqlType<V>>(&self, DataType: ST) -> SQLRETURN {
+        self.0.SQLGetTypeInfoA(DataType)
+    }
+
+    /// Returns information about data types supported by the data source. The driver returns the information in the form of an SQL result set. The data types are intended for use in Data Definition Language (DDL) statements.
+    ///
+    /// For complete documentation on SQLGetTypeInfoW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgettypeinfo-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLGetTypeInfoW<ST: SqlType<V>>(&self, DataType: ST) -> SQLRETURN {
+        self.0.SQLGetTypeInfoW(DataType)
+    }
+
+    /// Determines whether more results are available on a statement containing **SELECT**, **UPDATE**, **INSERT**, or **DELETE** statements and, if so, initializes processing for those results.
+    ///
+    /// For complete documentation on SQLMoreResults, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlmoreresults-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, OR SQL_PARAM_DATA_AVAILABLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLMoreResults(&self) -> SQLRETURN {
+        self.0.SQLMoreResults()
+    }
+
+    /// Returns the number of parameters in an SQL statement.
+    ///
+    /// For complete documentation on SQLNumParams, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlnumparams-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLNumParams(&self, ParameterCountPtr: &mut MaybeUninit<SQLSMALLINT>) -> SQLRETURN {
+        self.0.SQLNumParams(ParameterCountPtr)
+    }
+
+    /// Returns the number of columns in a result set.
+    ///
+    /// For complete documentation on SQLNumResultCols, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlnumresultcols-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLNumResultCols(&self, ColumnCountPtr: &mut MaybeUninit<SQLSMALLINT>) -> SQLRETURN {
+        self.0.SQLNumResultCols(ColumnCountPtr)
+    }
+
+    /// Used together with **SQLPutData** to supply parameter data at statement execution time, and with **SQLGetData** to retrieve streamed output parameter data.
+    ///
+    /// For complete documentation on SQLParamData, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlparamdata-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLParamData(&self, ValuePtrPtr: &mut MaybeUninit<SQLPOINTER>) -> SQLRETURN {
+        self.0.SQLParamData(ValuePtrPtr)
+    }
+
+    /// Prepares an SQL string for execution.
+    ///
+    /// For complete documentation on SQLPrepareA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlprepare-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLPrepareA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
+        self.0.SQLPrepareA(StatementText)
+    }
+
+    /// Prepares an SQL string for execution.
+    ///
+    /// For complete documentation on SQLPrepareW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlprepare-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLPrepareW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
+        self.0.SQLPrepareW(StatementText)
+    }
+
+    /// Returns the column names that make up the primary key for a table. The driver returns the information as a result set. This function does not support returning primary keys from multiple tables in a single call.
+    ///
+    /// For complete documentation on SQLPrimaryKeysA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlprimarykeys-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLPrimaryKeysA(
+        &self,
+        CatalogName: &OdbcStr<SQLCHAR>,
+        SchemaName: &OdbcStr<SQLCHAR>,
+        TableName: &OdbcStr<SQLCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLPrimaryKeysA(CatalogName, SchemaName, TableName)
+    }
+
+    /// Returns the column names that make up the primary key for a table. The driver returns the information as a result set. This function does not support returning primary keys from multiple tables in a single call.
+    ///
+    /// For complete documentation on SQLPrimaryKeysW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlprimarykeys-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLPrimaryKeysW(
+        &self,
+        CatalogName: &OdbcStr<SQLWCHAR>,
+        SchemaName: &OdbcStr<SQLWCHAR>,
+        TableName: &OdbcStr<SQLWCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLPrimaryKeysW(CatalogName, SchemaName, TableName)
+    }
+
+    /// Returns the list of input and output parameters, as well as the columns that make up the result set for the specified procedures. The driver returns the information as a result set on the specified statement.
+    ///
+    /// For complete documentation on SQLProcedureColumnsA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlprocedurecolumns-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLProcedureColumnsA(
+        &self,
+        CatalogName: &OdbcStr<SQLCHAR>,
+        SchemaName: &OdbcStr<SQLCHAR>,
+        ProcName: &OdbcStr<SQLCHAR>,
+        ColumnName: &OdbcStr<SQLCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLProcedureColumnsA(CatalogName, SchemaName, ProcName, ColumnName)
+    }
+
+    /// Returns the list of input and output parameters, as well as the columns that make up the result set for the specified procedures. The driver returns the information as a result set on the specified statement.
+    ///
+    /// For complete documentation on SQLProcedureColumnsW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlprocedurecolumns-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLProcedureColumnsW(
+        &self,
+        CatalogName: &OdbcStr<SQLWCHAR>,
+        SchemaName: &OdbcStr<SQLWCHAR>,
+        ProcName: &OdbcStr<SQLWCHAR>,
+        ColumnName: &OdbcStr<SQLWCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLProcedureColumnsW(CatalogName, SchemaName, ProcName, ColumnName)
+    }
+
+    /// Returns the list of procedure names stored in a specific data source. `Procedure` is a generic term used to describe an `executable object`, or a named entity that can be invoked using input and output parameters. For more information on procedures, see the Procedures.
+    ///
+    /// For complete documentation on SQLProceduresA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlprocedures-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLProceduresA(
+        &self,
+        CatalogName: &OdbcStr<SQLCHAR>,
+        SchemaName: &OdbcStr<SQLCHAR>,
+        ProcName: &OdbcStr<SQLCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLProceduresA(CatalogName, SchemaName, ProcName)
+    }
+
+    /// Returns the list of procedure names stored in a specific data source. `Procedure` is a generic term used to describe an `executable object`, or a named entity that can be invoked using input and output parameters. For more information on procedures, see the Procedures.
+    ///
+    /// For complete documentation on SQLProceduresW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlprocedures-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLProceduresW(
+        &self,
+        CatalogName: &OdbcStr<SQLWCHAR>,
+        SchemaName: &OdbcStr<SQLWCHAR>,
+        ProcName: &OdbcStr<SQLWCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLProceduresW(CatalogName, SchemaName, ProcName)
+    }
+
+    /// Allows an application to send data for a parameter or column to the driver at statement execution time. This function can be used to send character or binary data values in parts to a column with a character, binary, or data source-specific data type (for example, parameters of the SQL_LONGVARBINARY or SQL_LONGVARCHAR types). **SQLPutData** supports binding to a Unicode C data type, even if the underlying driver does not support Unicode data.
+    ///
+    /// For complete documentation on SQLPutData, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlputdata-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    // TODO: Is it unsafe if odbc_debug is used?
+    pub unsafe fn SQLPutData<TT: Ident, B: CData<TT, V>>(&self, DataPtr: Option<&B>) -> SQLRETURN
+    where
+        B: AsSQLPOINTER + ?Sized,
+    {
+        self.0.SQLPutData(DataPtr)
+    }
+
+    /// Returns the number of rows affected by an **UPDATE**, **INSERT**, or **DELETE** statement; an SQL_ADD, SQL_UPDATE_BY_BOOKMARK, or SQL_DELETE_BY_BOOKMARK operation in **SQLBulkOperations**; or an SQL_UPDATE or SQL_DELETE operation in **SQLSetPos**.
+    ///
+    /// For complete documentation on SQLRowCount, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlrowcount-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLRowCount(&self, RowCountPtr: &mut MaybeUninit<SQLLEN>) -> SQLRETURN {
+        self.0.SQLRowCount(RowCountPtr)
+    }
+
+    /// Associates a cursor name with an active statement. If an application does not call **SQLSetCursorName**, the driver generates cursor names as needed for SQL statement processing.
+    ///
+    /// For complete documentation on SQLSetCursorNameA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetcursorname-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLSetCursorNameA(&self, CursorName: &OdbcStr<SQLCHAR>) -> SQLRETURN {
+        self.0.SQLSetCursorNameA(CursorName)
+    }
+
+    /// Associates a cursor name with an active statement. If an application does not call **SQLSetCursorName**, the driver generates cursor names as needed for SQL statement processing.
+    ///
+    /// For complete documentation on SQLSetCursorNameW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetcursorname-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLSetCursorNameW(&self, CursorName: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
+        self.0.SQLSetCursorNameW(CursorName)
+    }
+
+    /// Sets the cursor position in a rowset and allows an application to refresh data in the rowset or to update or delete data in the result set.
+    ///
+    /// For complete documentation on SQLSetPos, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetpos-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn SQLSetPos(
+        &self,
+        RowNumber: SQLSETPOSIROW,
+        Operation: Operation,
+        LockType: LockType,
+    ) -> SQLRETURN {
+        unsafe {self.0.SQLSetPos(RowNumber, Operation, LockType)}
+    }
+
+    /// Sets attributes related to a statement.
+    ///
+    /// For complete documentation on SQLSetStmtAttrA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetstmtattr-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLSetStmtAttrA<A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, A, V>>(
+        &self,
+        Attribute: A,
+        ValuePtr: T,
+    ) -> SQLRETURN
+    where
+        T: AttrSet<A> + Ansi,
+    {
+        self.0.SQLSetStmtAttrA(Attribute, ValuePtr)
+    }
+
+    /// Sets attributes related to a statement.
+    ///
+    /// For complete documentation on SQLSetStmtAttrW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetstmtattr-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLSetStmtAttrW<A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, A, V>>(
+        &self,
+        Attribute: A,
+        ValuePtr: T,
+    ) -> SQLRETURN
+    where
+        T: AttrSet<A> + Unicode,
+    {
+        self.0.SQLSetStmtAttrW(Attribute, ValuePtr)
+    }
+
+    /// Retrieves the following information about columns within a specified table:
+    ///
+    /// * The optimal set of columns that uniquely identifies a row in the table.
+    /// * Columns that are automatically updated when any value in the row is updated by a transaction.
+    ///
+    /// For complete documentation on SQLSpecialColumnsA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlspecialcolumns-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLSpecialColumnsA(
+        &self,
+        IdentifierType: IdentifierType,
+        CatalogName: &OdbcStr<SQLCHAR>,
+        SchemaName: &OdbcStr<SQLCHAR>,
+        TableName: &OdbcStr<SQLCHAR>,
+        Scope: Scope,
+        Nullable: NullAllowed,
+    ) -> SQLRETURN {
+        self.0.SQLSpecialColumnsA(IdentifierType, CatalogName, SchemaName, TableName, Scope, Nullable)
+    }
+
+    /// Retrieves the following information about columns within a specified table:
+    ///
+    /// * The optimal set of columns that uniquely identifies a row in the table.
+    /// * Columns that are automatically updated when any value in the row is updated by a transaction.
+    ///
+    /// For complete documentation on SQLSpecialColumnsW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlspecialcolumns-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLSpecialColumnsW(
+        &self,
+        IdentifierType: IdentifierType,
+        CatalogName: &OdbcStr<SQLWCHAR>,
+        SchemaName: &OdbcStr<SQLWCHAR>,
+        TableName: &OdbcStr<SQLWCHAR>,
+        Scope: Scope,
+        Nullable: NullAllowed,
+    ) -> SQLRETURN {
+        self.0.SQLSpecialColumnsW(IdentifierType, CatalogName, SchemaName, TableName, Scope, Nullable)
+    }
+
+    /// Retrieves a list of statistics about a single table and the indexes associated with the table. The driver returns the information as a result set.
+    ///
+    /// For complete documentation on SQLStatisticsA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlstatistics-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLStatisticsA(
+        &self,
+        CatalogName: &OdbcStr<SQLCHAR>,
+        SchemaName: &OdbcStr<SQLCHAR>,
+        TableName: &OdbcStr<SQLCHAR>,
+        Unique: Unique,
+        Reserved: Reserved,
+    ) -> SQLRETURN {
+        self.0.SQLStatisticsA(CatalogName, SchemaName, TableName, Unique, Reserved)
+    }
+
+    /// Retrieves a list of statistics about a single table and the indexes associated with the table. The driver returns the information as a result set.
+    ///
+    /// For complete documentation on SQLStatisticsW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlstatistics-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLStatisticsW(
+        &self,
+        CatalogName: &OdbcStr<SQLWCHAR>,
+        SchemaName: &OdbcStr<SQLWCHAR>,
+        TableName: &OdbcStr<SQLWCHAR>,
+        Unique: Unique,
+        Reserved: Reserved,
+    ) -> SQLRETURN {
+        self.0.SQLStatisticsW(CatalogName, SchemaName, TableName, Unique, Reserved)
+    }
+
+    /// Returns a list of tables and the privileges associated with each table. The driver returns the information as a result set on the specified statement.
+    ///
+    /// For complete documentation on SQLTablePrivilegesA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqltableprivileges-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLTablePrivilegesA(
+        &self,
+        CatalogName: &OdbcStr<SQLCHAR>,
+        SchemaName: &OdbcStr<SQLCHAR>,
+        TableName: &OdbcStr<SQLCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLTablePrivilegesA(CatalogName, SchemaName, TableName)
+    }
+
+    /// Returns a list of tables and the privileges associated with each table. The driver returns the information as a result set on the specified statement.
+    ///
+    /// For complete documentation on SQLTablePrivilegesW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqltableprivileges-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLTablePrivilegesW(
+        &self,
+        CatalogName: &OdbcStr<SQLWCHAR>,
+        SchemaName: &OdbcStr<SQLWCHAR>,
+        TableName: &OdbcStr<SQLWCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLTablePrivilegesW(CatalogName, SchemaName, TableName)
+    }
+
+    /// Returns the list of table, catalog, or schema names, and table types, stored in a specific data source. The driver returns the information as a result set.
+    ///
+    /// For complete documentation on SQLTablesA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqltables-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLTablesA(
+        &self,
+        CatalogName: &OdbcStr<SQLCHAR>,
+        SchemaName: &OdbcStr<SQLCHAR>,
+        TableName: &OdbcStr<SQLCHAR>,
+        TableType: &OdbcStr<SQLCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLTablesA(CatalogName, SchemaName, TableName, TableType)
+    }
+
+    /// Returns the list of table, catalog, or schema names, and table types, stored in a specific data source. The driver returns the information as a result set.
+    ///
+    /// For complete documentation on SQLTablesW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqltables-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLTablesW(
+        &self,
+        CatalogName: &OdbcStr<SQLWCHAR>,
+        SchemaName: &OdbcStr<SQLWCHAR>,
+        TableName: &OdbcStr<SQLWCHAR>,
+        TableType: &OdbcStr<SQLWCHAR>,
+    ) -> SQLRETURN {
+        self.0.SQLTablesW(CatalogName, SchemaName, TableName, TableType)
+    }
+}
+
+impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
+    /// Binds application data buffers to columns in the result set.
+    ///
+    /// For complete documentation on SQLBindCol, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlbindcol-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLBindCol<TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<TT, V>>(
+        &self,
+        ColumnNumber: SQLUSMALLINT,
+        TargetType: TT,
+        TargetValuePtr: Option<&'buf B>,
+        StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
+    ) -> SQLRETURN
+    where
+        B: ?Sized,
+    {
         let sql_return = unsafe {
             let TargetValuePtr = TargetValuePtr.map_or((ptr::null_mut(), 0), |TargetValuePtr| {
                 (TargetValuePtr.as_SQLPOINTER(), TargetValuePtr.len())
@@ -1542,23 +2543,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
     #[inline]
     #[allow(non_snake_case)]
-    #[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
-    unsafe fn SQLExecDirectA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
-        let StatementText = StatementText.as_raw_slice();
-
-        ffi::SQLExecDirectA(self.as_SQLHANDLE(), StatementText.0, StatementText.1)
-    }
-
-    /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
-    ///
-    /// For complete documentation on SQLExecDirectA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    #[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
-    pub fn SQLExecDirectA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
+    pub unsafe fn SQLExecDirectA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
         let StatementText = StatementText.as_raw_slice();
 
         unsafe { ffi::SQLExecDirectA(self.as_SQLHANDLE(), StatementText.0, StatementText.1) }
@@ -1572,23 +2557,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
     #[inline]
     #[allow(non_snake_case)]
-    #[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
-    unsafe fn SQLExecDirectW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
-        let StatementText = StatementText.as_raw_slice();
-
-        ffi::SQLExecDirectW(self.as_SQLHANDLE(), StatementText.0, StatementText.1)
-    }
-
-    /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
-    ///
-    /// For complete documentation on SQLExecDirectW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    #[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
-    pub fn SQLExecDirectW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
+    pub unsafe fn SQLExecDirectW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
         let StatementText = StatementText.as_raw_slice();
 
         unsafe { ffi::SQLExecDirectW(self.as_SQLHANDLE(), StatementText.0, StatementText.1) }
@@ -1602,24 +2571,10 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
     #[inline]
     #[allow(non_snake_case)]
-    #[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
-    unsafe fn SQLExecute(&self) -> SQLRETURN {
+    pub unsafe fn SQLExecute(&self) -> SQLRETURN {
         ffi::SQLExecute(self.as_SQLHANDLE())
     }
 
-    /// Executes a prepared statement, using the current values of the parameter marker variables if any parameter markers exist in the statement.
-    ///
-    /// For complete documentation on SQLExecute, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecute-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    #[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
-    pub fn SQLExecute(&self) -> SQLRETURN {
-        unsafe { ffi::SQLExecute(self.as_SQLHANDLE()) }
-    }
-
     /// Fetches the next rowset of data from the result set and returns data for all bound columns.
     ///
     /// For complete documentation on SQLFetch, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetch-function).
@@ -1628,22 +2583,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
     #[allow(non_snake_case)]
-    #[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
-    unsafe fn SQLFetch(&self) -> SQLRETURN {
+    pub unsafe fn SQLFetch(&self) -> SQLRETURN {
         ffi::SQLFetch(self.as_SQLHANDLE())
-    }
-
-    /// Fetches the next rowset of data from the result set and returns data for all bound columns.
-    ///
-    /// For complete documentation on SQLFetch, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetch-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    #[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
-    pub fn SQLFetch(&self) -> SQLRETURN {
-        unsafe { ffi::SQLFetch(self.as_SQLHANDLE()) }
     }
 
     /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
@@ -1655,27 +2596,12 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
     #[allow(non_snake_case)]
-    #[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
-    unsafe fn SQLFetchScroll(
+    pub unsafe fn SQLFetchScroll(
         &self,
         FetchOrientation: SQLSMALLINT,
         FetchOffset: SQLLEN,
     ) -> SQLRETURN {
         ffi::SQLFetchScroll(self.as_SQLHANDLE(), FetchOrientation, FetchOffset)
-    }
-
-    /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
-    /// When working with an ODBC 2.x driver, the Driver Manager maps this function to **SQLExtendedFetch**. For more information, see Mapping Replacement Functions for Backward Compatibility of Applications.
-    ///
-    /// For complete documentation on SQLFetchScroll, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetchscroll-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    #[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
-    pub fn SQLFetchScroll(&self, FetchOrientation: SQLSMALLINT, FetchOffset: SQLLEN) -> SQLRETURN {
-        unsafe { ffi::SQLFetchScroll(self.as_SQLHANDLE(), FetchOrientation, FetchOffset) }
     }
 
     /// Can return:
@@ -2266,28 +3192,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
     #[allow(non_snake_case)]
-    #[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
-    unsafe fn SQLPutData<TT: Ident, B: CData<TT, V>>(&self, DataPtr: Option<&B>) -> SQLRETURN
-    where
-        B: AsSQLPOINTER + ?Sized,
-    {
-        let DataPtr = DataPtr.map_or((ptr::null_mut(), 0), |DataPtr| {
-            (DataPtr.as_SQLPOINTER(), DataPtr.len())
-        });
-
-        ffi::SQLPutData(self.as_SQLHANDLE(), DataPtr.0, DataPtr.1)
-    }
-
-    /// Allows an application to send data for a parameter or column to the driver at statement execution time. This function can be used to send character or binary data values in parts to a column with a character, binary, or data source-specific data type (for example, parameters of the SQL_LONGVARBINARY or SQL_LONGVARCHAR types). **SQLPutData** supports binding to a Unicode C data type, even if the underlying driver does not support Unicode data.
-    ///
-    /// For complete documentation on SQLPutData, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlputdata-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    #[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
-    // TODO: Remove unsafe keyword. How to know which type to provide and panic at runtime if incorrect?
+    // TODO: Is it unsafe if odbc_debug is used?
     pub unsafe fn SQLPutData<TT: Ident, B: CData<TT, V>>(&self, DataPtr: Option<&B>) -> SQLRETURN
     where
         B: AsSQLPOINTER + ?Sized,
@@ -2350,8 +3255,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
     #[allow(non_snake_case)]
-    #[cfg(all(feature = "raw_api", not(feature = "odbc_debug")))]
-    unsafe fn SQLSetPos(
+    pub unsafe fn SQLSetPos(
         &self,
         RowNumber: SQLSETPOSIROW,
         Operation: Operation,
@@ -2363,31 +3267,6 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
             Operation as SQLUSMALLINT,
             LockType as SQLUSMALLINT,
         )
-    }
-
-    /// Sets the cursor position in a rowset and allows an application to refresh data in the rowset or to update or delete data in the result set.
-    ///
-    /// For complete documentation on SQLSetPos, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetpos-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    #[cfg(any(not(feature = "raw_api"), feature = "odbc_debug"))]
-    pub fn SQLSetPos(
-        &self,
-        RowNumber: SQLSETPOSIROW,
-        Operation: Operation,
-        LockType: LockType,
-    ) -> SQLRETURN {
-        unsafe {
-            ffi::SQLSetPos(
-                self.as_SQLHANDLE(),
-                RowNumber,
-                Operation as SQLUSMALLINT,
-                LockType as SQLUSMALLINT,
-            )
-        }
     }
 
     /// Sets attributes related to a statement.
@@ -2747,7 +3626,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     }
 }
 
-impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> SQLHDESC<'conn, DT, V> {
+impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, V> {
     /// Copies descriptor information from one descriptor handle to another.
     ///
     /// For complete documentation on SQLCopyDesc, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcopydesc-function).
@@ -3046,6 +3925,193 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> SQLHDESC<'conn, DT, V> {
                 IndicatorPtr.as_mut_ptr(),
             )
         }
+    }
+}
+
+impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> SQLHDESC<'conn, DT, V> {
+    /// Copies descriptor information from one descriptor handle to another.
+    ///
+    /// For complete documentation on SQLCopyDesc, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcopydesc-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    // TODO: Not sure if application and implementation descriptors can be interchangeably copied
+    #[must_use]
+    // TODO: Do they have to have the same version?
+    // TODO: Is lifetime the same?
+    pub fn SQLCopyDesc<DT2: DescType<'buf>>(
+        &self,
+        TargetDescHandle: &SQLHDESC<DT2, V>,
+    ) -> SQLRETURN {
+        self.0.SQLCopyDesc(TargetDescHandle)
+    }
+
+    /// Returns the current setting or value of a single field of a descriptor record.
+    ///
+    /// For complete documentation on SQLGetDescFieldA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdescfield-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLGetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
+        &mut self,
+        RecNumber: SQLSMALLINT,
+        FieldIdentifier: A,
+        ValuePtr: Option<&mut T>,
+        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
+    ) -> SQLRETURN
+    where
+        T: AttrGet<A> + Ansi + ?Sized,
+        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+    {
+        self.0.SQLGetDescFieldA(RecNumber, FieldIdentifier, ValuePtr, StringLengthPtr)
+    }
+
+    /// Returns the current setting or value of a single field of a descriptor record.
+    ///
+    /// For complete documentation on SQLGetDescFieldW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdescfield-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLGetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
+        &mut self,
+        RecNumber: SQLSMALLINT,
+        FieldIdentifier: A,
+        ValuePtr: Option<&mut T>,
+        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
+    ) -> SQLRETURN
+    where
+        T: AttrGet<A> + Unicode + ?Sized,
+        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+    {
+        self.0.SQLGetDescFieldW(RecNumber, FieldIdentifier, ValuePtr, StringLengthPtr)
+    }
+
+    /// Returns the current settings or values of multiple fields of a descriptor record. The fields returned describe the name, data type, and storage of column or parameter data.
+    ///
+    /// For complete documentation on SQLGetDescRecA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdescrec-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLGetDescRecA<ST: SqlType<V>>(
+        &self,
+        RecNumber: SQLSMALLINT,
+        Name: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
+        StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        TypePtr: &mut MaybeUninit<ST>,
+        SubTypePtr: &mut MaybeUninit<DatetimeIntervalCode>,
+        LengthPtr: &mut MaybeUninit<SQLLEN>,
+        PrecisionPtr: &mut MaybeUninit<SQLSMALLINT>,
+        ScalePtr: &mut MaybeUninit<SQLSMALLINT>,
+        NullablePtr: &mut MaybeUninit<NullAllowed>,
+    ) -> SQLRETURN {
+        self.0.SQLGetDescRecA(RecNumber, Name, StringLengthPtr, TypePtr, SubTypePtr, LengthPtr, PrecisionPtr, ScalePtr, NullablePtr)
+    }
+
+    /// Returns the current settings or values of multiple fields of a descriptor record. The fields returned describe the name, data type, and storage of column or parameter data.
+    ///
+    /// For complete documentation on SQLGetDescRecW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdescrec-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLGetDescRecW<ST: SqlType<V>>(
+        &self,
+        RecNumber: SQLSMALLINT,
+        Name: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
+        StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        TypePtr: &mut MaybeUninit<ST>,
+        SubTypePtr: &mut MaybeUninit<DatetimeIntervalCode>,
+        LengthPtr: &mut MaybeUninit<SQLLEN>,
+        PrecisionPtr: &mut MaybeUninit<SQLSMALLINT>,
+        ScalePtr: &mut MaybeUninit<SQLSMALLINT>,
+        NullablePtr: &mut MaybeUninit<NullAllowed>,
+    ) -> SQLRETURN {
+        self.0.SQLGetDescRecW(RecNumber, Name, StringLengthPtr, TypePtr, SubTypePtr, LengthPtr, PrecisionPtr, ScalePtr, NullablePtr)
+    }
+
+    /// Sets the value of a single field of a descriptor record.
+    ///
+    /// For complete documentation on SQLSetDescFieldA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetdescfield-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLSetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
+        &self,
+        RecNumber: SQLSMALLINT,
+        FieldIdentifier: A,
+        ValuePtr: Option<T>,
+    ) -> SQLRETURN
+    where
+        T: AttrSet<A> + Ansi,
+    {
+        self.0.SQLSetDescFieldA(RecNumber, FieldIdentifier, ValuePtr)
+    }
+
+    /// Sets the value of a single field of a descriptor record.
+    ///
+    /// For complete documentation on SQLSetDescFieldW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetdescfield-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLSetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
+        &self,
+        RecNumber: SQLSMALLINT,
+        FieldIdentifier: A,
+        ValuePtr: Option<T>,
+    ) -> SQLRETURN
+    where
+        T: AttrSet<A> + Unicode,
+    {
+        self.0.SQLSetDescFieldW(RecNumber, FieldIdentifier, ValuePtr)
+    }
+
+    /// Sets multiple descriptor fields that affect the data type and buffer bound to a column or parameter data.
+    ///
+    /// For complete documentation on SQLSetDescRec, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetdescrec-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    #[must_use]
+    // TODO: Must not be allowed for IRD. Handle here or with DescField
+    pub fn SQLSetDescRec<ST: SqlType<V>, PTR>(
+        &self,
+        RecNumber: SQLSMALLINT,
+        Type: ST,
+        SubType: Option<DatetimeIntervalCode>,
+        Length: SQLLEN,
+        Precision: SQLSMALLINT,
+        Scale: SQLSMALLINT,
+        // TODO: Input or Output for both? I guess it depends on which descriptor was given
+        DataPtr: Option<&'buf PTR>,
+        // TODO: Shouldn't following two be UnsafeCell
+        StringLengthPtr: &'buf mut MaybeUninit<SQLLEN>,
+        IndicatorPtr: &'buf mut MaybeUninit<SQLLEN>,
+    ) -> SQLRETURN
+    where
+        &'buf PTR: IntoSQLPOINTER,
+    {
+        self.0.SQLSetDescRec(RecNumber, Type, SubType, Length, Precision, Scale, DataPtr, StringLengthPtr, IndicatorPtr)
     }
 }
 

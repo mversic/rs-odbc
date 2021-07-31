@@ -1,10 +1,10 @@
 error[E0505]: cannot move out of `env` because it is borrowed
-  --> $DIR/free_conn.rs:30:13
+  --> $DIR/free_conn.rs:30:5
    |
 28 |     let conn = connect_to_test_db(&env);
    |                                   ---- borrow of `env` occurs here
 29 |
-30 |     let _ = env.SQLFreeHandle();
-   |             ^^^ move out of `env` occurs here
-31 |     let _ = conn.SQLFreeHandle();
-   |             ---- borrow later used here
+30 |     env.SQLFreeHandle();
+   |     ^^^ move out of `env` occurs here
+31 |     conn.SQLFreeHandle();
+   |     ---- borrow later used here

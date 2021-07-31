@@ -1,7 +1,7 @@
+use crate::api::Handle;
 use crate::attr::{Attr, AttrGet, AttrLen, AttrZeroAssert};
 use crate::convert::AsMutSQLPOINTER;
 use crate::env::OdbcVersion;
-use crate::api::Handle;
 use crate::handle::SQLHSTMT;
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{

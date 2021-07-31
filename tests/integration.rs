@@ -134,7 +134,7 @@ fn stmt_get_desc_handle() {
     assert_eq!(SQL_SUCCESS, res);
     assert_eq!(10, val);
 
-    let res = stmt.SQLFreeHandle();
+    stmt.SQLFreeHandle();
     assert_eq!(SQL_SUCCESS, res);
 
     let (conn, res) = conn.SQLDisconnect();
@@ -160,10 +160,10 @@ fn stmt_set_desc_handle() {
     let res = stmt.SQLSetStmtAttrA(SQL_ATTR_APP_ROW_DESC, Some(&desc));
     assert_eq!(SQL_SUCCESS, res);
 
-    let res = stmt.SQLFreeHandle();
+    stmt.SQLFreeHandle();
     assert_eq!(SQL_SUCCESS, res);
 
-    let res = desc.SQLFreeHandle();
+    desc.SQLFreeHandle();
     assert_eq!(SQL_SUCCESS, res);
 
     let (conn, res) = conn.SQLDisconnect();

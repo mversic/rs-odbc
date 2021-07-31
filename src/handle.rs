@@ -261,44 +261,113 @@ impl<'env, OC: ConnState, V: OdbcVersion> SQLHDBC<'env, OC, V> {
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/statement-handles
 #[derive(Debug)]
+#[repr(transparent)]
+pub struct SQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion>(
+    pub(crate) UnsafeSQLHSTMT<'conn, 'desc, 'buf, V>,
+);
+impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
+    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    where
+        B: ?Sized,
+    {
+        self.0.bind_col(TargetValuePtr)
+    }
+
+    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT, V>>(
+        &self,
+        TargetValuePtr: Option<&'buf B>,
+    ) where
+        B: ?Sized,
+    {
+        self.0.bind_param(TargetValuePtr)
+    }
+
+    pub(crate) fn bind_strlen_or_ind(
+        &self,
+        StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
+    ) {
+        self.0.bind_strlen_or_ind(StrLen_or_IndPtr)
+    }
+}
+
+impl<V: OdbcVersion> Handle for SQLHSTMT<'_, '_, '_, V> {
+    type Ident = SQL_HANDLE_STMT;
+}
+impl<'conn, 'desc, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, 'desc, 'buf, V> {
+    // Valid because SQLHDBC is covariant
+    type SrcHandle = <UnsafeSQLHSTMT<'conn, 'desc, 'buf, V> as Allocate<'conn>>::SrcHandle;
+
+    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
+        Self(UnsafeSQLHSTMT::from_raw(handle))
+    }
+}
+unsafe impl<V: OdbcVersion> AsSQLHANDLE for SQLHSTMT<'_, '_, '_, V> {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.0.as_SQLHANDLE()
+    }
+}
+
+/// Statement handle consists of all of the information associated with a SQL statement,
+/// such as any result sets created by the statement and parameters used in the execution
+/// of the statement. A statement is associated with a single connection, and there can be
+/// multiple statements on that connection. The statement handle contains statement
+/// information, such as:
+/// * The statement's state
+/// * The current statement-level diagnostics
+/// * The addresses of the application variables bound to the statement's parameters and result set columns
+/// * The current settings of each statement attribute
+///
+/// Statement handles are used in most ODBC functions. Notably, they are used:
+/// * to bind parameters and result set columns (SQLBindParameter and SQLBindCol)
+/// * to prepare and execute statements (SQLPrepare, SQLExecute, and SQLExecDirect)
+/// * to retrieve metadata (SQLColAttribute and SQLDescribeCol)
+/// * to fetch results (SQLFetch), and retrieve diagnostics (SQLGetDiagField and SQLGetDiagRec)
+/// * in catalog functions (SQLColumns, SQLTables, ...)
+/// * in number of other functions.
+///
+/// Statement handles are allocated with SQLAllocHandle and freed with SQLFreeHandle.
+///
+/// # Documentation
+/// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/statement-handles
+#[derive(Debug)]
 #[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
-pub struct SQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion> {
+pub struct UnsafeSQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion> {
     pub(crate) handle: SQLHANDLE,
 
     parent: PhantomData<&'conn ()>,
     version: PhantomData<V>,
 
     #[cfg(feature = "odbc_debug")]
-    pub(crate) explicit_ard: Cell<Option<&'desc SQLHDESC<'desc, AppDesc<'buf>, V>>>,
+    pub(crate) explicit_ard: Cell<Option<&'desc UnsafeSQLHDESC<'desc, AppDesc<'buf>, V>>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) explicit_apd: Cell<Option<&'desc SQLHDESC<'desc, AppDesc<'buf>, V>>>,
+    pub(crate) explicit_apd: Cell<Option<&'desc UnsafeSQLHDESC<'desc, AppDesc<'buf>, V>>>,
 
     #[cfg(feature = "odbc_debug")]
-    pub(crate) ard: ManuallyDrop<SQLHDESC<'desc, AppDesc<'buf>, V>>,
+    pub(crate) ard: ManuallyDrop<UnsafeSQLHDESC<'desc, AppDesc<'buf>, V>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) apd: ManuallyDrop<SQLHDESC<'desc, AppDesc<'buf>, V>>,
+    pub(crate) apd: ManuallyDrop<UnsafeSQLHDESC<'desc, AppDesc<'buf>, V>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) ird: ManuallyDrop<SQLHDESC<'desc, ImplDesc<IRD>, V>>,
+    pub(crate) ird: ManuallyDrop<UnsafeSQLHDESC<'desc, ImplDesc<IRD>, V>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) ipd: ManuallyDrop<SQLHDESC<'desc, ImplDesc<IPD>, V>>,
+    pub(crate) ipd: ManuallyDrop<UnsafeSQLHDESC<'desc, ImplDesc<IPD>, V>>,
 
     #[allow(dead_code)]
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) explicit_ard: Cell<PhantomData<&'desc SQLHDESC<'desc, AppDesc<'buf>, V>>>,
+    pub(crate) explicit_ard: Cell<PhantomData<&'desc UnsafeSQLHDESC<'desc, AppDesc<'buf>, V>>>,
     #[allow(dead_code)]
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) explicit_apd: Cell<PhantomData<&'desc SQLHDESC<'desc, AppDesc<'buf>, V>>>,
+    pub(crate) explicit_apd: Cell<PhantomData<&'desc UnsafeSQLHDESC<'desc, AppDesc<'buf>, V>>>,
 
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) ard: PhantomData<SQLHDESC<'desc, AppDesc<'buf>, V>>,
+    pub(crate) ard: PhantomData<UnsafeSQLHDESC<'desc, AppDesc<'buf>, V>>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) apd: PhantomData<SQLHDESC<'desc, AppDesc<'buf>, V>>,
+    pub(crate) apd: PhantomData<UnsafeSQLHDESC<'desc, AppDesc<'buf>, V>>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) ird: PhantomData<SQLHDESC<'desc, ImplDesc<IRD>, V>>,
+    pub(crate) ird: PhantomData<UnsafeSQLHDESC<'desc, ImplDesc<IRD>, V>>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) ipd: PhantomData<SQLHDESC<'desc, ImplDesc<IPD>, V>>,
+    pub(crate) ipd: PhantomData<UnsafeSQLHDESC<'desc, ImplDesc<IPD>, V>>,
 }
-impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
+impl<'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, '_, 'buf, V> {
     #[cfg(feature = "odbc_debug")]
     unsafe fn get_descriptor_handle<A: Ident<Type = SQLINTEGER>>(handle: SQLHANDLE) -> SQLHANDLE {
         let mut descriptor_handle = MaybeUninit::uninit();
@@ -380,20 +449,20 @@ impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
     }
 }
 
-impl<V: OdbcVersion> Handle for SQLHSTMT<'_, '_, '_, V> {
+impl<V: OdbcVersion> Handle for UnsafeSQLHSTMT<'_, '_, '_, V> {
     type Ident = SQL_HANDLE_STMT;
 }
-impl<'conn, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V> {
+impl<'conn, V: OdbcVersion> Allocate<'conn> for UnsafeSQLHSTMT<'conn, '_, '_, V> {
     // Valid because SQLHDBC is covariant
     type SrcHandle = SQLHDBC<'conn, C4, V>;
 
     #[cfg(feature = "odbc_debug")]
     unsafe fn from_raw(handle: SQLHANDLE) -> Self {
         unsafe {
-            let ard = SQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_ROW_DESC>(handle);
-            let apd = SQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_PARAM_DESC>(handle);
-            let ird = SQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_IMP_ROW_DESC>(handle);
-            let ipd = SQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_IMP_PARAM_DESC>(handle);
+            let ard = UnsafeSQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_ROW_DESC>(handle);
+            let apd = UnsafeSQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_PARAM_DESC>(handle);
+            let ird = UnsafeSQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_IMP_ROW_DESC>(handle);
+            let ipd = UnsafeSQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_IMP_PARAM_DESC>(handle);
 
             Self {
                 parent: PhantomData,
@@ -401,10 +470,10 @@ impl<'conn, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V> {
 
                 handle,
 
-                ard: ManuallyDrop::new(SQLHDESC::from_raw(ard)),
-                apd: ManuallyDrop::new(SQLHDESC::from_raw(apd)),
-                ird: ManuallyDrop::new(SQLHDESC::from_raw(ird)),
-                ipd: ManuallyDrop::new(SQLHDESC::from_raw(ipd)),
+                ard: ManuallyDrop::new(UnsafeSQLHDESC::from_raw(ard)),
+                apd: ManuallyDrop::new(UnsafeSQLHDESC::from_raw(apd)),
+                ird: ManuallyDrop::new(UnsafeSQLHDESC::from_raw(ird)),
+                ipd: ManuallyDrop::new(UnsafeSQLHDESC::from_raw(ipd)),
 
                 explicit_ard: Cell::new(None),
                 explicit_apd: Cell::new(None),
@@ -430,12 +499,12 @@ impl<'conn, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, '_, '_, V> {
         }
     }
 }
-unsafe impl<V: OdbcVersion> AsSQLHANDLE for SQLHSTMT<'_, '_, '_, V> {
+unsafe impl<V: OdbcVersion> AsSQLHANDLE for UnsafeSQLHSTMT<'_, '_, '_, V> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.handle
     }
 }
-impl<V: OdbcVersion> Drop for SQLHSTMT<'_, '_, '_, V> {
+impl<V: OdbcVersion> Drop for UnsafeSQLHSTMT<'_, '_, '_, V> {
     fn drop(&mut self) {
         let sql_return =
             unsafe { ffi::SQLFreeHandle(SQL_HANDLE_STMT::IDENTIFIER, self.as_SQLHANDLE()) };
@@ -473,8 +542,59 @@ impl<V: OdbcVersion> Drop for SQLHSTMT<'_, '_, '_, V> {
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/descriptor-handles
 #[derive(Debug)]
+#[repr(transparent)]
+pub struct SQLHDESC<'conn, DT, V: OdbcVersion>(pub(crate) UnsafeSQLHDESC<'conn, DT, V>);
+impl<'buf, V: OdbcVersion, T: DescType<'buf>> Handle for SQLHDESC<'_, T, V> {
+    type Ident = SQL_HANDLE_DESC;
+}
+impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'buf>, V> {
+    // Valid because SQLHDBC is covariant
+    type SrcHandle = <UnsafeSQLHDESC<'conn, AppDesc<'buf>, V> as Allocate<'conn>>::SrcHandle;
+
+    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
+        Self(UnsafeSQLHDESC::from_raw(handle))
+    }
+}
+unsafe impl<V: OdbcVersion, T> AsSQLHANDLE for SQLHDESC<'_, T, V> {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.0.as_SQLHANDLE()
+    }
+}
+unsafe impl<'buf, V: OdbcVersion, T: DescType<'buf>> IntoSQLPOINTER
+    for Option<&SQLHDESC<'_, T, V>>
+{
+    fn into_SQLPOINTER(self) -> SQLPOINTER {
+        self.map_or_else(std::ptr::null_mut, |handle| {
+            Some(&handle.0).into_SQLPOINTER()
+        })
+    }
+}
+
+/// A descriptor is a collection of metadata that describes the parameters of an SQL
+/// statement or the columns of a result set. Thus, a descriptor can fill four roles:
+/// * (APD)Application Parameter Descriptor:
+///     Contains information about the application buffers bound to the parameters in an
+///     SQL statement, such as their addresses, lengths, and C data types.
+/// * (IPD)Implementation Parameter Descriptor:
+///     Contains information about the parameters in an SQL statement, such as their SQL
+///     data types, lengths, and nullability.
+/// * (ARD)Application Row Descriptor:
+///     Contains information about the application buffers bound to the columns in a
+///     result set, such as their addresses, lengths, and C data types.
+/// * (IRD)Implementation Row Descriptor:
+///     Contains information about the columns in a result set, such as their SQL data
+///     types, lengths, and nullability.
+///
+/// Four descriptors are allocated automatically when a statement is allocated, but
+/// applications can also allocate descriptors with SQLAllocHandle. They are allocated on
+/// a connection and can be associated with one or more statements on that connection to
+/// fulfill the role of an APD or ARD on those statements.
+///
+/// # Documentation
+/// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/descriptor-handles
+#[derive(Debug)]
 #[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
-pub struct SQLHDESC<'conn, T, V: OdbcVersion> {
+pub struct UnsafeSQLHDESC<'conn, T, V: OdbcVersion> {
     pub(crate) handle: SQLHANDLE,
 
     parent: PhantomData<&'conn ()>,
@@ -486,10 +606,10 @@ pub struct SQLHDESC<'conn, T, V: OdbcVersion> {
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) inner: PhantomData<T>,
 }
-impl<'buf, V: OdbcVersion, T: DescType<'buf>> Handle for SQLHDESC<'_, T, V> {
+impl<'buf, V: OdbcVersion, T: DescType<'buf>> Handle for UnsafeSQLHDESC<'_, T, V> {
     type Ident = SQL_HANDLE_DESC;
 }
-impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'buf>, V> {
+impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for UnsafeSQLHDESC<'conn, AppDesc<'buf>, V> {
     // Valid because SQLHDBC is covariant
     type SrcHandle = SQLHDBC<'conn, C4, V>;
 
@@ -504,19 +624,19 @@ impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'b
         }
     }
 }
-unsafe impl<V: OdbcVersion, T> AsSQLHANDLE for SQLHDESC<'_, T, V> {
+unsafe impl<V: OdbcVersion, T> AsSQLHANDLE for UnsafeSQLHDESC<'_, T, V> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.handle
     }
 }
 unsafe impl<'buf, V: OdbcVersion, T: DescType<'buf>> IntoSQLPOINTER
-    for Option<&SQLHDESC<'_, T, V>>
+    for Option<&UnsafeSQLHDESC<'_, T, V>>
 {
     fn into_SQLPOINTER(self) -> SQLPOINTER {
         self.map_or_else(std::ptr::null_mut, |handle| handle.as_SQLHANDLE().cast())
     }
 }
-impl<V: OdbcVersion, T> Drop for SQLHDESC<'_, T, V> {
+impl<V: OdbcVersion, T> Drop for UnsafeSQLHDESC<'_, T, V> {
     fn drop(&mut self) {
         let sql_return =
             unsafe { ffi::SQLFreeHandle(SQL_HANDLE_DESC::IDENTIFIER, self.as_SQLHANDLE()) };
@@ -535,8 +655,8 @@ impl<V: OdbcVersion, T> Drop for SQLHDESC<'_, T, V> {
 mod test {
     #![allow(non_snake_case)]
 
-    use crate::env::SQL_OV_ODBC3_80;
     use super::*;
+    use crate::env::SQL_OV_ODBC3_80;
 
     #[test]
     fn disconnect_C2() {
