@@ -3,6 +3,7 @@ use crate::env::{OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::sql_types::*;
 use crate::str::{OdbcChar, OdbcStr};
 use crate::Ident;
+use crate::SQLPOINTER;
 use crate::{
     SQLBIGINT, SQLCHAR, SQLDOUBLE, SQLINTEGER, SQLLEN, SQLREAL, SQLSCHAR, SQLSMALLINT, SQLUBIGINT,
     SQLUINTEGER, SQLUSMALLINT, SQLWCHAR, SQL_PARAM_INPUT, SQL_PARAM_INPUT_OUTPUT, SQL_PARAM_OUTPUT,
@@ -10,9 +11,6 @@ use crate::{
 use std::cell::UnsafeCell;
 use std::convert::TryInto;
 use std::mem::MaybeUninit;
-
-#[cfg(feature = "raw_api")]
-use crate::SQLPOINTER;
 
 pub trait CData<TT: Ident, V: OdbcVersion>: CDataLen {}
 
@@ -597,13 +595,13 @@ impl<T> CDataLen for OdbcStr<T> {
         <[T] as CDataLen>::len(self)
     }
 }
-#[cfg(feature = "raw_api")]
 impl CDataLen for (SQLPOINTER, SQLLEN) {
     fn len(&self) -> SQLLEN {
         self.1
     }
 }
 
+// TODO:
 #[cfg(feature = "raw_api")]
 unsafe impl<TT: Ident, V: OdbcVersion> DeferredBuf<TT, V> for (SQLPOINTER, SQLLEN) {}
 

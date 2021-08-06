@@ -1,4 +1,11 @@
 use crate::c_types::{ScalarCType, StrLenOrInd};
+use crate::conn::ConnState;
+use crate::desc::DescType;
+use crate::env::OdbcVersion;
+use crate::handle::{
+    RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, UnsafeSQLHSTMT, SQLHANDLE, SQLHDBC, SQLHDESC,
+    SQLHENV, SQLHSTMT, SQL_NULL_HANDLE,
+};
 use crate::str::{Ansi, OdbcChar, OdbcStr, Unicode};
 use crate::{
     slice_len, Ident, Void, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLUINTEGER,
@@ -45,6 +52,11 @@ pub(crate) unsafe trait AsRawSlice<CH, LEN: Copy> {
 /// Used to do a cheap mutable slice-to-raw slice conversion.
 pub(crate) unsafe trait AsMutRawSlice<CH, LEN: Copy> {
     fn as_mut_raw_slice(&mut self) -> (*mut CH, LEN);
+}
+
+pub unsafe trait AsSQLHANDLE {
+    #[allow(non_snake_case)]
+    fn as_SQLHANDLE(&self) -> SQLHANDLE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -216,9 +228,25 @@ unsafe impl IntoSQLPOINTER for SQLULEN {
         self as SQLPOINTER
     }
 }
-#[cfg(feature = "raw_api")]
+unsafe impl<'buf, V: OdbcVersion, T: DescType<'buf>> IntoSQLPOINTER
+    for Option<&SQLHDESC<'_, T, V>>
+{
+    fn into_SQLPOINTER(self) -> SQLPOINTER {
+        self.map_or_else(std::ptr::null_mut, |handle| {
+            Some(&handle.0).into_SQLPOINTER()
+        })
+    }
+}
+unsafe impl<'buf, V: OdbcVersion, T: DescType<'buf>> IntoSQLPOINTER
+    for Option<&UnsafeSQLHDESC<'_, T, V>>
+{
+    fn into_SQLPOINTER(self) -> SQLPOINTER {
+        self.map_or_else(std::ptr::null_mut, |handle| handle.as_SQLHANDLE().cast())
+    }
+}
+
 unsafe impl AsSQLPOINTER for (SQLPOINTER, SQLLEN) {
-    fn into_SQLPOINTER(&self) -> SQLPOINTER {
+    fn as_SQLPOINTER(&self) -> SQLPOINTER {
         self.0
     }
 }
@@ -231,5 +259,59 @@ unsafe impl AsMutSQLPOINTER for SQLLEN {
 unsafe impl AsMutSQLPOINTER for SQLULEN {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
         (self as *mut Self).cast()
+    }
+}
+unsafe impl<DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<RefUnsafeSQLHDESC<'_, DT, V>> {
+    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
+        if cfg!(feature = "odbc_debug") {
+            // SQLHDESC is not transparent
+            unimplemented!("This method should never be called")
+        }
+
+        // SQLHDESC is transparent
+        self.as_mut_ptr().cast()
+    }
+}
+unsafe impl<'conn, DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<RefSQLHDESC<'conn, DT, V>> {
+    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
+        // Valid because RefSQLHDESC is a transparent newtype wrapper over RefUnsafeSQLHDESC
+        unsafe { std::mem::transmute::<_, &mut MaybeUninit<RefUnsafeSQLHDESC<'conn, DT, V>>>(self) }
+            .as_mut_SQLPOINTER()
+    }
+}
+
+unsafe impl AsSQLHANDLE for SQL_NULL_HANDLE {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        std::ptr::null_mut()
+    }
+}
+unsafe impl<V: OdbcVersion> AsSQLHANDLE for SQLHENV<V> {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.handle
+    }
+}
+unsafe impl<C: ConnState, V: OdbcVersion> AsSQLHANDLE for SQLHDBC<'_, C, V> {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.handle
+    }
+}
+unsafe impl<V: OdbcVersion> AsSQLHANDLE for SQLHSTMT<'_, '_, '_, V> {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.0.as_SQLHANDLE()
+    }
+}
+unsafe impl<V: OdbcVersion> AsSQLHANDLE for UnsafeSQLHSTMT<'_, '_, '_, V> {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.handle
+    }
+}
+unsafe impl<V: OdbcVersion, T> AsSQLHANDLE for SQLHDESC<'_, T, V> {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.0.as_SQLHANDLE()
+    }
+}
+unsafe impl<V: OdbcVersion, T> AsSQLHANDLE for UnsafeSQLHDESC<'_, T, V> {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.handle
     }
 }

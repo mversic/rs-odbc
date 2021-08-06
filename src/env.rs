@@ -28,7 +28,6 @@ where
     Self: AttrLen<OdbcDefined, SQLINTEGER>,
 {
 }
-
 impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for OdbcStr<MaybeUninit<SQLCHAR>> where
     OdbcStr<SQLCHAR>: EnvAttr<A, V>
 {
@@ -39,8 +38,10 @@ impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for OdbcStr<MaybeUninit<SQLWCHAR>> 
 }
 
 // Implement EnvAttr for references to character environment attributes (used by AttrSet)
-impl<A: Ident, CH: OdbcChar, V: OdbcVersion> EnvAttr<A, V> for &OdbcStr<CH> where
-    OdbcStr<CH>: EnvAttr<A, V>
+impl<A: Ident, CH: OdbcChar, V: OdbcVersion> EnvAttr<A, V> for &OdbcStr<CH>
+where
+    OdbcStr<CH>: EnvAttr<A, V>,
+    Self: AttrSet<A>,
 {
 }
 

@@ -71,10 +71,8 @@ where
     Self: AttrLen<Self::DefinedBy, SQLINTEGER>,
 {
 }
-impl<A: Ident, C: ConnState, V: OdbcVersion> ConnAttr<A, C, V> for OdbcStr<MaybeUninit<SQLCHAR>>
-where
-    OdbcStr<SQLCHAR>: ConnAttr<A, C, V>,
-    Self: AttrLen<Self::DefinedBy, SQLINTEGER>,
+impl<A: Ident, C: ConnState, V: OdbcVersion> ConnAttr<A, C, V> for OdbcStr<MaybeUninit<SQLCHAR>> where
+    OdbcStr<SQLCHAR>: ConnAttr<A, C, V>
 {
 }
 impl<A: Ident, C: ConnState, V: OdbcVersion> ConnAttr<A, C, V> for OdbcStr<MaybeUninit<SQLWCHAR>> where
@@ -83,8 +81,10 @@ impl<A: Ident, C: ConnState, V: OdbcVersion> ConnAttr<A, C, V> for OdbcStr<Maybe
 }
 
 // Implement ConnAttr for references to character connection attributes (used by AttrSet)
-impl<A: Ident, C: ConnState, CH: OdbcChar, V: OdbcVersion> ConnAttr<A, C, V> for &OdbcStr<CH> where
-    OdbcStr<CH>: ConnAttr<A, C, V>
+impl<A: Ident, C: ConnState, CH: OdbcChar, V: OdbcVersion> ConnAttr<A, C, V> for &OdbcStr<CH>
+where
+    OdbcStr<CH>: ConnAttr<A, C, V>,
+    Self: AttrSet<A>,
 {
 }
 
@@ -97,7 +97,8 @@ mod private {
     use super::{C2, C3, C4};
     #[double]
     use crate::api::ffi;
-    use crate::handle::{AsSQLHANDLE, SQLHDBC};
+    use crate::convert::AsSQLHANDLE;
+    use crate::handle::SQLHDBC;
     use crate::{env, sqlreturn};
     use mockall_double::double;
     use std::{any, thread};
@@ -415,38 +416,38 @@ unsafe impl AttrSet<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {}
 
 // Re-exported as connection attribute
 pub use crate::stmt::SQL_ATTR_ASYNC_ENABLE;
-impl<'stmt, 'buf, T: Ident> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C2, SQL_OV_ODBC3> for T where
-    T: StmtAttr<'stmt, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
+impl<'desc, 'buf, T: Ident> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C2, SQL_OV_ODBC3> for T where
+    T: StmtAttr<'desc, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
 {
 }
-impl<'stmt, 'buf, T: Ident> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C4, SQL_OV_ODBC3> for T where
-    T: StmtAttr<'stmt, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
+impl<'desc, 'buf, T: Ident> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C4, SQL_OV_ODBC3> for T where
+    T: StmtAttr<'desc, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
 {
 }
-impl<'stmt, 'buf, T> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C2, SQL_OV_ODBC3> for [T] where
-    [T]: StmtAttr<'stmt, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
+impl<'desc, 'buf, T> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C2, SQL_OV_ODBC3> for [T] where
+    [T]: StmtAttr<'desc, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
 {
 }
-impl<'stmt, 'buf, T> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C4, SQL_OV_ODBC3> for [T] where
-    [T]: StmtAttr<'stmt, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
+impl<'desc, 'buf, T> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C4, SQL_OV_ODBC3> for [T] where
+    [T]: StmtAttr<'desc, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
 {
 }
 
 pub use crate::stmt::SQL_ATTR_METADATA_ID;
-impl<'stmt, 'buf, T: Ident> ConnAttr<SQL_ATTR_METADATA_ID, C2, SQL_OV_ODBC3> for T where
-    T: StmtAttr<'stmt, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
+impl<'desc, 'buf, T: Ident> ConnAttr<SQL_ATTR_METADATA_ID, C2, SQL_OV_ODBC3> for T where
+    T: StmtAttr<'desc, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
 {
 }
-impl<'stmt, 'buf, T: Ident> ConnAttr<SQL_ATTR_METADATA_ID, C4, SQL_OV_ODBC3> for T where
-    T: StmtAttr<'stmt, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
+impl<'desc, 'buf, T: Ident> ConnAttr<SQL_ATTR_METADATA_ID, C4, SQL_OV_ODBC3> for T where
+    T: StmtAttr<'desc, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
 {
 }
-impl<'stmt, 'buf, T> ConnAttr<SQL_ATTR_METADATA_ID, C2, SQL_OV_ODBC3> for [T] where
-    [T]: StmtAttr<'stmt, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
+impl<'desc, 'buf, T> ConnAttr<SQL_ATTR_METADATA_ID, C2, SQL_OV_ODBC3> for [T] where
+    [T]: StmtAttr<'desc, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
 {
 }
-impl<'stmt, 'buf, T> ConnAttr<SQL_ATTR_METADATA_ID, C4, SQL_OV_ODBC3> for [T] where
-    [T]: StmtAttr<'stmt, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
+impl<'desc, 'buf, T> ConnAttr<SQL_ATTR_METADATA_ID, C4, SQL_OV_ODBC3> for [T] where
+    [T]: StmtAttr<'desc, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
 {
 }
 

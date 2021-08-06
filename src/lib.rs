@@ -127,12 +127,12 @@ impl<T> Ident for &mut T {
 
     const IDENTIFIER: Self::Type = SQL_IS_POINTER;
 }
-impl<T> Ident for Option<&T> {
+impl<T: Ident> Ident for Option<&T> {
     type Type = SQLSMALLINT;
 
     const IDENTIFIER: Self::Type = SQL_IS_POINTER;
 }
-impl<T> Ident for Option<&mut T> {
+impl<T: Ident> Ident for Option<&mut T> {
     type Type = SQLSMALLINT;
 
     const IDENTIFIER: Self::Type = SQL_IS_POINTER;

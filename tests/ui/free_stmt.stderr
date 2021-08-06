@@ -1,10 +1,10 @@
 error[E0505]: cannot move out of `conn` because it is borrowed
-  --> $DIR/free_stmt.rs:43:35
+  --> $DIR/free_stmt.rs:33:5
    |
-40 |     SQLAllocHandle(SQL_HANDLE_STMT, &conn, &mut stmt);
-   |                                     ----- borrow of `conn` occurs here
+30 |     let (stmt, _) = SQLHSTMT::SQLAllocHandle(&conn);
+   |                                              ----- borrow of `conn` occurs here
 ...
-43 |     SQLFreeHandle(SQL_HANDLE_DBC, conn);
-   |                                   ^^^^ move out of `conn` occurs here
-44 |     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
-   |                                    ---- borrow later used here
+33 |     conn.SQLFreeHandle();
+   |     ^^^^ move out of `conn` occurs here
+34 |     stmt.SQLFreeHandle();
+   |     ---- borrow later used here

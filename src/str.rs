@@ -1,3 +1,6 @@
+use crate::desc::AppDesc;
+use crate::env::OdbcVersion;
+use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, SQLHDESC};
 use crate::{Ident, SQLCHAR, SQLWCHAR};
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
@@ -75,7 +78,7 @@ where
     }
 }
 
-impl<T: Ident> Ansi for T {}    // TODO: This coincidentally implements it for SQLWCHAR as well. May not be a problem?
+impl<T: Ident> Ansi for T {} // TODO: This coincidentally implements it for SQLWCHAR as well. May not be a problem?
 impl<T: Ident> Unicode for T {} // TODO: This coincidentally implements it for SQLWCHAR as well. May not be a problem?
 
 impl<T: Ident> Ansi for MaybeUninit<T> where T: Ansi {}
@@ -89,3 +92,15 @@ impl Unicode for OdbcStr<MaybeUninit<SQLWCHAR>> {}
 
 impl<CH: OdbcChar> Ansi for &OdbcStr<CH> where OdbcStr<CH>: Ansi {}
 impl<CH: OdbcChar> Unicode for &OdbcStr<CH> where OdbcStr<CH>: Unicode {}
+
+impl<V: OdbcVersion> Ansi for MaybeUninit<RefSQLHDESC<'_, AppDesc<'_>, V>> {}
+impl<V: OdbcVersion> Unicode for MaybeUninit<RefSQLHDESC<'_, AppDesc<'_>, V>> {}
+
+impl<V: OdbcVersion> Ansi for MaybeUninit<RefUnsafeSQLHDESC<'_, AppDesc<'_>, V>> {}
+impl<V: OdbcVersion> Unicode for MaybeUninit<RefUnsafeSQLHDESC<'_, AppDesc<'_>, V>> {}
+
+impl<DT, V: OdbcVersion> Ansi for Option<&SQLHDESC<'_, DT, V>> {}
+impl<DT, V: OdbcVersion> Unicode for Option<&SQLHDESC<'_, DT, V>> {}
+
+impl<DT, V: OdbcVersion> Ansi for Option<&UnsafeSQLHDESC<'_, DT, V>> {}
+impl<DT, V: OdbcVersion> Unicode for Option<&UnsafeSQLHDESC<'_, DT, V>> {}
