@@ -1,8 +1,8 @@
 use rs_odbc::api::{Allocate, Handle};
 use rs_odbc::conn::C4;
 use rs_odbc::env::SQL_OV_ODBC3_80;
-use rs_odbc::handle::{SQLHDBC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE};
-use rs_odbc::stmt::{RefSQLHDESC, SQL_ATTR_APP_ROW_DESC};
+use rs_odbc::handle::{RefSQLHDESC, SQLHDBC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE};
+use rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC;
 use rs_odbc::SQL_DRIVER_COMPLETE;
 use std::mem::MaybeUninit;
 

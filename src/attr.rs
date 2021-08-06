@@ -1,5 +1,8 @@
 use crate::c_types::ScalarCType;
 use crate::convert::{AsMutSQLPOINTER, IntoSQLPOINTER};
+use crate::desc::AppDesc;
+use crate::env::OdbcVersion;
+use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, SQLHDESC};
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{
     slice_len, Def, DriverDefined, Ident, OdbcDefined, Void, SQLCHAR, SQLINTEGER, SQLLEN,
@@ -27,6 +30,9 @@ pub unsafe trait AttrLen<AD: Def, LEN: Copy> {
 
     fn len(&self) -> LEN;
 }
+
+pub trait SafeApi {}
+pub trait UnsafeApi {}
 
 pub trait AttrZeroAssert {
     fn assert_zeroed(&self) {}
@@ -90,7 +96,7 @@ where
 unsafe impl<AD: Def, LEN: Copy, T: Ident> AttrLen<AD, LEN> for T
 where
     MaybeUninit<T>: AttrLen<AD, LEN>,
-    LEN: From<u8>,
+    LEN: From<SQLSMALLINT>,
 {
     type StrLen = Void;
 
@@ -101,7 +107,7 @@ where
 }
 unsafe impl<LEN: Copy, T: Ident> AttrLen<OdbcDefined, LEN> for MaybeUninit<T>
 where
-    LEN: From<u8>,
+    LEN: From<SQLSMALLINT>,
 {
     type StrLen = Void;
 
@@ -111,7 +117,6 @@ where
 }
 unsafe impl<LEN: Copy, T: Ident> AttrLen<DriverDefined, LEN> for MaybeUninit<T>
 where
-    T: AttrLen<OdbcDefined, LEN>,
     LEN: From<T::Type>,
 {
     type StrLen = Void;
@@ -183,7 +188,7 @@ where
 }
 unsafe impl<AD: Def, LEN: Copy, T: Ident> AttrLen<AD, LEN> for [T]
 where
-    LEN: From<u8>,
+    LEN: From<SQLSMALLINT>,
 {
     type StrLen = Void;
 
@@ -225,6 +230,78 @@ unsafe impl<AD: Def, T> AttrLen<AD, SQLINTEGER> for [UnsafeCell<T>] {
 
     fn len(&self) -> SQLINTEGER {
         0 // Length is not used for deferred buffers
+    }
+}
+unsafe impl<DT, LEN: Copy, V: OdbcVersion> AttrLen<OdbcDefined, LEN>
+    for MaybeUninit<RefUnsafeSQLHDESC<'_, DT, V>>
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = Void;
+
+    fn len(&self) -> LEN {
+        LEN::from(0)
+    }
+}
+unsafe impl<DT, LEN: Copy, V: OdbcVersion> AttrLen<DriverDefined, LEN>
+    for MaybeUninit<RefUnsafeSQLHDESC<'_, DT, V>>
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = Void;
+
+    fn len(&self) -> LEN {
+        LEN::from(crate::SQL_IS_POINTER)
+    }
+}
+unsafe impl<'conn, AD: Def, DT, LEN: Copy, V: OdbcVersion> AttrLen<AD, LEN>
+    for MaybeUninit<RefSQLHDESC<'conn, DT, V>>
+where
+    MaybeUninit<RefUnsafeSQLHDESC<'conn, DT, V>>: AttrLen<AD, LEN>,
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = <MaybeUninit<RefUnsafeSQLHDESC<'conn, DT, V>> as AttrLen<AD, LEN>>::StrLen;
+
+    fn len(&self) -> LEN {
+        // Transmute is safe because RefSQLHDESC is a transparent wrapper over RefUnsafeSQLHDESC
+        unsafe { std::mem::transmute::<_, &MaybeUninit<RefUnsafeSQLHDESC<'conn, DT, V>>>(self) }
+            .len()
+    }
+}
+unsafe impl<LEN: Copy, V: OdbcVersion> AttrLen<OdbcDefined, LEN>
+    for Option<&UnsafeSQLHDESC<'_, AppDesc<'_>, V>>
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = Void;
+
+    fn len(&self) -> LEN {
+        LEN::from(0)
+    }
+}
+unsafe impl<LEN: Copy, V: OdbcVersion> AttrLen<DriverDefined, LEN>
+    for Option<&UnsafeSQLHDESC<'_, AppDesc<'_>, V>>
+where
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = Void;
+
+    fn len(&self) -> LEN {
+        LEN::from(crate::SQL_IS_POINTER)
+    }
+}
+unsafe impl<'a, 'conn, 'buf, AD: Def, LEN: Copy, V: OdbcVersion> AttrLen<AD, LEN>
+    for Option<&'a SQLHDESC<'conn, AppDesc<'buf>, V>>
+where
+    Option<&'a UnsafeSQLHDESC<'conn, AppDesc<'buf>, V>>: AttrLen<AD, LEN>,
+    LEN: From<SQLSMALLINT>,
+{
+    type StrLen = <Option<&'a UnsafeSQLHDESC<'conn, AppDesc<'buf>, V>> as AttrLen<AD, LEN>>::StrLen;
+
+    fn len(&self) -> LEN {
+        // Transmute is safe because SQLHDESC is a transparent wrapper over UnsafeSQLHDESC
+        unsafe { std::mem::transmute::<_, Option<&UnsafeSQLHDESC<'conn, AppDesc<'buf>, V>>>(self) }
+            .len()
     }
 }
 

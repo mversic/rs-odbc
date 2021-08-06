@@ -4,16 +4,27 @@ use crate::env::OdbcVersion;
 use crate::str::{OdbcChar, OdbcStr};
 use crate::SQLLEN;
 use crate::{
-    handle::UnsafeSQLHDESC, Ident, OdbcBool, OdbcDefined, SQLCHAR, SQLINTEGER, SQLSMALLINT, SQLUINTEGER,
-    SQLULEN, SQLWCHAR,
+    handle::UnsafeSQLHDESC, Ident, OdbcBool, OdbcDefined, SQLCHAR, SQLINTEGER, SQLSMALLINT,
+    SQLUINTEGER, SQLULEN, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::cell::UnsafeCell;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 
-impl<'buf> DescType<'buf> for AppDesc<'buf> {}
-impl<T> DescType<'_> for ImplDesc<T> {}
+// TODO: It's unclear if this trait is required because
+// of column lifetime binding or it can be removed
+pub trait DescType<'buf> {}
+
+pub trait UnsafeDescField<A: Ident, DT>: Attr<A> + AttrLen<Self::DefinedBy, SQLINTEGER> {
+    // TODO: Implement for buffers to bind their lifetimes
+    fn update_handle<V: OdbcVersion>(&self, _: &UnsafeSQLHDESC<DT, V>)
+    where
+        Self: AttrSet<A>,
+    {
+        // TODO: Do the same as for DescField
+    }
+}
 
 // TODO: The statement attribute SQL_ATTR_USE_BOOKMARKS should always be set before calling SQLSetDescField to set bookmark fields. While this is not mandatory, it is strongly recommended.
 pub trait DescField<A: Ident, DT>: Attr<A> + AttrLen<Self::DefinedBy, SQLINTEGER> {
@@ -33,10 +44,6 @@ pub trait DescField<A: Ident, DT>: Attr<A> + AttrLen<Self::DefinedBy, SQLINTEGER
     }
 }
 
-// TODO: It's unclear if this trait is required because
-// of column lifetime binding or it can be removed
-pub trait DescType<'buf> {}
-
 #[derive(Debug)]
 pub struct AppDesc<'buf> {
     pub(crate) rows_processed: PhantomData<&'buf ()>,
@@ -53,6 +60,11 @@ pub enum IRD {}
 #[derive(Debug)]
 pub enum IPD {}
 
+impl<'buf> DescType<'buf> for AppDesc<'buf> {}
+impl<T> DescType<'_> for ImplDesc<T> {}
+
+impl<A: Ident, T: DescField<A, DT>, DT> UnsafeDescField<A, DT> for T where T: ?Sized {}
+
 // Implement DescField for uninitialized descriptor fields
 impl<A: Ident, T: Ident, DT> DescField<A, DT> for MaybeUninit<T>
 where
@@ -60,10 +72,8 @@ where
     Self: AttrLen<Self::DefinedBy, SQLINTEGER>,
 {
 }
-impl<A: Ident, DT> DescField<A, DT> for OdbcStr<MaybeUninit<SQLCHAR>>
-where
-    OdbcStr<SQLCHAR>: DescField<A, DT>,
-    Self: AttrLen<Self::DefinedBy, SQLINTEGER>,
+impl<A: Ident, DT> DescField<A, DT> for OdbcStr<MaybeUninit<SQLCHAR>> where
+    OdbcStr<SQLCHAR>: DescField<A, DT>
 {
 }
 impl<A: Ident, DT> DescField<A, DT> for OdbcStr<MaybeUninit<SQLWCHAR>> where
@@ -72,8 +82,10 @@ impl<A: Ident, DT> DescField<A, DT> for OdbcStr<MaybeUninit<SQLWCHAR>> where
 }
 
 // Implement DescField for references to character descriptor fields (used by AttrSet)
-impl<A: Ident, DT, CH: OdbcChar> DescField<A, DT> for &OdbcStr<CH> where
-    OdbcStr<CH>: DescField<A, DT>
+impl<A: Ident, DT, CH: OdbcChar> DescField<A, DT> for &OdbcStr<CH>
+where
+    OdbcStr<CH>: DescField<A, DT>,
+    Self: AttrSet<A>,
 {
 }
 
@@ -128,12 +140,10 @@ unsafe impl AttrSet<SQL_DESC_ARRAY_SIZE> for SQLULEN {}
 //unsafe impl Attr<SQL_DESC_BIND_OFFSET_PTR> for UnsafeCell<SQLLEN> {
 //    type DefinedBy = OdbcDefined;
 //}
-//impl DescField<SQL_DESC_BIND_OFFSET_PTR, AppDesc<'_>> for UnsafeCell<SQLLEN> {
+//impl UnsafeDescField<SQL_DESC_BIND_OFFSET_PTR, AppDesc<'_>> for UnsafeCell<SQLLEN> {
 //    fn update_handle<V: OdbcVersion>(&self, DescriptorHandle: &UnsafeSQLHDESC<AppDesc<'_>, V>)
-//    where
-//        Self: AttrSet<A>,
 //    {
-//        handle.bind_offset.set(*self);
+//        DescriptorHandle.bind_offset.set(*self);
 //    }
 //}
 //unsafe impl AttrGet<SQL_DESC_BIND_OFFSET_PTR> for UnsafeCell<SQLLEN> {}

@@ -9,64 +9,21 @@ use crate::{
     c_types::DeferredBuf,
     col::ColAttr,
     conn::{BrowseConnect, ConnAttr, ConnState, Disconnect, C2, C3, C4},
-    convert::{AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLPOINTER, IntoSQLPOINTER},
-    desc::{DescField, DescType},
+    convert::{AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLPOINTER, IntoSQLPOINTER, AsSQLHANDLE},
+    desc::{DescField, DescType, UnsafeDescField},
     diag::{DiagField, SQLSTATE},
     env::{EnvAttr, OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4},
-    handle::{SQLHDBC, UnsafeSQLHDESC, SQLHENV, SQLHDESC, SQLHSTMT, UnsafeSQLHSTMT},
+    handle::{UnsafeSQLHDESC, UnsafeSQLHSTMT, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
     info::InfoType,
     sql_types::SqlType,
     sqlreturn::{SQLRETURN, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_SUCCEEDED},
-    stmt::StmtAttr,
+    stmt::{StmtAttr, UnsafeStmtAttr, private::BaseStmtAttr},
     str::{Ansi, OdbcStr, Unicode},
     BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion, FreeStmtOption,
     FunctionId, IOType, Ident, IdentifierType, LockType, NullAllowed, Operation, Reserved, Scope,
     StrLenOrInd, Unique, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW,
     SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
-
-// TODO: Should be unsafe?
-// TODO: Where to require Drop? I could make a generic Drop implementation, hmmmm
-pub trait Allocate<'src>: Handle {
-    type SrcHandle: AsSQLHANDLE;
-
-    /// Creates handle from a raw pointer
-    ///
-    /// # Safety
-    ///
-    /// This is highly unsafe, due to the fact that raw pointer validity isn't checked
-    ///
-    // TODO: Consider using ptr::NonNull<RawHandle> here
-    unsafe fn from_raw(handle: SQLHANDLE) -> Self;
-
-    /// Allocates an environment, connection, statement, or descriptor handle.
-    ///
-    /// For complete documentation on SQLAllocHandle, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlallochandle-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_INVALID_HANDLE, or SQL_ERROR.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    fn SQLAllocHandle(InputHandle: &'src Self::SrcHandle) -> (Result<Self, ()>, SQLRETURN) {
-        // Initialized to ptr::null_mut for additional safety
-        let mut output_handle: SQLHANDLE = ptr::null_mut();
-
-        unsafe {
-            let sql_return = ffi::SQLAllocHandle(
-                Self::Ident::IDENTIFIER,
-                InputHandle.as_SQLHANDLE(),
-                &mut output_handle,
-            );
-
-            if SQL_SUCCEEDED(sql_return) {
-                (Ok(Self::from_raw(output_handle)), sql_return)
-            } else {
-                (Err(()), sql_return)
-            }
-        }
-    }
-}
 
 pub trait Handle: AsSQLHANDLE + Sized {
     type Ident: Ident<Type = SQLSMALLINT>;
@@ -233,6 +190,47 @@ pub trait Handle: AsSQLHANDLE + Sized {
     #[inline]
     #[allow(non_snake_case)]
     fn SQLFreeHandle(self) {}
+}
+
+pub trait Allocate<'src>: Handle {
+    type SrcHandle: AsSQLHANDLE;
+
+    /// Creates handle from a raw pointer
+    ///
+    /// # Safety
+    ///
+    /// This is highly unsafe, due to the fact that raw pointer validity isn't checked
+    ///
+    // TODO: Consider using ptr::NonNull<RawHandle> here
+    unsafe fn from_raw(handle: SQLHANDLE) -> Self;
+
+    /// Allocates an environment, connection, statement, or descriptor handle.
+    ///
+    /// For complete documentation on SQLAllocHandle, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlallochandle-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_INVALID_HANDLE, or SQL_ERROR.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    fn SQLAllocHandle(InputHandle: &'src Self::SrcHandle) -> (Result<Self, ()>, SQLRETURN) {
+        // Initialized to ptr::null_mut for additional safety
+        let mut output_handle: SQLHANDLE = ptr::null_mut();
+
+        unsafe {
+            let sql_return = ffi::SQLAllocHandle(
+                Self::Ident::IDENTIFIER,
+                InputHandle.as_SQLHANDLE(),
+                &mut output_handle,
+            );
+
+            if SQL_SUCCEEDED(sql_return) {
+                (Ok(Self::from_raw(output_handle)), sql_return)
+            } else {
+                (Err(()), sql_return)
+            }
+        }
+    }
 }
 
 impl<V: OdbcVersion> SQLHENV<V> {
@@ -1071,7 +1069,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     where
         B: ?Sized,
     {
-        self.0.SQLBindCol(ColumnNumber, TargetType, TargetValuePtr, StrLen_or_IndPtr)
+        self.0
+            .SQLBindCol(ColumnNumber, TargetType, TargetValuePtr, StrLen_or_IndPtr)
     }
 
     /// Binds a buffer to a parameter marker in an SQL statement. **SQLBindParameter** supports binding to a Unicode C data type, even if the underlying driver does not support Unicode data.
@@ -1102,7 +1101,16 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     where
         B: ?Sized,
     {
-        self.0.SQLBindParameter(ParameterNumber, InputOutputType, ValueType, ParameterType, ColumnSize, DecimalDigits, ParameterValuePtr, StrLen_or_IndPtr)
+        self.0.SQLBindParameter(
+            ParameterNumber,
+            InputOutputType,
+            ValueType,
+            ParameterType,
+            ColumnSize,
+            DecimalDigits,
+            ParameterValuePtr,
+            StrLen_or_IndPtr,
+        )
     }
 
     /// Performs bulk insertions and bulk bookmark operations, including update, delete, and fetch by bookmark.
@@ -1166,7 +1174,13 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         T: AttrGet<A> + Ansi + ?Sized,
         MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
     {
-        self.0.SQLColAttributeA(ColumnNumber, FieldIdentifier, CharacterAttributePtr, StringLengthPtr, NumericAttributePtr)
+        self.0.SQLColAttributeA(
+            ColumnNumber,
+            FieldIdentifier,
+            CharacterAttributePtr,
+            StringLengthPtr,
+            NumericAttributePtr,
+        )
     }
 
     /// Returns descriptor information for a column in a result set. Descriptor information is returned as a character string, a descriptor-dependent value, or an integer value.
@@ -1190,7 +1204,13 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         T: AttrGet<A> + Unicode + ?Sized,
         MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
     {
-        self.0.SQLColAttributeW(ColumnNumber, FieldIdentifier, CharacterAttributePtr, StringLengthPtr, NumericAttributePtr)
+        self.0.SQLColAttributeW(
+            ColumnNumber,
+            FieldIdentifier,
+            CharacterAttributePtr,
+            StringLengthPtr,
+            NumericAttributePtr,
+        )
     }
 
     /// Returns a list of columns and associated privileges for the specified table. The driver returns the information as a result set on the specified `self`.
@@ -1209,7 +1229,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         TableName: &OdbcStr<SQLCHAR>,
         ColumnName: &OdbcStr<SQLCHAR>,
     ) -> SQLRETURN {
-        self.0.SQLColumnPrivilegesA(CatalogName, SchemaName, TableName, ColumnName)
+        self.0
+            .SQLColumnPrivilegesA(CatalogName, SchemaName, TableName, ColumnName)
     }
 
     /// Returns a list of columns and associated privileges for the specified table. The driver returns the information as a result set on the specified `self`.
@@ -1228,7 +1249,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         TableName: &OdbcStr<SQLWCHAR>,
         ColumnName: &OdbcStr<SQLWCHAR>,
     ) -> SQLRETURN {
-        self.0.SQLColumnPrivilegesW(CatalogName, SchemaName, TableName, ColumnName)
+        self.0
+            .SQLColumnPrivilegesW(CatalogName, SchemaName, TableName, ColumnName)
     }
 
     /// Returns the list of column names in specified tables. The driver returns this information as a result set on the specified `self`.
@@ -1247,7 +1269,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         TableName: &OdbcStr<SQLCHAR>,
         ColumnName: &OdbcStr<SQLCHAR>,
     ) -> SQLRETURN {
-        self.0.SQLColumnsA(CatalogName, SchemaName, TableName, ColumnName)
+        self.0
+            .SQLColumnsA(CatalogName, SchemaName, TableName, ColumnName)
     }
 
     /// Returns the list of column names in specified tables. The driver returns this information as a result set on the specified `self`.
@@ -1266,7 +1289,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         TableName: &OdbcStr<SQLWCHAR>,
         ColumnName: &OdbcStr<SQLWCHAR>,
     ) -> SQLRETURN {
-        self.0.SQLColumnsW(CatalogName, SchemaName, TableName, ColumnName)
+        self.0
+            .SQLColumnsW(CatalogName, SchemaName, TableName, ColumnName)
     }
 
     /// Returns the result descriptor - column name,type, column size, decimal digits, and nullability - for one column in the result set. This information also is available in the fields of the IRD.
@@ -1288,7 +1312,15 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         DecimalDigitsPtr: &mut MaybeUninit<SQLSMALLINT>,
         NullablePtr: &mut MaybeUninit<NullAllowed>,
     ) -> SQLRETURN {
-        self.0.SQLDescribeColA(ColumnNumber, ColumnName, NameLengthPtr, DataTypePtr, ColumnSizePtr, DecimalDigitsPtr, NullablePtr)
+        self.0.SQLDescribeColA(
+            ColumnNumber,
+            ColumnName,
+            NameLengthPtr,
+            DataTypePtr,
+            ColumnSizePtr,
+            DecimalDigitsPtr,
+            NullablePtr,
+        )
     }
 
     /// Returns the result descriptor - column name,type, column size, decimal digits, and nullability - for one column in the result set. This information also is available in the fields of the IRD.
@@ -1310,7 +1342,15 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         DecimalDigitsPtr: &mut MaybeUninit<SQLSMALLINT>,
         NullablePtr: &mut MaybeUninit<NullAllowed>,
     ) -> SQLRETURN {
-        self.0.SQLDescribeColW(ColumnNumber, ColumnName, NameLengthPtr, DataTypePtr, ColumnSizePtr, DecimalDigitsPtr, NullablePtr)
+        self.0.SQLDescribeColW(
+            ColumnNumber,
+            ColumnName,
+            NameLengthPtr,
+            DataTypePtr,
+            ColumnSizePtr,
+            DecimalDigitsPtr,
+            NullablePtr,
+        )
     }
 
     /// Returns the description of a parameter marker associated with a prepared SQL statement. This information is also available in the fields of the IPD.
@@ -1330,7 +1370,13 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         DecimalDigitsPtr: &mut MaybeUninit<SQLSMALLINT>,
         NullablePtr: &mut MaybeUninit<NullAllowed>,
     ) -> SQLRETURN {
-        self.0.SQLDescribeParam(ParameterNumber, DataTypePtr, ParameterSizePtr, DecimalDigitsPtr, NullablePtr)
+        self.0.SQLDescribeParam(
+            ParameterNumber,
+            DataTypePtr,
+            ParameterSizePtr,
+            DecimalDigitsPtr,
+            NullablePtr,
+        )
     }
 
     /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
@@ -1342,7 +1388,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     #[inline]
     #[allow(non_snake_case)]
     pub fn SQLExecDirectA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
-        unsafe {self.0.SQLExecDirectA(StatementText)}
+        unsafe { self.0.SQLExecDirectA(StatementText) }
     }
 
     /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
@@ -1354,7 +1400,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     #[inline]
     #[allow(non_snake_case)]
     pub fn SQLExecDirectW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
-        unsafe{self.0.SQLExecDirectW(StatementText)}
+        unsafe { self.0.SQLExecDirectW(StatementText) }
     }
 
     /// Executes a prepared statement, using the current values of the parameter marker variables if any parameter markers exist in the statement.
@@ -1366,7 +1412,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     #[inline]
     #[allow(non_snake_case)]
     pub fn SQLExecute(&self) -> SQLRETURN {
-        unsafe {self.0.SQLExecute()}
+        unsafe { self.0.SQLExecute() }
     }
 
     /// Fetches the next rowset of data from the result set and returns data for all bound columns.
@@ -1378,7 +1424,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     #[inline]
     #[allow(non_snake_case)]
     pub fn SQLFetch(&self) -> SQLRETURN {
-        unsafe {self.0.SQLFetch()}
+        unsafe { self.0.SQLFetch() }
     }
 
     /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
@@ -1390,12 +1436,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
     #[allow(non_snake_case)]
-    pub fn SQLFetchScroll(
-        &self,
-        FetchOrientation: SQLSMALLINT,
-        FetchOffset: SQLLEN,
-    ) -> SQLRETURN {
-        unsafe {self.0.SQLFetchScroll(FetchOrientation, FetchOffset)}
+    pub fn SQLFetchScroll(&self, FetchOrientation: SQLSMALLINT, FetchOffset: SQLLEN) -> SQLRETURN {
+        unsafe { self.0.SQLFetchScroll(FetchOrientation, FetchOffset) }
     }
 
     /// Can return:
@@ -1421,7 +1463,14 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         FKSchemaName: &OdbcStr<SQLCHAR>,
         FKTableName: &OdbcStr<SQLCHAR>,
     ) -> SQLRETURN {
-        self.0.SQLForeignKeysA(PKCatalogName, PKSchemaName, PKTableName, FKCatalogName, FKSchemaName, FKTableName)
+        self.0.SQLForeignKeysA(
+            PKCatalogName,
+            PKSchemaName,
+            PKTableName,
+            FKCatalogName,
+            FKSchemaName,
+            FKTableName,
+        )
     }
 
     /// Can return:
@@ -1447,7 +1496,14 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         FKSchemaName: &OdbcStr<SQLWCHAR>,
         FKTableName: &OdbcStr<SQLWCHAR>,
     ) -> SQLRETURN {
-        self.0.SQLForeignKeysW(PKCatalogName, PKSchemaName, PKTableName, FKCatalogName, FKSchemaName, FKTableName)
+        self.0.SQLForeignKeysW(
+            PKCatalogName,
+            PKSchemaName,
+            PKTableName,
+            FKCatalogName,
+            FKSchemaName,
+            FKTableName,
+        )
     }
 
     /// Stops processing associated with a specific statement, closes any open cursors associated with the statement, discards pending results, or, optionally, frees all resources associated with the statement handle.
@@ -1518,7 +1574,12 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         B: AsMutSQLPOINTER + ?Sized,
         MaybeUninit<StrLenOrInd>: AsMutPtr<SQLLEN>,
     {
-        self.0.SQLGetData(Col_or_Param_Num, TargetType, TargetValuePtr, StrLen_or_IndPtr)
+        self.0.SQLGetData(
+            Col_or_Param_Num,
+            TargetType,
+            TargetValuePtr,
+            StrLen_or_IndPtr,
+        )
     }
 
     /// Returns the current setting of a statement attribute.
@@ -1537,10 +1598,10 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Ansi,
+        T: AttrGet<A> + Ansi + ?Sized,
         MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
     {
-        self.0.SQLGetStmtAttrA(Attribute, ValuePtr, StringLengthPtr)
+        SQLGetStmtAttrA(&self.0, Attribute, ValuePtr, StringLengthPtr)
     }
 
     /// Returns the current setting of a statement attribute.
@@ -1562,7 +1623,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         T: AttrGet<A> + Unicode + ?Sized,
         MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
     {
-        self.0.SQLGetStmtAttrW(Attribute, ValuePtr, StringLengthPtr)
+        SQLGetStmtAttrW(&self.0, Attribute, ValuePtr, StringLengthPtr)
     }
 
     /// Returns information about data types supported by the data source. The driver returns the information in the form of an SQL result set. The data types are intended for use in Data Definition Language (DDL) statements.
@@ -1721,7 +1782,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         ProcName: &OdbcStr<SQLCHAR>,
         ColumnName: &OdbcStr<SQLCHAR>,
     ) -> SQLRETURN {
-        self.0.SQLProcedureColumnsA(CatalogName, SchemaName, ProcName, ColumnName)
+        self.0
+            .SQLProcedureColumnsA(CatalogName, SchemaName, ProcName, ColumnName)
     }
 
     /// Returns the list of input and output parameters, as well as the columns that make up the result set for the specified procedures. The driver returns the information as a result set on the specified statement.
@@ -1740,7 +1802,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         ProcName: &OdbcStr<SQLWCHAR>,
         ColumnName: &OdbcStr<SQLWCHAR>,
     ) -> SQLRETURN {
-        self.0.SQLProcedureColumnsW(CatalogName, SchemaName, ProcName, ColumnName)
+        self.0
+            .SQLProcedureColumnsW(CatalogName, SchemaName, ProcName, ColumnName)
     }
 
     /// Returns the list of procedure names stored in a specific data source. `Procedure` is a generic term used to describe an `executable object`, or a named entity that can be invoked using input and output parameters. For more information on procedures, see the Procedures.
@@ -1848,7 +1911,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         Operation: Operation,
         LockType: LockType,
     ) -> SQLRETURN {
-        unsafe {self.0.SQLSetPos(RowNumber, Operation, LockType)}
+        unsafe { self.0.SQLSetPos(RowNumber, Operation, LockType) }
     }
 
     /// Sets attributes related to a statement.
@@ -1868,7 +1931,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     where
         T: AttrSet<A> + Ansi,
     {
-        self.0.SQLSetStmtAttrA(Attribute, ValuePtr)
+        SQLSetStmtAttrA(&self.0, Attribute, ValuePtr)
     }
 
     /// Sets attributes related to a statement.
@@ -1888,7 +1951,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     where
         T: AttrSet<A> + Unicode,
     {
-        self.0.SQLSetStmtAttrW(Attribute, ValuePtr)
+        SQLSetStmtAttrW(&self.0, Attribute, ValuePtr)
     }
 
     /// Retrieves the following information about columns within a specified table:
@@ -1912,7 +1975,14 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         Scope: Scope,
         Nullable: NullAllowed,
     ) -> SQLRETURN {
-        self.0.SQLSpecialColumnsA(IdentifierType, CatalogName, SchemaName, TableName, Scope, Nullable)
+        self.0.SQLSpecialColumnsA(
+            IdentifierType,
+            CatalogName,
+            SchemaName,
+            TableName,
+            Scope,
+            Nullable,
+        )
     }
 
     /// Retrieves the following information about columns within a specified table:
@@ -1936,7 +2006,14 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         Scope: Scope,
         Nullable: NullAllowed,
     ) -> SQLRETURN {
-        self.0.SQLSpecialColumnsW(IdentifierType, CatalogName, SchemaName, TableName, Scope, Nullable)
+        self.0.SQLSpecialColumnsW(
+            IdentifierType,
+            CatalogName,
+            SchemaName,
+            TableName,
+            Scope,
+            Nullable,
+        )
     }
 
     /// Retrieves a list of statistics about a single table and the indexes associated with the table. The driver returns the information as a result set.
@@ -1956,7 +2033,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         Unique: Unique,
         Reserved: Reserved,
     ) -> SQLRETURN {
-        self.0.SQLStatisticsA(CatalogName, SchemaName, TableName, Unique, Reserved)
+        self.0
+            .SQLStatisticsA(CatalogName, SchemaName, TableName, Unique, Reserved)
     }
 
     /// Retrieves a list of statistics about a single table and the indexes associated with the table. The driver returns the information as a result set.
@@ -1976,7 +2054,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         Unique: Unique,
         Reserved: Reserved,
     ) -> SQLRETURN {
-        self.0.SQLStatisticsW(CatalogName, SchemaName, TableName, Unique, Reserved)
+        self.0
+            .SQLStatisticsW(CatalogName, SchemaName, TableName, Unique, Reserved)
     }
 
     /// Returns a list of tables and the privileges associated with each table. The driver returns the information as a result set on the specified statement.
@@ -1994,7 +2073,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         SchemaName: &OdbcStr<SQLCHAR>,
         TableName: &OdbcStr<SQLCHAR>,
     ) -> SQLRETURN {
-        self.0.SQLTablePrivilegesA(CatalogName, SchemaName, TableName)
+        self.0
+            .SQLTablePrivilegesA(CatalogName, SchemaName, TableName)
     }
 
     /// Returns a list of tables and the privileges associated with each table. The driver returns the information as a result set on the specified statement.
@@ -2012,7 +2092,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         SchemaName: &OdbcStr<SQLWCHAR>,
         TableName: &OdbcStr<SQLWCHAR>,
     ) -> SQLRETURN {
-        self.0.SQLTablePrivilegesW(CatalogName, SchemaName, TableName)
+        self.0
+            .SQLTablePrivilegesW(CatalogName, SchemaName, TableName)
     }
 
     /// Returns the list of table, catalog, or schema names, and table types, stored in a specific data source. The driver returns the information as a result set.
@@ -2031,7 +2112,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         TableName: &OdbcStr<SQLCHAR>,
         TableType: &OdbcStr<SQLCHAR>,
     ) -> SQLRETURN {
-        self.0.SQLTablesA(CatalogName, SchemaName, TableName, TableType)
+        self.0
+            .SQLTablesA(CatalogName, SchemaName, TableName, TableType)
     }
 
     /// Returns the list of table, catalog, or schema names, and table types, stored in a specific data source. The driver returns the information as a result set.
@@ -2050,7 +2132,8 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
         TableName: &OdbcStr<SQLWCHAR>,
         TableType: &OdbcStr<SQLWCHAR>,
     ) -> SQLRETURN {
-        self.0.SQLTablesW(CatalogName, SchemaName, TableName, TableType)
+        self.0
+            .SQLTablesW(CatalogName, SchemaName, TableName, TableType)
     }
 }
 
@@ -2546,7 +2629,7 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     pub unsafe fn SQLExecDirectA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
         let StatementText = StatementText.as_raw_slice();
 
-        unsafe { ffi::SQLExecDirectA(self.as_SQLHANDLE(), StatementText.0, StatementText.1) }
+        ffi::SQLExecDirectA(self.as_SQLHANDLE(), StatementText.0, StatementText.1)
     }
 
     /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
@@ -2560,7 +2643,7 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     pub unsafe fn SQLExecDirectW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
         let StatementText = StatementText.as_raw_slice();
 
-        unsafe { ffi::SQLExecDirectW(self.as_SQLHANDLE(), StatementText.0, StatementText.1) }
+        ffi::SQLExecDirectW(self.as_SQLHANDLE(), StatementText.0, StatementText.1)
     }
 
     /// Executes a prepared statement, using the current values of the parameter marker variables if any parameter markers exist in the statement.
@@ -2809,33 +2892,17 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    pub fn SQLGetStmtAttrA<'stmt, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'stmt, 'buf, A, V>>(
+    pub fn SQLGetStmtAttrA<'stmt, A: Ident<Type = SQLINTEGER>, T: UnsafeStmtAttr<'stmt, 'buf, A, V>>(
         &'stmt self,
         Attribute: A,
         ValuePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Ansi,
+        T: AttrGet<A> + Ansi + ?Sized,
         MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
     {
-        if let Some(ValuePtr) = ValuePtr {
-            if cfg!(feature = "odbc_debug") {
-                ValuePtr.assert_zeroed();
-            }
-
-            ValuePtr.readA(self, StringLengthPtr)
-        } else {
-            unsafe {
-                ffi::SQLGetStmtAttrA(
-                    self.as_SQLHANDLE(),
-                    A::IDENTIFIER,
-                    ptr::null_mut(),
-                    0,
-                    StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
-                )
-            }
-        }
+        SQLGetStmtAttrA(self, Attribute, ValuePtr, StringLengthPtr)
     }
 
     /// Returns the current setting of a statement attribute.
@@ -2847,7 +2914,7 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    pub fn SQLGetStmtAttrW<'stmt, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'stmt, 'buf, A, V>>(
+    pub fn SQLGetStmtAttrW<'stmt, A: Ident<Type = SQLINTEGER>, T: UnsafeStmtAttr<'stmt, 'buf, A, V>>(
         &'stmt self,
         Attribute: A,
         ValuePtr: Option<&mut T>,
@@ -2857,23 +2924,7 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
         T: AttrGet<A> + Unicode + ?Sized,
         MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
     {
-        if let Some(ValuePtr) = ValuePtr {
-            if cfg!(feature = "odbc_debug") {
-                ValuePtr.assert_zeroed();
-            }
-
-            ValuePtr.readW(self, StringLengthPtr)
-        } else {
-            unsafe {
-                ffi::SQLGetStmtAttrW(
-                    self.as_SQLHANDLE(),
-                    A::IDENTIFIER,
-                    ptr::null_mut(),
-                    0,
-                    StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
-                )
-            }
-        }
+        SQLGetStmtAttrW(self, Attribute, ValuePtr, StringLengthPtr)
     }
 
     /// Returns information about data types supported by the data source. The driver returns the information in the form of an SQL result set. The data types are intended for use in Data Definition Language (DDL) statements.
@@ -3278,7 +3329,7 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    pub fn SQLSetStmtAttrA<A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, A, V>>(
+    pub fn SQLSetStmtAttrA<A: Ident<Type = SQLINTEGER>, T: UnsafeStmtAttr<'desc, 'buf, A, V>>(
         &self,
         Attribute: A,
         ValuePtr: T,
@@ -3286,20 +3337,7 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     where
         T: AttrSet<A> + Ansi,
     {
-        let sql_return = unsafe {
-            ffi::SQLSetStmtAttrA(
-                self.as_SQLHANDLE(),
-                A::IDENTIFIER,
-                ValuePtr.into_SQLPOINTER(),
-                ValuePtr.len(),
-            )
-        };
-
-        if SQL_SUCCEEDED(sql_return) {
-            ValuePtr.update_handle(self);
-        }
-
-        sql_return
+        SQLSetStmtAttrA(self, Attribute, ValuePtr)
     }
 
     /// Sets attributes related to a statement.
@@ -3311,7 +3349,7 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    pub fn SQLSetStmtAttrW<A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, A, V>>(
+    pub fn SQLSetStmtAttrW<A: Ident<Type = SQLINTEGER>, T: UnsafeStmtAttr<'desc, 'buf, A, V>>(
         &self,
         Attribute: A,
         ValuePtr: T,
@@ -3319,20 +3357,7 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     where
         T: AttrSet<A> + Unicode,
     {
-        let sql_return = unsafe {
-            ffi::SQLSetStmtAttrW(
-                self.as_SQLHANDLE(),
-                A::IDENTIFIER,
-                ValuePtr.into_SQLPOINTER(),
-                ValuePtr.len(),
-            )
-        };
-
-        if SQL_SUCCEEDED(sql_return) {
-            ValuePtr.update_handle(self);
-        }
-
-        sql_return
+        SQLSetStmtAttrW(self, Attribute, ValuePtr)
     }
 
     /// Retrieves the following information about columns within a specified table:
@@ -3655,8 +3680,8 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, 
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    pub fn SQLGetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
-        &mut self,
+    pub fn SQLGetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: UnsafeDescField<A, DT>>(
+        &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
         ValuePtr: Option<&mut T>,
@@ -3695,8 +3720,8 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, 
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    pub fn SQLGetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
-        &mut self,
+    pub fn SQLGetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: UnsafeDescField<A, DT>>(
+        &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
         ValuePtr: Option<&mut T>,
@@ -3815,7 +3840,7 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, 
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    pub fn SQLSetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
+    pub fn SQLSetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: UnsafeDescField<A, DT>>(
         &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
@@ -3854,7 +3879,7 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, 
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    pub fn SQLSetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
+    pub fn SQLSetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: UnsafeDescField<A, DT>>(
         &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
@@ -3958,7 +3983,7 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> SQLHDESC<'conn, DT, V> {
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
     pub fn SQLGetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
-        &mut self,
+        &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
         ValuePtr: Option<&mut T>,
@@ -3968,7 +3993,8 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> SQLHDESC<'conn, DT, V> {
         T: AttrGet<A> + Ansi + ?Sized,
         MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
     {
-        self.0.SQLGetDescFieldA(RecNumber, FieldIdentifier, ValuePtr, StringLengthPtr)
+        self.0
+            .SQLGetDescFieldA(RecNumber, FieldIdentifier, ValuePtr, StringLengthPtr)
     }
 
     /// Returns the current setting or value of a single field of a descriptor record.
@@ -3981,7 +4007,7 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> SQLHDESC<'conn, DT, V> {
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
     pub fn SQLGetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
-        &mut self,
+        &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
         ValuePtr: Option<&mut T>,
@@ -3991,7 +4017,8 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> SQLHDESC<'conn, DT, V> {
         T: AttrGet<A> + Unicode + ?Sized,
         MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
     {
-        self.0.SQLGetDescFieldW(RecNumber, FieldIdentifier, ValuePtr, StringLengthPtr)
+        self.0
+            .SQLGetDescFieldW(RecNumber, FieldIdentifier, ValuePtr, StringLengthPtr)
     }
 
     /// Returns the current settings or values of multiple fields of a descriptor record. The fields returned describe the name, data type, and storage of column or parameter data.
@@ -4015,7 +4042,17 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> SQLHDESC<'conn, DT, V> {
         ScalePtr: &mut MaybeUninit<SQLSMALLINT>,
         NullablePtr: &mut MaybeUninit<NullAllowed>,
     ) -> SQLRETURN {
-        self.0.SQLGetDescRecA(RecNumber, Name, StringLengthPtr, TypePtr, SubTypePtr, LengthPtr, PrecisionPtr, ScalePtr, NullablePtr)
+        self.0.SQLGetDescRecA(
+            RecNumber,
+            Name,
+            StringLengthPtr,
+            TypePtr,
+            SubTypePtr,
+            LengthPtr,
+            PrecisionPtr,
+            ScalePtr,
+            NullablePtr,
+        )
     }
 
     /// Returns the current settings or values of multiple fields of a descriptor record. The fields returned describe the name, data type, and storage of column or parameter data.
@@ -4039,7 +4076,17 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> SQLHDESC<'conn, DT, V> {
         ScalePtr: &mut MaybeUninit<SQLSMALLINT>,
         NullablePtr: &mut MaybeUninit<NullAllowed>,
     ) -> SQLRETURN {
-        self.0.SQLGetDescRecW(RecNumber, Name, StringLengthPtr, TypePtr, SubTypePtr, LengthPtr, PrecisionPtr, ScalePtr, NullablePtr)
+        self.0.SQLGetDescRecW(
+            RecNumber,
+            Name,
+            StringLengthPtr,
+            TypePtr,
+            SubTypePtr,
+            LengthPtr,
+            PrecisionPtr,
+            ScalePtr,
+            NullablePtr,
+        )
     }
 
     /// Sets the value of a single field of a descriptor record.
@@ -4060,7 +4107,8 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> SQLHDESC<'conn, DT, V> {
     where
         T: AttrSet<A> + Ansi,
     {
-        self.0.SQLSetDescFieldA(RecNumber, FieldIdentifier, ValuePtr)
+        self.0
+            .SQLSetDescFieldA(RecNumber, FieldIdentifier, ValuePtr)
     }
 
     /// Sets the value of a single field of a descriptor record.
@@ -4081,7 +4129,8 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> SQLHDESC<'conn, DT, V> {
     where
         T: AttrSet<A> + Unicode,
     {
-        self.0.SQLSetDescFieldW(RecNumber, FieldIdentifier, ValuePtr)
+        self.0
+            .SQLSetDescFieldW(RecNumber, FieldIdentifier, ValuePtr)
     }
 
     /// Sets multiple descriptor fields that affect the data type and buffer bound to a column or parameter data.
@@ -4111,7 +4160,17 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> SQLHDESC<'conn, DT, V> {
     where
         &'buf PTR: IntoSQLPOINTER,
     {
-        self.0.SQLSetDescRec(RecNumber, Type, SubType, Length, Precision, Scale, DataPtr, StringLengthPtr, IndicatorPtr)
+        self.0.SQLSetDescRec(
+            RecNumber,
+            Type,
+            SubType,
+            Length,
+            Precision,
+            Scale,
+            DataPtr,
+            StringLengthPtr,
+            IndicatorPtr,
+        )
     }
 }
 
@@ -4144,6 +4203,108 @@ impl Async for SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3_80> {}
 impl Async for SQLHSTMT<'_, '_, '_, SQL_OV_ODBC4> {}
 impl Async for SQLHDBC<'_, C4, SQL_OV_ODBC3_80> {}
 impl Async for SQLHDBC<'_, C4, SQL_OV_ODBC4> {}
+
+#[allow(non_snake_case, unused_variables)]
+pub fn SQLGetStmtAttrA<'stmt, 'buf, A: Ident<Type = SQLINTEGER>, T: BaseStmtAttr<'stmt, 'buf, A, V>, V: OdbcVersion>(
+    Handle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, V>,
+    Attribute: A,
+    ValuePtr: Option<&mut T>,
+    StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
+) -> SQLRETURN
+where
+    T: AttrGet<A> + Ansi + ?Sized,
+    MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+{
+    if let Some(ValuePtr) = ValuePtr {
+        if cfg!(feature = "odbc_debug") {
+            ValuePtr.assert_zeroed();
+        }
+
+        ValuePtr.readA(Handle, StringLengthPtr)
+    } else {
+        unsafe {
+            ffi::SQLGetStmtAttrA(
+                Handle.as_SQLHANDLE(),
+                A::IDENTIFIER,
+                ptr::null_mut(),
+                0,
+                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+            )
+        }
+    }
+}
+
+#[allow(non_snake_case, unused_variables)]
+pub fn SQLGetStmtAttrW<'stmt, 'buf, A: Ident<Type = SQLINTEGER>, T: BaseStmtAttr<'stmt, 'buf, A, V>, V: OdbcVersion>(
+    Handle: &'stmt UnsafeSQLHSTMT<'_, '_, 'buf, V>,
+    Attribute: A,
+    ValuePtr: Option<&mut T>,
+    StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
+) -> SQLRETURN
+where
+    T: AttrGet<A> + Unicode + ?Sized,
+    MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+{
+    if let Some(ValuePtr) = ValuePtr {
+        if cfg!(feature = "odbc_debug") {
+            ValuePtr.assert_zeroed();
+        }
+
+        ValuePtr.readW(Handle, StringLengthPtr)
+    } else {
+        unsafe {
+            ffi::SQLGetStmtAttrW(
+                Handle.as_SQLHANDLE(),
+                A::IDENTIFIER,
+                ptr::null_mut(),
+                0,
+                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+            )
+        }
+    }
+}
+
+#[allow(non_snake_case, unused_variables)]
+fn SQLSetStmtAttrA<'desc, 'buf, A: Ident<Type = SQLINTEGER>, T: BaseStmtAttr<'desc, 'buf, A, V>, V: OdbcVersion>(Handle: &UnsafeSQLHSTMT<'_, 'desc, 'buf, V>, Attribute: A, ValuePtr: T)
+-> SQLRETURN
+where
+T: AttrSet<A> + Ansi {
+    let sql_return = unsafe {
+        ffi::SQLSetStmtAttrA(
+            Handle.as_SQLHANDLE(),
+            A::IDENTIFIER,
+            ValuePtr.into_SQLPOINTER(),
+            ValuePtr.len(),
+        )
+    };
+
+    if SQL_SUCCEEDED(sql_return) {
+        ValuePtr.update_handle(Handle);
+    }
+
+    sql_return
+}
+
+#[allow(non_snake_case, unused_variables)]
+fn SQLSetStmtAttrW<'desc, 'buf, A: Ident<Type = SQLINTEGER>, T: BaseStmtAttr<'desc, 'buf, A, V>, V: OdbcVersion>(Handle: &UnsafeSQLHSTMT<'_, 'desc, 'buf, V>, Attribute: A, ValuePtr: T)
+-> SQLRETURN
+where
+T: AttrSet<A> + Unicode {
+    let sql_return = unsafe {
+        ffi::SQLSetStmtAttrW(
+            Handle.as_SQLHANDLE(),
+            A::IDENTIFIER,
+            ValuePtr.into_SQLPOINTER(),
+            ValuePtr.len(),
+        )
+    };
+
+    if SQL_SUCCEEDED(sql_return) {
+        ValuePtr.update_handle(Handle);
+    }
+
+    sql_return
+}
 
 #[cfg(test)]
 use mockall::automock;

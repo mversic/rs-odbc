@@ -3,7 +3,7 @@ use crate::api::ffi;
 use crate::api::{Allocate, Handle};
 use crate::c_types::DeferredBuf;
 use crate::conn::{ConnState, C2, C3, C4};
-use crate::convert::IntoSQLPOINTER;
+use crate::convert::{AsSQLHANDLE, IntoSQLPOINTER};
 use crate::desc::{AppDesc, DescType, ImplDesc, IPD, IRD};
 use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION};
 #[cfg(feature = "odbc_debug")]
@@ -15,14 +15,9 @@ use mockall_double::double;
 use std::any::type_name;
 use std::cell::{Cell, UnsafeCell};
 use std::marker::PhantomData;
-use std::mem::ManuallyDrop;
+use std::mem::{ManuallyDrop, MaybeUninit};
+use std::ops::{Deref, DerefMut};
 use std::thread::panicking;
-
-// TODO: Move to convert.rs?
-pub unsafe trait AsSQLHANDLE {
-    #[allow(non_snake_case)]
-    fn as_SQLHANDLE(&self) -> SQLHANDLE;
-}
 
 #[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 1)]
@@ -66,11 +61,6 @@ pub type SQLHANDLE = *mut RawHandle;
 
 #[allow(non_camel_case_types)]
 pub struct SQL_NULL_HANDLE;
-unsafe impl AsSQLHANDLE for SQL_NULL_HANDLE {
-    fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        std::ptr::null_mut()
-    }
-}
 
 /// An environment is a global context which holds information such as:
 /// * The environment's state
@@ -90,9 +80,14 @@ pub struct SQLHENV<V: OdbcVersion> {
     pub(crate) handle: SQLHANDLE,
     version: PhantomData<V>,
 }
+
+unsafe impl<V: OdbcVersion> Send for SQLHENV<V> {}
+unsafe impl<V: OdbcVersion> Sync for SQLHENV<V> {}
+
 impl<V: OdbcVersion> Handle for SQLHENV<V> {
     type Ident = SQL_HANDLE_ENV;
 }
+
 impl<V: OdbcVersion> Allocate<'_> for SQLHENV<V> {
     type SrcHandle = SQL_NULL_HANDLE;
 
@@ -120,23 +115,10 @@ impl<V: OdbcVersion> Allocate<'_> for SQLHENV<V> {
         val
     }
 }
-unsafe impl<V: OdbcVersion> AsSQLHANDLE for SQLHENV<V> {
-    fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        self.handle
-    }
-}
+
 impl<V: OdbcVersion> Drop for SQLHENV<V> {
     fn drop(&mut self) {
-        let sql_return =
-            unsafe { ffi::SQLFreeHandle(SQL_HANDLE_ENV::IDENTIFIER, self.as_SQLHANDLE()) };
-
-        if sql_return != SQL_SUCCESS && !panicking() {
-            panic!(
-                "{}: SQLFreeHandle returned {:?}",
-                type_name::<Self>(),
-                sql_return
-            )
-        }
+        drop_handle(self);
     }
 }
 
@@ -167,9 +149,21 @@ pub struct SQLHDBC<'env, C: ConnState, V: OdbcVersion> {
     connected: PhantomData<C>,
     version: PhantomData<V>,
 }
+
+unsafe impl<C: ConnState, V: OdbcVersion> Send for SQLHDBC<'_, C, V> {}
+// TODO: Reference: http://www.firstsql.com/ithread5.htm
+//  Connection Options (set with SQLSetConnectOption) should be set before sharing begins and should not be changed.
+//  Connection-level Statement Options (set with SQLSetConnectOption) should be set before sharing begins and should not be changed.
+//  Transactions, there are several choices:
+//      autocommit, each statement is implicitly committed,
+//      connection-wide, a single transaction during the entire connection,
+//      otherwise, commits and rollbacks must be synchronized between threads.
+// unsafe impl<V: OdbcVersion> Sync for SQLHDBC<'_, C4, V> {}
+
 impl<C: ConnState, V: OdbcVersion> Handle for SQLHDBC<'_, C, V> {
     type Ident = SQL_HANDLE_DBC;
 }
+
 impl<'env, V: OdbcVersion> Allocate<'env> for SQLHDBC<'env, C2, V> {
     type SrcHandle = SQLHENV<V>;
 
@@ -183,25 +177,11 @@ impl<'env, V: OdbcVersion> Allocate<'env> for SQLHDBC<'env, C2, V> {
         }
     }
 }
-unsafe impl<C: ConnState, V: OdbcVersion> AsSQLHANDLE for SQLHDBC<'_, C, V> {
-    fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        self.handle
-    }
-}
+
 impl<C: ConnState, V: OdbcVersion> Drop for SQLHDBC<'_, C, V> {
     fn drop(&mut self) {
         C::disconnect(self);
-
-        let sql_return =
-            unsafe { ffi::SQLFreeHandle(SQL_HANDLE_DBC::IDENTIFIER, self.as_SQLHANDLE()) };
-
-        if sql_return != SQL_SUCCESS && !panicking() {
-            panic!(
-                "{}: SQLFreeHandle returned {:?}",
-                type_name::<Self>(),
-                sql_return
-            )
-        }
+        drop_handle(self);
     }
 }
 
@@ -265,6 +245,9 @@ impl<'env, OC: ConnState, V: OdbcVersion> SQLHDBC<'env, OC, V> {
 pub struct SQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion>(
     pub(crate) UnsafeSQLHSTMT<'conn, 'desc, 'buf, V>,
 );
+
+unsafe impl<V: OdbcVersion> Send for SQLHSTMT<'_, '_, '_, V> {}
+
 impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
     pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
     where
@@ -290,20 +273,16 @@ impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
     }
 }
 
-impl<V: OdbcVersion> Handle for SQLHSTMT<'_, '_, '_, V> {
-    type Ident = SQL_HANDLE_STMT;
+impl<'conn, 'desc, 'buf, V: OdbcVersion> Handle for SQLHSTMT<'conn, 'desc, 'buf, V> {
+    type Ident = <UnsafeSQLHSTMT<'conn, 'desc, 'buf, V> as Handle>::Ident;
 }
+
 impl<'conn, 'desc, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, 'desc, 'buf, V> {
     // Valid because SQLHDBC is covariant
     type SrcHandle = <UnsafeSQLHSTMT<'conn, 'desc, 'buf, V> as Allocate<'conn>>::SrcHandle;
 
     unsafe fn from_raw(handle: SQLHANDLE) -> Self {
         Self(UnsafeSQLHSTMT::from_raw(handle))
-    }
-}
-unsafe impl<V: OdbcVersion> AsSQLHANDLE for SQLHSTMT<'_, '_, '_, V> {
-    fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        self.0.as_SQLHANDLE()
     }
 }
 
@@ -351,10 +330,8 @@ pub struct UnsafeSQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion> {
     #[cfg(feature = "odbc_debug")]
     pub(crate) ipd: ManuallyDrop<UnsafeSQLHDESC<'desc, ImplDesc<IPD>, V>>,
 
-    #[allow(dead_code)]
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) explicit_ard: Cell<PhantomData<&'desc UnsafeSQLHDESC<'desc, AppDesc<'buf>, V>>>,
-    #[allow(dead_code)]
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) explicit_apd: Cell<PhantomData<&'desc UnsafeSQLHDESC<'desc, AppDesc<'buf>, V>>>,
 
@@ -367,6 +344,9 @@ pub struct UnsafeSQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion> {
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) ipd: PhantomData<UnsafeSQLHDESC<'desc, ImplDesc<IPD>, V>>,
 }
+
+unsafe impl<V: OdbcVersion> Send for UnsafeSQLHSTMT<'_, '_, '_, V> {}
+
 impl<'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, '_, 'buf, V> {
     #[cfg(feature = "odbc_debug")]
     unsafe fn get_descriptor_handle<A: Ident<Type = SQLINTEGER>>(handle: SQLHANDLE) -> SQLHANDLE {
@@ -452,6 +432,7 @@ impl<'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, '_, 'buf, V> {
 impl<V: OdbcVersion> Handle for UnsafeSQLHSTMT<'_, '_, '_, V> {
     type Ident = SQL_HANDLE_STMT;
 }
+
 impl<'conn, V: OdbcVersion> Allocate<'conn> for UnsafeSQLHSTMT<'conn, '_, '_, V> {
     // Valid because SQLHDBC is covariant
     type SrcHandle = SQLHDBC<'conn, C4, V>;
@@ -499,23 +480,10 @@ impl<'conn, V: OdbcVersion> Allocate<'conn> for UnsafeSQLHSTMT<'conn, '_, '_, V>
         }
     }
 }
-unsafe impl<V: OdbcVersion> AsSQLHANDLE for UnsafeSQLHSTMT<'_, '_, '_, V> {
-    fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        self.handle
-    }
-}
+
 impl<V: OdbcVersion> Drop for UnsafeSQLHSTMT<'_, '_, '_, V> {
     fn drop(&mut self) {
-        let sql_return =
-            unsafe { ffi::SQLFreeHandle(SQL_HANDLE_STMT::IDENTIFIER, self.as_SQLHANDLE()) };
-
-        if sql_return != SQL_SUCCESS && !panicking() {
-            panic!(
-                "{}: SQLFreeHandle returned: {:?}",
-                type_name::<Self>(),
-                sql_return
-            )
-        }
+        drop_handle(self);
     }
 }
 
@@ -544,29 +512,19 @@ impl<V: OdbcVersion> Drop for UnsafeSQLHSTMT<'_, '_, '_, V> {
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct SQLHDESC<'conn, DT, V: OdbcVersion>(pub(crate) UnsafeSQLHDESC<'conn, DT, V>);
+
+unsafe impl<DT, V: OdbcVersion> Send for SQLHDESC<'_, DT, V> {}
+
 impl<'buf, V: OdbcVersion, T: DescType<'buf>> Handle for SQLHDESC<'_, T, V> {
     type Ident = SQL_HANDLE_DESC;
 }
+
 impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'buf>, V> {
     // Valid because SQLHDBC is covariant
     type SrcHandle = <UnsafeSQLHDESC<'conn, AppDesc<'buf>, V> as Allocate<'conn>>::SrcHandle;
 
     unsafe fn from_raw(handle: SQLHANDLE) -> Self {
         Self(UnsafeSQLHDESC::from_raw(handle))
-    }
-}
-unsafe impl<V: OdbcVersion, T> AsSQLHANDLE for SQLHDESC<'_, T, V> {
-    fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        self.0.as_SQLHANDLE()
-    }
-}
-unsafe impl<'buf, V: OdbcVersion, T: DescType<'buf>> IntoSQLPOINTER
-    for Option<&SQLHDESC<'_, T, V>>
-{
-    fn into_SQLPOINTER(self) -> SQLPOINTER {
-        self.map_or_else(std::ptr::null_mut, |handle| {
-            Some(&handle.0).into_SQLPOINTER()
-        })
     }
 }
 
@@ -606,9 +564,13 @@ pub struct UnsafeSQLHDESC<'conn, T, V: OdbcVersion> {
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) inner: PhantomData<T>,
 }
-impl<'buf, V: OdbcVersion, T: DescType<'buf>> Handle for UnsafeSQLHDESC<'_, T, V> {
+
+unsafe impl<DT, V: OdbcVersion> Send for UnsafeSQLHDESC<'_, DT, V> {}
+
+impl<V: OdbcVersion, T> Handle for UnsafeSQLHDESC<'_, T, V> {
     type Ident = SQL_HANDLE_DESC;
 }
+
 impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for UnsafeSQLHDESC<'conn, AppDesc<'buf>, V> {
     // Valid because SQLHDBC is covariant
     type SrcHandle = SQLHDBC<'conn, C4, V>;
@@ -624,30 +586,60 @@ impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for UnsafeSQLHDESC<'conn, AppD
         }
     }
 }
-unsafe impl<V: OdbcVersion, T> AsSQLHANDLE for UnsafeSQLHDESC<'_, T, V> {
-    fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        self.handle
-    }
-}
-unsafe impl<'buf, V: OdbcVersion, T: DescType<'buf>> IntoSQLPOINTER
-    for Option<&UnsafeSQLHDESC<'_, T, V>>
-{
-    fn into_SQLPOINTER(self) -> SQLPOINTER {
-        self.map_or_else(std::ptr::null_mut, |handle| handle.as_SQLHANDLE().cast())
-    }
-}
+
 impl<V: OdbcVersion, T> Drop for UnsafeSQLHDESC<'_, T, V> {
     fn drop(&mut self) {
-        let sql_return =
-            unsafe { ffi::SQLFreeHandle(SQL_HANDLE_DESC::IDENTIFIER, self.as_SQLHANDLE()) };
+        drop_handle(self);
+    }
+}
 
-        if sql_return != SQL_SUCCESS && !panicking() {
-            panic!(
-                "{}: SQLFreeHandle returned: {:?}",
-                type_name::<Self>(),
-                sql_return
-            )
-        }
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct RefUnsafeSQLHDESC<'conn, T, V: OdbcVersion>(ManuallyDrop<UnsafeSQLHDESC<'conn, T, V>>);
+
+impl<'conn, T, V: OdbcVersion> Deref for RefUnsafeSQLHDESC<'conn, T, V> {
+    type Target = UnsafeSQLHDESC<'conn, T, V>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'conn, T, V: OdbcVersion> DerefMut for RefUnsafeSQLHDESC<'conn, T, V> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct RefSQLHDESC<'conn, T, V: OdbcVersion>(RefUnsafeSQLHDESC<'conn, T, V>);
+
+impl<'conn, T, V: OdbcVersion> Deref for RefSQLHDESC<'conn, T, V> {
+    type Target = SQLHDESC<'conn, T, V>;
+
+    fn deref(&self) -> &Self::Target {
+        // Transmute is safe because SQLHDESC is a newtype wrapper around UnsafeSQLHDESC
+        unsafe {std::mem::transmute::<_, &SQLHDESC<'conn, T, V>>(&*self.0)}
+    }
+}
+
+impl<'conn, T, V: OdbcVersion> DerefMut for RefSQLHDESC<'conn, T, V> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // TODO: Validate this transmute
+        unsafe {std::mem::transmute::<_, &mut SQLHDESC<'conn, T, V>>(&mut self.0)}
+    }
+}
+
+fn drop_handle<H: Handle>(handle: &mut H) {
+    let sql_return = unsafe { ffi::SQLFreeHandle(H::Ident::IDENTIFIER, handle.as_SQLHANDLE()) };
+
+    if sql_return != SQL_SUCCESS && !panicking() {
+        panic!(
+            "{}: SQLFreeHandle returned: {:?}",
+            type_name::<H>(),
+            sql_return
+        )
     }
 }
 

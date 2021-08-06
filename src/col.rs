@@ -1,4 +1,4 @@
-use crate::attr::{Attr, AttrGet, AttrLen};
+use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{Ident, OdbcDefined, SQLCHAR, SQLLEN, SQLSMALLINT, SQLWCHAR};
@@ -39,8 +39,10 @@ impl<A: Ident, V: OdbcVersion> ColAttr<A, V> for OdbcStr<MaybeUninit<SQLWCHAR>> 
 }
 
 // Implement ColAttr for references to character column attributes (used by AttrSet)
-impl<A: Ident, CH: OdbcChar, V: OdbcVersion> ColAttr<A, V> for &OdbcStr<CH> where
-    OdbcStr<CH>: ColAttr<A, V>
+impl<A: Ident, CH: OdbcChar, V: OdbcVersion> ColAttr<A, V> for &OdbcStr<CH>
+where
+    OdbcStr<CH>: ColAttr<A, V>,
+    Self: AttrSet<A>,
 {
 }
 

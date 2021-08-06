@@ -4,12 +4,15 @@ use rs_odbc::desc::SQL_DESC_ARRAY_SIZE;
 use rs_odbc::env::{
     CpMatch, SQL_ATTR_CP_MATCH, SQL_CP_RELAXED_MATCH, SQL_OV_ODBC3, SQL_OV_ODBC3_80,
 };
-use rs_odbc::handle::{SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE};
+use rs_odbc::handle::{
+    RefSQLHDESC, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT,
+    SQL_NULL_HANDLE,
+};
 use rs_odbc::info::{
     TxnIsolation, SQL_TXN_ISOLATION_OPTION, SQL_TXN_READ_COMMITTED, SQL_TXN_READ_UNCOMMITTED,
     SQL_TXN_REPEATABLE_READ, SQL_TXN_SERIALIZABLE,
 };
-use rs_odbc::stmt::{RefSQLHDESC, SQL_ATTR_APP_ROW_DESC};
+use rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC;
 use rs_odbc::{sqlreturn::SQL_SUCCESS, SQLCHAR, SQL_DRIVER_COMPLETE};
 use std::mem::MaybeUninit;
 
@@ -125,7 +128,7 @@ fn stmt_get_desc_handle() {
     assert_eq!(SQL_SUCCESS, res);
 
     let val = 10;
-    let mut desc = unsafe { desc.assume_init() };
+    let desc = unsafe { desc.assume_init() };
     let res = desc.SQLSetDescFieldA(0, SQL_DESC_ARRAY_SIZE, Some(val));
     assert_eq!(SQL_SUCCESS, res);
 
