@@ -10,10 +10,10 @@ use crate::{
     col::ColAttr,
     conn::{BrowseConnect, ConnAttr, ConnState, Disconnect, C2, C3, C4},
     convert::{AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLPOINTER, IntoSQLPOINTER, AsSQLHANDLE},
-    desc::{DescField, DescType, UnsafeDescField},
+    desc::{DescField, DescType},
     diag::{DiagField, SQLSTATE},
     env::{EnvAttr, OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4},
-    handle::{UnsafeSQLHDESC, UnsafeSQLHSTMT, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
+    handle::{UnsafeSQLHSTMT, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
     info::InfoType,
     sql_types::SqlType,
     sqlreturn::{SQLRETURN, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_SUCCEEDED},
@@ -2962,6 +2962,7 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     #[inline]
     #[must_use]
     #[allow(non_snake_case)]
+    // TODO: Maybe this fn should be unsafe
     pub fn SQLMoreResults(&self) -> SQLRETURN {
         unsafe { ffi::SQLMoreResults(self.as_SQLHANDLE()) }
     }
@@ -3651,7 +3652,7 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     }
 }
 
-impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, V> {
+pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// Copies descriptor information from one descriptor handle to another.
     ///
     /// For complete documentation on SQLCopyDesc, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcopydesc-function).
@@ -3664,7 +3665,7 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, 
     #[must_use]
     // TODO: Do they have to have the same version?
     // TODO: Is lifetime the same?
-    pub fn SQLCopyDesc<DT2: DescType<'buf>>(
+    fn SQLCopyDesc<DT2: DescType<'buf>>(
         &self,
         TargetDescHandle: &SQLHDESC<DT2, V>,
     ) -> SQLRETURN {
@@ -3680,7 +3681,7 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, 
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    pub fn SQLGetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: UnsafeDescField<A, DT>>(
+    fn SQLGetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, A, Self, DT, V>>(
         &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
@@ -3720,7 +3721,7 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, 
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    pub fn SQLGetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: UnsafeDescField<A, DT>>(
+    fn SQLGetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, A, Self, DT, V>>(
         &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
@@ -3760,7 +3761,7 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, 
     #[inline]
     #[must_use]
     #[allow(non_snake_case)]
-    pub fn SQLGetDescRecA<ST: SqlType<V>>(
+    fn SQLGetDescRecA<ST: SqlType<V>>(
         &self,
         RecNumber: SQLSMALLINT,
         Name: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
@@ -3800,7 +3801,7 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, 
     #[inline]
     #[must_use]
     #[allow(non_snake_case)]
-    pub fn SQLGetDescRecW<ST: SqlType<V>>(
+    fn SQLGetDescRecW<ST: SqlType<V>>(
         &self,
         RecNumber: SQLSMALLINT,
         Name: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
@@ -3840,7 +3841,7 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, 
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    pub fn SQLSetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: UnsafeDescField<A, DT>>(
+    fn SQLSetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, A, Self, DT, V>>(
         &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
@@ -3879,7 +3880,7 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, 
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    pub fn SQLSetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: UnsafeDescField<A, DT>>(
+    fn SQLSetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, A, Self, DT, V>>(
         &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
@@ -3919,7 +3920,7 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, 
     #[allow(non_snake_case)]
     #[must_use]
     // TODO: Must not be allowed for IRD. Handle here or with DescField
-    pub fn SQLSetDescRec<ST: SqlType<V>, PTR>(
+    fn SQLSetDescRec<ST: SqlType<V>, PTR>(
         &self,
         RecNumber: SQLSMALLINT,
         Type: ST,
@@ -3950,227 +3951,6 @@ impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> UnsafeSQLHDESC<'conn, DT, 
                 IndicatorPtr.as_mut_ptr(),
             )
         }
-    }
-}
-
-impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> SQLHDESC<'conn, DT, V> {
-    /// Copies descriptor information from one descriptor handle to another.
-    ///
-    /// For complete documentation on SQLCopyDesc, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcopydesc-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    // TODO: Not sure if application and implementation descriptors can be interchangeably copied
-    #[must_use]
-    // TODO: Do they have to have the same version?
-    // TODO: Is lifetime the same?
-    pub fn SQLCopyDesc<DT2: DescType<'buf>>(
-        &self,
-        TargetDescHandle: &SQLHDESC<DT2, V>,
-    ) -> SQLRETURN {
-        self.0.SQLCopyDesc(TargetDescHandle)
-    }
-
-    /// Returns the current setting or value of a single field of a descriptor record.
-    ///
-    /// For complete documentation on SQLGetDescFieldA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdescfield-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
-    pub fn SQLGetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
-        &self,
-        RecNumber: SQLSMALLINT,
-        FieldIdentifier: A,
-        ValuePtr: Option<&mut T>,
-        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
-    ) -> SQLRETURN
-    where
-        T: AttrGet<A> + Ansi + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
-    {
-        self.0
-            .SQLGetDescFieldA(RecNumber, FieldIdentifier, ValuePtr, StringLengthPtr)
-    }
-
-    /// Returns the current setting or value of a single field of a descriptor record.
-    ///
-    /// For complete documentation on SQLGetDescFieldW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdescfield-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
-    pub fn SQLGetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
-        &self,
-        RecNumber: SQLSMALLINT,
-        FieldIdentifier: A,
-        ValuePtr: Option<&mut T>,
-        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
-    ) -> SQLRETURN
-    where
-        T: AttrGet<A> + Unicode + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
-    {
-        self.0
-            .SQLGetDescFieldW(RecNumber, FieldIdentifier, ValuePtr, StringLengthPtr)
-    }
-
-    /// Returns the current settings or values of multiple fields of a descriptor record. The fields returned describe the name, data type, and storage of column or parameter data.
-    ///
-    /// For complete documentation on SQLGetDescRecA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdescrec-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLGetDescRecA<ST: SqlType<V>>(
-        &self,
-        RecNumber: SQLSMALLINT,
-        Name: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
-        StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-        TypePtr: &mut MaybeUninit<ST>,
-        SubTypePtr: &mut MaybeUninit<DatetimeIntervalCode>,
-        LengthPtr: &mut MaybeUninit<SQLLEN>,
-        PrecisionPtr: &mut MaybeUninit<SQLSMALLINT>,
-        ScalePtr: &mut MaybeUninit<SQLSMALLINT>,
-        NullablePtr: &mut MaybeUninit<NullAllowed>,
-    ) -> SQLRETURN {
-        self.0.SQLGetDescRecA(
-            RecNumber,
-            Name,
-            StringLengthPtr,
-            TypePtr,
-            SubTypePtr,
-            LengthPtr,
-            PrecisionPtr,
-            ScalePtr,
-            NullablePtr,
-        )
-    }
-
-    /// Returns the current settings or values of multiple fields of a descriptor record. The fields returned describe the name, data type, and storage of column or parameter data.
-    ///
-    /// For complete documentation on SQLGetDescRecW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdescrec-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLGetDescRecW<ST: SqlType<V>>(
-        &self,
-        RecNumber: SQLSMALLINT,
-        Name: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
-        StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-        TypePtr: &mut MaybeUninit<ST>,
-        SubTypePtr: &mut MaybeUninit<DatetimeIntervalCode>,
-        LengthPtr: &mut MaybeUninit<SQLLEN>,
-        PrecisionPtr: &mut MaybeUninit<SQLSMALLINT>,
-        ScalePtr: &mut MaybeUninit<SQLSMALLINT>,
-        NullablePtr: &mut MaybeUninit<NullAllowed>,
-    ) -> SQLRETURN {
-        self.0.SQLGetDescRecW(
-            RecNumber,
-            Name,
-            StringLengthPtr,
-            TypePtr,
-            SubTypePtr,
-            LengthPtr,
-            PrecisionPtr,
-            ScalePtr,
-            NullablePtr,
-        )
-    }
-
-    /// Sets the value of a single field of a descriptor record.
-    ///
-    /// For complete documentation on SQLSetDescFieldA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetdescfield-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
-    pub fn SQLSetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
-        &self,
-        RecNumber: SQLSMALLINT,
-        FieldIdentifier: A,
-        ValuePtr: Option<T>,
-    ) -> SQLRETURN
-    where
-        T: AttrSet<A> + Ansi,
-    {
-        self.0
-            .SQLSetDescFieldA(RecNumber, FieldIdentifier, ValuePtr)
-    }
-
-    /// Sets the value of a single field of a descriptor record.
-    ///
-    /// For complete documentation on SQLSetDescFieldW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetdescfield-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
-    pub fn SQLSetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<A, DT>>(
-        &self,
-        RecNumber: SQLSMALLINT,
-        FieldIdentifier: A,
-        ValuePtr: Option<T>,
-    ) -> SQLRETURN
-    where
-        T: AttrSet<A> + Unicode,
-    {
-        self.0
-            .SQLSetDescFieldW(RecNumber, FieldIdentifier, ValuePtr)
-    }
-
-    /// Sets multiple descriptor fields that affect the data type and buffer bound to a column or parameter data.
-    ///
-    /// For complete documentation on SQLSetDescRec, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetdescrec-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    #[must_use]
-    // TODO: Must not be allowed for IRD. Handle here or with DescField
-    pub fn SQLSetDescRec<ST: SqlType<V>, PTR>(
-        &self,
-        RecNumber: SQLSMALLINT,
-        Type: ST,
-        SubType: Option<DatetimeIntervalCode>,
-        Length: SQLLEN,
-        Precision: SQLSMALLINT,
-        Scale: SQLSMALLINT,
-        // TODO: Input or Output for both? I guess it depends on which descriptor was given
-        DataPtr: Option<&'buf PTR>,
-        // TODO: Shouldn't following two be UnsafeCell
-        StringLengthPtr: &'buf mut MaybeUninit<SQLLEN>,
-        IndicatorPtr: &'buf mut MaybeUninit<SQLLEN>,
-    ) -> SQLRETURN
-    where
-        &'buf PTR: IntoSQLPOINTER,
-    {
-        self.0.SQLSetDescRec(
-            RecNumber,
-            Type,
-            SubType,
-            Length,
-            Precision,
-            Scale,
-            DataPtr,
-            StringLengthPtr,
-            IndicatorPtr,
-        )
     }
 }
 

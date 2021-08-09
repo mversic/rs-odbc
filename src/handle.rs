@@ -1,6 +1,6 @@
 #[double]
 use crate::api::ffi;
-use crate::api::{Allocate, Handle};
+use crate::api::{Allocate, Handle, Descriptor};
 use crate::c_types::DeferredBuf;
 use crate::conn::{ConnState, C2, C3, C4};
 use crate::convert::{AsSQLHANDLE, IntoSQLPOINTER};
@@ -528,6 +528,8 @@ impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'b
     }
 }
 
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for SQLHDESC<'_, DT, V> {}
+
 /// A descriptor is a collection of metadata that describes the parameters of an SQL
 /// statement or the columns of a result set. Thus, a descriptor can fill four roles:
 /// * (APD)Application Parameter Descriptor:
@@ -587,6 +589,8 @@ impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for UnsafeSQLHDESC<'conn, AppD
     }
 }
 
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for UnsafeSQLHDESC<'_, DT, V> {}
+
 impl<V: OdbcVersion, T> Drop for UnsafeSQLHDESC<'_, T, V> {
     fn drop(&mut self) {
         drop_handle(self);
@@ -595,41 +599,29 @@ impl<V: OdbcVersion, T> Drop for UnsafeSQLHDESC<'_, T, V> {
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct RefUnsafeSQLHDESC<'conn, T, V: OdbcVersion>(ManuallyDrop<UnsafeSQLHDESC<'conn, T, V>>);
-
-impl<'conn, T, V: OdbcVersion> Deref for RefUnsafeSQLHDESC<'conn, T, V> {
-    type Target = UnsafeSQLHDESC<'conn, T, V>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+pub struct RefUnsafeSQLHDESC<'conn, DT, V: OdbcVersion>(ManuallyDrop<UnsafeSQLHDESC<'conn, DT, V>>);
+unsafe impl<V: OdbcVersion, T> AsSQLHANDLE for RefUnsafeSQLHDESC<'_, T, V> {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.0.handle
     }
 }
-
-impl<'conn, T, V: OdbcVersion> DerefMut for RefUnsafeSQLHDESC<'conn, T, V> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
+impl<V: OdbcVersion, T> Handle for RefUnsafeSQLHDESC<'_, T, V> {
+    type Ident = SQL_HANDLE_DESC;
 }
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefUnsafeSQLHDESC<'_, DT, V> {}
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct RefSQLHDESC<'conn, T, V: OdbcVersion>(RefUnsafeSQLHDESC<'conn, T, V>);
-
-impl<'conn, T, V: OdbcVersion> Deref for RefSQLHDESC<'conn, T, V> {
-    type Target = SQLHDESC<'conn, T, V>;
-
-    fn deref(&self) -> &Self::Target {
-        // Transmute is safe because SQLHDESC is a newtype wrapper around UnsafeSQLHDESC
-        unsafe {std::mem::transmute::<_, &SQLHDESC<'conn, T, V>>(&*self.0)}
+pub struct RefSQLHDESC<'conn, DT, V: OdbcVersion>(RefUnsafeSQLHDESC<'conn, DT, V>);
+unsafe impl<V: OdbcVersion, T> AsSQLHANDLE for RefSQLHDESC<'_, T, V> {
+    fn as_SQLHANDLE(&self) -> SQLHANDLE {
+        self.0.as_SQLHANDLE()
     }
 }
-
-impl<'conn, T, V: OdbcVersion> DerefMut for RefSQLHDESC<'conn, T, V> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        // TODO: Validate this transmute
-        unsafe {std::mem::transmute::<_, &mut SQLHDESC<'conn, T, V>>(&mut self.0)}
-    }
+impl<V: OdbcVersion, T> Handle for RefSQLHDESC<'_, T, V> {
+    type Ident = SQL_HANDLE_DESC;
 }
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefSQLHDESC<'_, DT, V> {}
 
 fn drop_handle<H: Handle>(handle: &mut H) {
     let sql_return = unsafe { ffi::SQLFreeHandle(H::Ident::IDENTIFIER, handle.as_SQLHANDLE()) };

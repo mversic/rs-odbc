@@ -279,6 +279,24 @@ unsafe impl<'conn, DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<RefSQLHDE
             .as_mut_SQLPOINTER()
     }
 }
+unsafe impl<'conn, 'desc, DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<&'desc UnsafeSQLHDESC<'conn, DT, V>> {
+    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
+        if cfg!(feature = "odbc_debug") {
+            // SQLHDESC is not transparent
+            unimplemented!("This method should never be called")
+        }
+
+        // SQLHDESC is transparent
+        self.as_mut_ptr().cast()
+    }
+}
+unsafe impl<'conn, 'desc, DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<&'desc SQLHDESC<'conn, DT, V>> {
+    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
+        // Valid because RefSQLHDESC is a transparent newtype wrapper over RefUnsafeSQLHDESC
+        unsafe { std::mem::transmute::<_, &mut MaybeUninit<&'desc UnsafeSQLHDESC<'conn, DT, V>>>(self) }
+            .as_mut_SQLPOINTER()
+    }
+}
 
 unsafe impl AsSQLHANDLE for SQL_NULL_HANDLE {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {

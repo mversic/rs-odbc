@@ -304,6 +304,20 @@ where
             .len()
     }
 }
+unsafe impl<DT, V: OdbcVersion> AttrLen<OdbcDefined, SQLINTEGER> for MaybeUninit<&UnsafeSQLHDESC<'_, DT, V>> {
+    type StrLen = Void;
+
+    fn len(&self) -> SQLINTEGER {
+        0
+    }
+}
+unsafe impl<DT, V: OdbcVersion> AttrLen<OdbcDefined, SQLINTEGER> for MaybeUninit<&SQLHDESC<'_, DT, V>> {
+    type StrLen = Void;
+
+    fn len(&self) -> SQLINTEGER {
+        0
+    }
+}
 
 impl<T> AttrZeroAssert for MaybeUninit<T> {
     // MaybeUninit must not be read

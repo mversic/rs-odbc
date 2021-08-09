@@ -48,15 +48,16 @@ where
 //=====================================================================================//
 //-------------------------------------Attributes--------------------------------------//
 
+// TODO: Consider using const generics for OdbcVersion once it's available on stable,
+// otherwise don't expose this attribute unless there is a valid use-case
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 200)]
 #[allow(non_camel_case_types)]
-// This is read-only attribute becaues it's handled by type system
-pub struct SQL_ATTR_ODBC_VERSION;
-// TODO: When const generics are implemented restore this attribute
+// This is read-only attribute because
+// it's handled by the type system
+pub(crate) struct SQL_ATTR_ODBC_VERSION;
 //unsafe impl Attr<SQL_ATTR_ODBC_VERSION> for OdbcVersion {
 //    type DefinedBy = OdbcDefined;
-//    type NonBinary = True;
 //}
 //impl EnvAttr<SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3> for OdbcVersion {}
 //unsafe impl AttrGet<SQL_ATTR_ODBC_VERSION> for OdbcVersion {}
