@@ -1,4 +1,4 @@
-use rs_odbc::api::{Allocate, Handle};
+use rs_odbc::api::{Allocate, Handle, Statement};
 use rs_odbc::conn::C4;
 use rs_odbc::env::SQL_OV_ODBC3_80;
 use rs_odbc::handle::{RefSQLHDESC, SQLHDBC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE};

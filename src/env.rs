@@ -13,13 +13,9 @@ pub trait EnvAttr<A: Ident, V: OdbcVersion>:
 impl<A: Ident, T: Ident> EnvAttr<A, SQL_OV_ODBC3_80> for T where T: EnvAttr<A, SQL_OV_ODBC3> {}
 impl<A: Ident, T: Ident> EnvAttr<A, SQL_OV_ODBC4> for T where T: EnvAttr<A, SQL_OV_ODBC3_80> {}
 impl<A: Ident, CH: OdbcChar> EnvAttr<A, SQL_OV_ODBC3_80> for OdbcStr<CH> where
-    OdbcStr<CH>: EnvAttr<A, SQL_OV_ODBC3>
-{
-}
+    OdbcStr<CH>: EnvAttr<A, SQL_OV_ODBC3> {}
 impl<A: Ident, CH: OdbcChar> EnvAttr<A, SQL_OV_ODBC4> for OdbcStr<CH> where
-    OdbcStr<CH>: EnvAttr<A, SQL_OV_ODBC3_80>
-{
-}
+    OdbcStr<CH>: EnvAttr<A, SQL_OV_ODBC3_80> {}
 
 // Implement EnvAttr for uninitialized environment attributes
 impl<A: Ident, T: Ident, V: OdbcVersion> EnvAttr<A, V> for MaybeUninit<T>
@@ -87,24 +83,28 @@ unsafe impl AttrSet<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {}
 //=====================================================================================//
 
 pub trait OdbcVersion {
+    type PrevVersion: OdbcVersion;
     const IDENTIFIER: SQLUINTEGER;
 }
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
 pub enum SQL_OV_ODBC3 {}
 impl OdbcVersion for SQL_OV_ODBC3 {
+    type PrevVersion = SQL_OV_ODBC3;
     const IDENTIFIER: SQLUINTEGER = 3;
 }
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
 pub enum SQL_OV_ODBC3_80 {}
 impl OdbcVersion for SQL_OV_ODBC3_80 {
+    type PrevVersion = SQL_OV_ODBC3;
     const IDENTIFIER: SQLUINTEGER = 380;
 }
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
 pub enum SQL_OV_ODBC4 {}
 impl OdbcVersion for SQL_OV_ODBC4 {
+    type PrevVersion = SQL_OV_ODBC3_80;
     const IDENTIFIER: SQLUINTEGER = 400;
 }
 

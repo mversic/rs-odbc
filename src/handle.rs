@@ -248,31 +248,6 @@ pub struct SQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion>(
 
 unsafe impl<V: OdbcVersion> Send for SQLHSTMT<'_, '_, '_, V> {}
 
-impl<'buf, V: OdbcVersion> SQLHSTMT<'_, '_, 'buf, V> {
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
-    where
-        B: ?Sized,
-    {
-        self.0.bind_col(TargetValuePtr)
-    }
-
-    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT, V>>(
-        &self,
-        TargetValuePtr: Option<&'buf B>,
-    ) where
-        B: ?Sized,
-    {
-        self.0.bind_param(TargetValuePtr)
-    }
-
-    pub(crate) fn bind_strlen_or_ind(
-        &self,
-        StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
-    ) {
-        self.0.bind_strlen_or_ind(StrLen_or_IndPtr)
-    }
-}
-
 impl<'conn, 'desc, 'buf, V: OdbcVersion> Handle for SQLHSTMT<'conn, 'desc, 'buf, V> {
     type Ident = <UnsafeSQLHSTMT<'conn, 'desc, 'buf, V> as Handle>::Ident;
 }
@@ -368,64 +343,6 @@ impl<'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, '_, 'buf, V> {
         }
 
         descriptor_handle.assume_init()
-    }
-
-    // TODO: Don't bind (SQLPOINTER, SQLLEN) fat pointer when using raw_api
-    #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
-    where
-        B: ?Sized,
-    {
-    }
-    #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT, V>>(
-        &self,
-        TargetValuePtr: Option<&'buf B>,
-    ) where
-        B: ?Sized,
-    {
-    }
-    #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) fn bind_strlen_or_ind(
-        &self,
-        StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
-    ) {
-    }
-
-    #[cfg(feature = "odbc_debug")]
-    pub(crate) fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
-    where
-        B: ?Sized,
-    {
-        if let Some(explicit_ard) = self.explicit_ard.get() {
-            // TODO:
-            //explicit_ard.bind_col(TargetValuePtr);
-        } else {
-            // TODO:
-            //self.ard.bind_col(TargetValuePtr);
-        }
-    }
-    #[cfg(feature = "odbc_debug")]
-    pub(crate) fn bind_param<TT: Ident, B: DeferredBuf<TT, V>>(
-        &self,
-        TargetValuePtr: Option<&'buf B>,
-    ) where
-        B: ?Sized,
-    {
-        if let Some(explicit_apd) = self.explicit_apd.get() {
-            // TODO:
-            //explicit_apd.bind_param(TargetValuePtr);
-        } else {
-            // TODO:
-            //self.apd.bind_param(TargetValuePtr);
-        }
-    }
-    #[cfg(feature = "odbc_debug")]
-    pub(crate) fn bind_strlen_or_ind(
-        &self,
-        StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
-    ) {
-        unimplemented!();
     }
 }
 

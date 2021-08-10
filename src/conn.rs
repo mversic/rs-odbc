@@ -1,6 +1,6 @@
 use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
-use crate::handle::SQLHDBC;
+use crate::handle::{SQLHSTMT, SQLHDBC};
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{
     info::TxnIsolation, stmt::StmtAttr, Ident, OdbcBool, OdbcDefined, SQLCHAR, SQLINTEGER,
@@ -416,38 +416,38 @@ unsafe impl AttrSet<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {}
 
 // Re-exported as connection attribute
 pub use crate::stmt::SQL_ATTR_ASYNC_ENABLE;
-impl<'desc, 'buf, T: Ident> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C2, SQL_OV_ODBC3> for T where
-    T: StmtAttr<'desc, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
+impl<'conn, 'stmt, 'desc, 'buf: 'desc, T: Ident> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C2, SQL_OV_ODBC3> for T where
+    T: StmtAttr<'stmt, 'desc, 'buf, SQL_ATTR_ASYNC_ENABLE, SQLHSTMT<'conn, 'desc, 'buf, SQL_OV_ODBC3>, SQL_OV_ODBC3>
 {
 }
-impl<'desc, 'buf, T: Ident> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C4, SQL_OV_ODBC3> for T where
-    T: StmtAttr<'desc, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
+impl<'conn, 'stmt, 'desc, 'buf: 'desc, T: Ident> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C4, SQL_OV_ODBC3> for T where
+    T: StmtAttr<'stmt, 'desc, 'buf, SQL_ATTR_ASYNC_ENABLE, SQLHSTMT<'conn, 'desc, 'buf, SQL_OV_ODBC3>, SQL_OV_ODBC3>
 {
 }
-impl<'desc, 'buf, T> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C2, SQL_OV_ODBC3> for [T] where
-    [T]: StmtAttr<'desc, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
+impl<'conn, 'stmt, 'desc, 'buf: 'desc, T> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C2, SQL_OV_ODBC3> for [T] where
+    [T]: StmtAttr<'stmt, 'desc, 'buf, SQL_ATTR_ASYNC_ENABLE, SQLHSTMT<'conn, 'desc, 'buf, SQL_OV_ODBC3>, SQL_OV_ODBC3>
 {
 }
-impl<'desc, 'buf, T> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C4, SQL_OV_ODBC3> for [T] where
-    [T]: StmtAttr<'desc, 'buf, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3>
+impl<'conn, 'stmt, 'desc, 'buf: 'desc, T> ConnAttr<SQL_ATTR_ASYNC_ENABLE, C4, SQL_OV_ODBC3> for [T] where
+    [T]: StmtAttr<'stmt, 'desc, 'buf, SQL_ATTR_ASYNC_ENABLE, SQLHSTMT<'conn, 'desc, 'buf, SQL_OV_ODBC3>, SQL_OV_ODBC3>
 {
 }
 
 pub use crate::stmt::SQL_ATTR_METADATA_ID;
-impl<'desc, 'buf, T: Ident> ConnAttr<SQL_ATTR_METADATA_ID, C2, SQL_OV_ODBC3> for T where
-    T: StmtAttr<'desc, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
+impl<'conn, 'stmt, 'desc, 'buf: 'desc, T: Ident> ConnAttr<SQL_ATTR_METADATA_ID, C2, SQL_OV_ODBC3> for T where
+    T: StmtAttr<'stmt, 'desc, 'buf, SQL_ATTR_METADATA_ID, SQLHSTMT<'conn, 'desc, 'buf, SQL_OV_ODBC3>, SQL_OV_ODBC3>
 {
 }
-impl<'desc, 'buf, T: Ident> ConnAttr<SQL_ATTR_METADATA_ID, C4, SQL_OV_ODBC3> for T where
-    T: StmtAttr<'desc, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
+impl<'conn, 'stmt, 'desc, 'buf: 'desc, T: Ident> ConnAttr<SQL_ATTR_METADATA_ID, C4, SQL_OV_ODBC3> for T where
+    T: StmtAttr<'stmt, 'desc, 'buf, SQL_ATTR_METADATA_ID, SQLHSTMT<'conn, 'desc, 'buf, SQL_OV_ODBC3>, SQL_OV_ODBC3>
 {
 }
-impl<'desc, 'buf, T> ConnAttr<SQL_ATTR_METADATA_ID, C2, SQL_OV_ODBC3> for [T] where
-    [T]: StmtAttr<'desc, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
+impl<'conn, 'stmt, 'desc, 'buf: 'desc, T> ConnAttr<SQL_ATTR_METADATA_ID, C2, SQL_OV_ODBC3> for [T] where
+    [T]: StmtAttr<'stmt, 'desc, 'buf, SQL_ATTR_METADATA_ID, SQLHSTMT<'conn, 'desc, 'buf, SQL_OV_ODBC3>, SQL_OV_ODBC3>
 {
 }
-impl<'desc, 'buf, T> ConnAttr<SQL_ATTR_METADATA_ID, C4, SQL_OV_ODBC3> for [T] where
-    [T]: StmtAttr<'desc, 'buf, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3>
+impl<'conn, 'stmt, 'desc, 'buf: 'desc, T> ConnAttr<SQL_ATTR_METADATA_ID, C4, SQL_OV_ODBC3> for [T] where
+    [T]: StmtAttr<'stmt, 'desc, 'buf, SQL_ATTR_METADATA_ID, SQLHSTMT<'conn, 'desc, 'buf, SQL_OV_ODBC3>, SQL_OV_ODBC3>
 {
 }
 
@@ -484,3 +484,37 @@ pub struct RefreshConnection;
 pub const SQL_REFRESH_NOW: RefreshConnection = RefreshConnection(-1);
 pub const SQL_REFRESH_AUTO: RefreshConnection = RefreshConnection(0);
 pub const SQL_REFRESH_MANUAL: RefreshConnection = RefreshConnection(1);
+
+#[cfg(test)]
+mod test {
+    #![allow(non_snake_case)]
+
+    use crate::api::mock_ffi as ffi;
+    use super::*;
+    use crate::api::Allocate;
+    use crate::SQL_TRUE;
+    use crate::stmt::SQL_ASYNC_ENABLE_OFF;
+    use crate::handle::SQLHANDLE;
+    use crate::env::SQL_OV_ODBC3_80;
+    use crate::sqlreturn::SQL_SUCCESS;
+
+    #[test]
+    fn test_SQL_ATTR_METADATA_ID_is_ConnAttr() {
+        let SQLSetConnectAttr_ctx = ffi::SQLSetConnectAttrA_context();
+        SQLSetConnectAttr_ctx.expect().once().return_const(SQL_SUCCESS);
+        let SQLFreeHandle_ctx = ffi::SQLFreeHandle_context();
+        SQLFreeHandle_ctx.expect().once().return_const(SQL_SUCCESS);
+
+        let handle = unsafe { SQLHDBC::<C2, SQL_OV_ODBC3_80>::from_raw(13 as SQLHANDLE)};
+        assert_eq!(SQL_SUCCESS, handle.SQLSetConnectAttrA(SQL_ATTR_METADATA_ID, SQL_TRUE));
+    }
+
+    //#[test]
+    //fn test_SQL_ATTR_ASYNC_ENABLE_is_ConnAttr() {
+    //    let SQLSetConnectAttr_ctx = ffi::SQLSetConnectAttrA_context();
+    //    SQLSetConnectAttr_ctx.expect().once().return_const(SQL_SUCCESS);
+
+    //    let handle = unsafe { SQLHDBC::<C2, SQL_OV_ODBC3_80>::from_raw(13 as SQLHANDLE)};
+    //    assert_eq!(SQL_SUCCESS, handle.SQLSetConnectAttrA(SQL_ATTR_ASYNC_ENABLE, SQL_ASYNC_ENABLE_OFF));
+    //}
+}
