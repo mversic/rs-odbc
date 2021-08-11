@@ -1,4 +1,5 @@
 use crate::convert::AsSQLPOINTER;
+use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::sql_types::*;
 use crate::str::{OdbcChar, OdbcStr};
@@ -17,9 +18,9 @@ pub trait CData<TT: Ident, V: OdbcVersion>: CDataLen {}
 /// Care must be taken because references to DeferredBuf might be written to. This usually
 /// means that DeferredBuf should only be implemented on &UnsafeCell<T> or &[UnsafeCell<T>].
 // TODO: Do I need to disambiguate between BindCol and BindParameters deferred buffers
-pub unsafe trait DeferredBuf<TT: Ident, V: OdbcVersion>: CDataLen + AsSQLPOINTER {}
+pub unsafe trait DeferredBuf<S, TT: Ident, V: OdbcVersion>: CDataLen + AsSQLPOINTER {}
 
-impl<TT: Ident, T: ScalarCType, V: OdbcVersion> CData<TT, V> for MaybeUninit<T> where T: CData<TT, V>
+impl<TT: Ident, T: CScalar, V: OdbcVersion> CData<TT, V> for MaybeUninit<T> where T: CData<TT, V>
 {}
 
 impl<TT: Ident, T, V: OdbcVersion> CData<TT, V> for [MaybeUninit<T>] where [T]: CData<TT, V> {}
@@ -29,15 +30,14 @@ impl<TT: Ident, T: OdbcChar, V: OdbcVersion> CData<TT, V> for OdbcStr<MaybeUnini
 {
 }
 
-unsafe impl<TT: Ident, T: ScalarCType, V: OdbcVersion> DeferredBuf<TT, V> for UnsafeCell<T> where
-    T: CData<TT, V>
-{
-}
+unsafe impl<DT, TT: Ident, T: CScalar, V: OdbcVersion> DeferredBuf<RefSQLHDESC<'_, DT, V>, TT, V> for UnsafeCell<T> where T: CData<TT, V> {}
+unsafe impl<DT, TT: Ident, T: CScalar, V: OdbcVersion> DeferredBuf<RefSQLHDESC<'_, DT, V>, TT, V> for [UnsafeCell<T>] where [T]: CData<TT, V> {}
+unsafe impl<DT, TT: Ident, CH: OdbcChar, V: OdbcVersion> DeferredBuf<RefSQLHDESC<'_, DT, V>, TT, V> for OdbcStr<UnsafeCell<CH>> where OdbcStr<CH>: CData<TT, V> {}
 
-unsafe impl<TT: Ident, T, V: OdbcVersion> DeferredBuf<TT, V> for [UnsafeCell<T>] where
-    [T]: CData<TT, V>
-{
-}
+unsafe impl<'conn, DT, TT: Ident, T: CScalar, V: OdbcVersion> DeferredBuf<RefUnsafeSQLHDESC<'conn, DT, V>, TT, V> for UnsafeCell<T> where T: DeferredBuf<RefSQLHDESC<'conn, DT, V>, TT, V> {}
+unsafe impl<'conn, DT, TT: Ident, T: CScalar, V: OdbcVersion> DeferredBuf<RefUnsafeSQLHDESC<'conn, DT, V>, TT, V> for [UnsafeCell<T>] where [T]: DeferredBuf<RefSQLHDESC<'conn, DT, V>, TT, V> {}
+unsafe impl<'conn, DT, TT: Ident, CH: OdbcChar, V: OdbcVersion> DeferredBuf<RefUnsafeSQLHDESC<'conn, DT, V>, TT, V> for OdbcStr<UnsafeCell<CH>> where OdbcStr<CH>: DeferredBuf<RefSQLHDESC<'conn, DT, V>, TT, V> {}
+unsafe impl<DT, TT: Ident, V: OdbcVersion> DeferredBuf<RefUnsafeSQLHDESC<'_, DT, V>, TT, V> for (SQLPOINTER, SQLLEN) {}
 
 #[repr(transparent)]
 pub struct StrLenOrInd(pub(crate) SQLLEN);
@@ -535,50 +535,50 @@ struct SQL_DAY_SECOND_STRUCT {
     pub fraction: SQLUINTEGER,
 }
 
-/// ScalarCType must be repr(C) and have
+/// CScalar must be repr(C) and have
 /// the same representation as SQLPOINTER
-pub unsafe trait ScalarCType {}
+pub unsafe trait CScalar {}
 
-unsafe impl ScalarCType for SQLSMALLINT {}
-unsafe impl ScalarCType for SQLUSMALLINT {}
-unsafe impl ScalarCType for SQLUINTEGER {}
-unsafe impl ScalarCType for SQLINTEGER {}
-unsafe impl ScalarCType for SQLREAL {}
-unsafe impl ScalarCType for SQLDOUBLE {}
-unsafe impl ScalarCType for SQLCHAR {}
-unsafe impl ScalarCType for SQLSCHAR {}
-unsafe impl ScalarCType for SQLBIGINT {}
-unsafe impl ScalarCType for SQLUBIGINT {}
-unsafe impl ScalarCType for SQLGUID {}
-unsafe impl ScalarCType for SQL_NUMERIC_STRUCT {}
-unsafe impl ScalarCType for SQL_INTERVAL_STRUCT {}
-unsafe impl ScalarCType for SQL_DATE_STRUCT {}
-unsafe impl ScalarCType for SQL_TIME_STRUCT {}
-unsafe impl ScalarCType for SQL_TIMESTAMP_STRUCT {}
-unsafe impl ScalarCType for SQL_TIME_WITH_TIMEZONE_STRUCT {}
-unsafe impl ScalarCType for SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT {}
+unsafe impl CScalar for SQLSMALLINT {}
+unsafe impl CScalar for SQLUSMALLINT {}
+unsafe impl CScalar for SQLUINTEGER {}
+unsafe impl CScalar for SQLINTEGER {}
+unsafe impl CScalar for SQLREAL {}
+unsafe impl CScalar for SQLDOUBLE {}
+unsafe impl CScalar for SQLCHAR {}
+unsafe impl CScalar for SQLSCHAR {}
+unsafe impl CScalar for SQLBIGINT {}
+unsafe impl CScalar for SQLUBIGINT {}
+unsafe impl CScalar for SQLGUID {}
+unsafe impl CScalar for SQL_NUMERIC_STRUCT {}
+unsafe impl CScalar for SQL_INTERVAL_STRUCT {}
+unsafe impl CScalar for SQL_DATE_STRUCT {}
+unsafe impl CScalar for SQL_TIME_STRUCT {}
+unsafe impl CScalar for SQL_TIMESTAMP_STRUCT {}
+unsafe impl CScalar for SQL_TIME_WITH_TIMEZONE_STRUCT {}
+unsafe impl CScalar for SQL_TIMESTAMP_WITH_TIMEZONE_STRUCT {}
 
 pub trait CDataLen {
     fn len(&self) -> SQLLEN;
 }
 
-impl<T: ScalarCType> CDataLen for T {
+impl<T: CScalar> CDataLen for T {
     fn len(&self) -> SQLLEN {
         0
     }
 }
-impl<T: ScalarCType> CDataLen for UnsafeCell<T> {
+impl<T: CScalar> CDataLen for UnsafeCell<T> {
     fn len(&self) -> SQLLEN {
         0
     }
 }
-impl<T: ScalarCType> CDataLen for MaybeUninit<T> {
+impl<T: CScalar> CDataLen for MaybeUninit<T> {
     fn len(&self) -> SQLLEN {
         0
     }
 }
 // TODO:
-//impl<T: ScalarCType> CDataLen for UnsafeCell<MaybeUninit<T>> {
+//impl<T: CScalar> CDataLen for UnsafeCell<MaybeUninit<T>> {
 //    fn len(&self) -> SQLLEN {
 //        0
 //    }
@@ -600,10 +600,6 @@ impl CDataLen for (SQLPOINTER, SQLLEN) {
         self.1
     }
 }
-
-// TODO:
-#[cfg(feature = "raw_api")]
-unsafe impl<TT: Ident, V: OdbcVersion> DeferredBuf<TT, V> for (SQLPOINTER, SQLLEN) {}
 
 //impl<T> ParameterDir<SQL_PARAM_INPUT> for [T] where [T]: DeferredBuf {}
 //impl<T> ParameterDir<SQL_PARAM_OUTPUT> for [MaybeUninit<T>] where [T]: DeferredBuf {}

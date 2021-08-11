@@ -1,6 +1,6 @@
 use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
 use crate::str::{OdbcChar, OdbcStr};
-use crate::{Ident, OdbcDefined, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR};
+use crate::{Ident, OdbcDefined, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR, Scalar};
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
 
@@ -10,30 +10,67 @@ pub trait EnvAttr<A: Ident, V: OdbcVersion>:
 }
 
 // Implement EnvAttr for all versions of environment attributes
-impl<A: Ident, T: Ident> EnvAttr<A, SQL_OV_ODBC3_80> for T where T: EnvAttr<A, SQL_OV_ODBC3> {}
-impl<A: Ident, T: Ident> EnvAttr<A, SQL_OV_ODBC4> for T where T: EnvAttr<A, SQL_OV_ODBC3_80> {}
+impl<A: Ident, T: Scalar> EnvAttr<A, SQL_OV_ODBC3_80> for T where
+    T: EnvAttr<A, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
+{
+}
+impl<A: Ident, T: Scalar> EnvAttr<A, SQL_OV_ODBC4> for T where
+    T: EnvAttr<A, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
+{
+}
+impl<A: Ident, T: Scalar> EnvAttr<A, SQL_OV_ODBC3_80> for [T] where
+    [T]: EnvAttr<A, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
+{
+}
+impl<A: Ident, T: Scalar> EnvAttr<A, SQL_OV_ODBC4> for [T] where
+    [T]: EnvAttr<A, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
+{
+}
 impl<A: Ident, CH: OdbcChar> EnvAttr<A, SQL_OV_ODBC3_80> for OdbcStr<CH> where
-    OdbcStr<CH>: EnvAttr<A, SQL_OV_ODBC3> {}
+    OdbcStr<CH>: EnvAttr<A, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
+{
+}
 impl<A: Ident, CH: OdbcChar> EnvAttr<A, SQL_OV_ODBC4> for OdbcStr<CH> where
-    OdbcStr<CH>: EnvAttr<A, SQL_OV_ODBC3_80> {}
+    OdbcStr<CH>: EnvAttr<A, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
+{
+}
 
 // Implement EnvAttr for uninitialized environment attributes
-impl<A: Ident, T: Ident, V: OdbcVersion> EnvAttr<A, V> for MaybeUninit<T>
+impl<A: Ident, T: Scalar, V: OdbcVersion> EnvAttr<A, V> for MaybeUninit<T>
 where
-    T: EnvAttr<A, V>,
+    T: EnvAttr<A, V> + AttrGet<A>,
+    Self: AttrLen<OdbcDefined, SQLINTEGER>,
+{
+}
+impl<A: Ident, T: Scalar, V: OdbcVersion> EnvAttr<A, V> for [MaybeUninit<T>]
+where
+    [T]: EnvAttr<A, V> + AttrGet<A>,
     Self: AttrLen<OdbcDefined, SQLINTEGER>,
 {
 }
 impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for OdbcStr<MaybeUninit<SQLCHAR>> where
-    OdbcStr<SQLCHAR>: EnvAttr<A, V>
+    OdbcStr<SQLCHAR>: EnvAttr<A, V> + AttrGet<A>
 {
 }
 impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for OdbcStr<MaybeUninit<SQLWCHAR>> where
-    OdbcStr<SQLWCHAR>: EnvAttr<A, V>
+    OdbcStr<SQLWCHAR>: EnvAttr<A, V> + AttrGet<A>
 {
 }
 
-// Implement EnvAttr for references to character environment attributes (used by AttrSet)
+// Implement EnvAttr for references to environment attributes (used by AttrSet)
+// TODO: Is it possible to implement for all reference types? Check other attributes as well
+impl<A: Ident, T: Scalar> EnvAttr<A, SQL_OV_ODBC3> for &T
+where
+    T: EnvAttr<A, SQL_OV_ODBC3>,
+    Self: AttrSet<A>,
+{
+}
+impl<A: Ident, T: Scalar, V: OdbcVersion> EnvAttr<A, V> for &[T]
+where
+    [T]: EnvAttr<A, V>,
+    Self: AttrSet<A>,
+{
+}
 impl<A: Ident, CH: OdbcChar, V: OdbcVersion> EnvAttr<A, V> for &OdbcStr<CH>
 where
     OdbcStr<CH>: EnvAttr<A, V>,

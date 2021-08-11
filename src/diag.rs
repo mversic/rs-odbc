@@ -5,13 +5,13 @@ use crate::env::OdbcVersion;
 use crate::handle::SQLHSTMT;
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{
-    sqlreturn::SQLRETURN, Def, Ident, OdbcDefined, Void, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER,
-    SQLSMALLINT, SQLWCHAR,
+    sqlreturn::SQLRETURN, Def, Ident, OdbcDefined, Scalar, Void, SQLCHAR, SQLINTEGER, SQLLEN,
+    SQLPOINTER, SQLSMALLINT, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
 use std::mem::MaybeUninit;
 
-pub trait DiagField<D: Ident, H: Handle>: Attr<D> + AttrLen<Self::DefinedBy, SQLSMALLINT> {
+pub trait DiagField<H: Handle, D: Ident>: Attr<D> + AttrLen<Self::DefinedBy, SQLSMALLINT> {
     // TODO: These could be checked by the type system
     // SQL_DIAG_CURSOR_ROW_COUNT -> The contents of this field are defined only after SQLExecute, SQLExecDirect, or SQLMoreResults
     // SQL_DIAG_DYNAMIC_FUNCTION -> The contents of this field are defined only after SQLExecute, SQLExecDirect, or SQLMoreResults
@@ -122,19 +122,26 @@ unsafe impl<AD: Def> AttrLen<AD, SQLSMALLINT> for MaybeUninit<SQLSTATE<SQLWCHAR>
 }
 
 // Implement DiagField for uninitialized diagnostic attributes
-impl<D: Ident, T: Ident, H: Handle> DiagField<D, H> for MaybeUninit<T>
+impl<D: Ident, T: Scalar, H: Handle> DiagField<H, D> for MaybeUninit<T>
 where
-    T: DiagField<D, H>,
+    T: DiagField<H, D> + AttrGet<D>,
     Self: AttrLen<Self::DefinedBy, SQLSMALLINT>,
 {
 }
 
-impl<D: Ident, H: Handle> DiagField<D, H> for OdbcStr<MaybeUninit<SQLCHAR>> where
-    OdbcStr<SQLCHAR>: DiagField<D, H>
+impl<D: Ident, T: Scalar, H: Handle> DiagField<H, D> for [MaybeUninit<T>]
+where
+    [T]: DiagField<H, D> + AttrGet<D>,
+    Self: AttrLen<Self::DefinedBy, SQLSMALLINT>,
 {
 }
-impl<D: Ident, H: Handle> DiagField<D, H> for OdbcStr<MaybeUninit<SQLWCHAR>> where
-    OdbcStr<SQLWCHAR>: DiagField<D, H>
+
+impl<D: Ident, H: Handle> DiagField<H, D> for OdbcStr<MaybeUninit<SQLCHAR>> where
+    OdbcStr<SQLCHAR>: DiagField<H, D> + AttrGet<D>
+{
+}
+impl<D: Ident, H: Handle> DiagField<H, D> for OdbcStr<MaybeUninit<SQLWCHAR>> where
+    OdbcStr<SQLWCHAR>: DiagField<H, D> + AttrGet<D>
 {
 }
 
@@ -152,7 +159,7 @@ pub struct SQL_DIAG_CURSOR_ROW_COUNT;
 unsafe impl Attr<SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {
     type DefinedBy = OdbcDefined;
 }
-impl<V: OdbcVersion> DiagField<SQL_DIAG_CURSOR_ROW_COUNT, SQLHSTMT<'_, '_, '_, V>> for SQLLEN {}
+impl<V: OdbcVersion> DiagField<SQLHSTMT<'_, '_, '_, V>, SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {}
 unsafe impl AttrGet<SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {}
 
 #[derive(Ident)]
@@ -162,7 +169,7 @@ pub struct SQL_DIAG_DYNAMIC_FUNCTION;
 unsafe impl Attr<SQL_DIAG_DYNAMIC_FUNCTION> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
 }
-impl<V: OdbcVersion> DiagField<SQL_DIAG_DYNAMIC_FUNCTION, SQLHSTMT<'_, '_, '_, V>>
+impl<V: OdbcVersion> DiagField<SQLHSTMT<'_, '_, '_, V>, SQL_DIAG_DYNAMIC_FUNCTION>
     for OdbcStr<SQLCHAR>
 {
 }
@@ -175,7 +182,7 @@ pub struct SQL_DIAG_DYNAMIC_FUNCTION_CODE;
 unsafe impl Attr<SQL_DIAG_DYNAMIC_FUNCTION_CODE> for DiagDynamicFunctionCode {
     type DefinedBy = OdbcDefined;
 }
-impl<V: OdbcVersion> DiagField<SQL_DIAG_DYNAMIC_FUNCTION_CODE, SQLHSTMT<'_, '_, '_, V>>
+impl<V: OdbcVersion> DiagField<SQLHSTMT<'_, '_, '_, V>, SQL_DIAG_DYNAMIC_FUNCTION_CODE>
     for DiagDynamicFunctionCode
 {
 }
@@ -188,7 +195,7 @@ pub struct SQL_DIAG_NUMBER;
 unsafe impl Attr<SQL_DIAG_NUMBER> for SQLINTEGER {
     type DefinedBy = OdbcDefined;
 }
-impl<H: Handle> DiagField<SQL_DIAG_NUMBER, H> for SQLINTEGER {}
+impl<H: Handle> DiagField<H, SQL_DIAG_NUMBER> for SQLINTEGER {}
 unsafe impl AttrGet<SQL_DIAG_NUMBER> for SQLINTEGER {}
 
 #[derive(Ident)]
@@ -198,7 +205,7 @@ pub struct SQL_DIAG_RETURNCODE;
 unsafe impl Attr<SQL_DIAG_RETURNCODE> for SQLRETURN {
     type DefinedBy = OdbcDefined;
 }
-impl<H: Handle> DiagField<SQL_DIAG_RETURNCODE, H> for SQLRETURN {}
+impl<H: Handle> DiagField<H, SQL_DIAG_RETURNCODE> for SQLRETURN {}
 unsafe impl AttrGet<SQL_DIAG_RETURNCODE> for SQLRETURN {}
 
 #[derive(Ident)]
@@ -208,7 +215,7 @@ pub struct SQL_DIAG_ROW_COUNT;
 unsafe impl Attr<SQL_DIAG_ROW_COUNT> for SQLLEN {
     type DefinedBy = OdbcDefined;
 }
-impl<V: OdbcVersion> DiagField<SQL_DIAG_ROW_COUNT, SQLHSTMT<'_, '_, '_, V>> for SQLLEN {}
+impl<V: OdbcVersion> DiagField<SQLHSTMT<'_, '_, '_, V>, SQL_DIAG_ROW_COUNT> for SQLLEN {}
 unsafe impl AttrGet<SQL_DIAG_ROW_COUNT> for SQLLEN {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -222,7 +229,7 @@ pub struct SQL_DIAG_CLASS_ORIGIN;
 unsafe impl Attr<SQL_DIAG_CLASS_ORIGIN> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
 }
-impl<H: Handle> DiagField<SQL_DIAG_CLASS_ORIGIN, H> for OdbcStr<SQLCHAR> {}
+impl<H: Handle> DiagField<H, SQL_DIAG_CLASS_ORIGIN> for OdbcStr<SQLCHAR> {}
 unsafe impl AttrGet<SQL_DIAG_CLASS_ORIGIN> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
@@ -232,7 +239,7 @@ pub struct SQL_DIAG_COLUMN_NUMBER;
 unsafe impl Attr<SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {
     type DefinedBy = OdbcDefined;
 }
-impl<V: OdbcVersion> DiagField<SQL_DIAG_COLUMN_NUMBER, SQLHSTMT<'_, '_, '_, V>>
+impl<V: OdbcVersion> DiagField<SQLHSTMT<'_, '_, '_, V>, SQL_DIAG_COLUMN_NUMBER>
     for DiagColumnNumber
 {
 }
@@ -245,7 +252,7 @@ pub struct SQL_DIAG_CONNECTION_NAME;
 unsafe impl Attr<SQL_DIAG_CONNECTION_NAME> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
 }
-impl<H: Handle> DiagField<SQL_DIAG_CONNECTION_NAME, H> for OdbcStr<SQLCHAR> {}
+impl<H: Handle> DiagField<H, SQL_DIAG_CONNECTION_NAME> for OdbcStr<SQLCHAR> {}
 unsafe impl AttrGet<SQL_DIAG_CONNECTION_NAME> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
@@ -255,7 +262,7 @@ pub struct SQL_DIAG_MESSAGE_TEXT;
 unsafe impl Attr<SQL_DIAG_MESSAGE_TEXT> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
 }
-impl<H: Handle> DiagField<SQL_DIAG_MESSAGE_TEXT, H> for OdbcStr<SQLCHAR> {}
+impl<H: Handle> DiagField<H, SQL_DIAG_MESSAGE_TEXT> for OdbcStr<SQLCHAR> {}
 unsafe impl AttrGet<SQL_DIAG_MESSAGE_TEXT> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
@@ -265,7 +272,7 @@ pub struct SQL_DIAG_NATIVE;
 unsafe impl Attr<SQL_DIAG_NATIVE> for SQLINTEGER {
     type DefinedBy = OdbcDefined;
 }
-impl<H: Handle> DiagField<SQL_DIAG_NATIVE, H> for SQLINTEGER {}
+impl<H: Handle> DiagField<H, SQL_DIAG_NATIVE> for SQLINTEGER {}
 unsafe impl AttrGet<SQL_DIAG_NATIVE> for SQLINTEGER {}
 
 #[derive(Ident)]
@@ -275,7 +282,7 @@ pub struct SQL_DIAG_ROW_NUMBER;
 unsafe impl Attr<SQL_DIAG_ROW_NUMBER> for DiagRowNumber {
     type DefinedBy = OdbcDefined;
 }
-impl<V: OdbcVersion> DiagField<SQL_DIAG_ROW_NUMBER, SQLHSTMT<'_, '_, '_, V>> for DiagRowNumber {}
+impl<V: OdbcVersion> DiagField<SQLHSTMT<'_, '_, '_, V>, SQL_DIAG_ROW_NUMBER> for DiagRowNumber {}
 unsafe impl AttrGet<SQL_DIAG_ROW_NUMBER> for DiagRowNumber {}
 
 #[derive(Ident)]
@@ -285,7 +292,7 @@ pub struct SQL_DIAG_SERVER_NAME;
 unsafe impl Attr<SQL_DIAG_SERVER_NAME> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
 }
-impl<H: Handle> DiagField<SQL_DIAG_SERVER_NAME, H> for OdbcStr<SQLCHAR> {}
+impl<H: Handle> DiagField<H, SQL_DIAG_SERVER_NAME> for OdbcStr<SQLCHAR> {}
 unsafe impl AttrGet<SQL_DIAG_SERVER_NAME> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
@@ -295,8 +302,8 @@ pub struct SQL_DIAG_SQLSTATE;
 unsafe impl<C: OdbcChar> Attr<SQL_DIAG_SQLSTATE> for SQLSTATE<C> {
     type DefinedBy = OdbcDefined;
 }
-impl<H: Handle> DiagField<SQL_DIAG_SQLSTATE, H> for SQLSTATE<SQLCHAR> {}
-impl<H: Handle> DiagField<SQL_DIAG_SQLSTATE, H> for SQLSTATE<SQLWCHAR> {}
+impl<H: Handle> DiagField<H, SQL_DIAG_SQLSTATE> for SQLSTATE<SQLCHAR> {}
+impl<H: Handle> DiagField<H, SQL_DIAG_SQLSTATE> for SQLSTATE<SQLWCHAR> {}
 unsafe impl<C: OdbcChar> AttrGet<SQL_DIAG_SQLSTATE> for SQLSTATE<C> {}
 
 #[derive(Ident)]
@@ -306,7 +313,7 @@ pub struct SQL_DIAG_SUBCLASS_ORIGIN;
 unsafe impl Attr<SQL_DIAG_SUBCLASS_ORIGIN> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
 }
-impl<H: Handle> DiagField<SQL_DIAG_SUBCLASS_ORIGIN, H> for OdbcStr<SQLCHAR> {}
+impl<H: Handle> DiagField<H, SQL_DIAG_SUBCLASS_ORIGIN> for OdbcStr<SQLCHAR> {}
 unsafe impl AttrGet<SQL_DIAG_SUBCLASS_ORIGIN> for OdbcStr<SQLCHAR> {}
 
 //=====================================================================================//

@@ -1,7 +1,9 @@
 use crate::attr::{Attr, AttrGet, AttrLen};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::str::{OdbcChar, OdbcStr};
-use crate::{Ident, OdbcDefined, SQLCHAR, SQLSMALLINT, SQLUINTEGER, SQLUSMALLINT, SQLWCHAR};
+use crate::{
+    Ident, OdbcDefined, Scalar, SQLCHAR, SQLSMALLINT, SQLUINTEGER, SQLUSMALLINT, SQLWCHAR,
+};
 use rs_odbc_derive::{odbc_bitmask, odbc_type, Ident};
 use std::mem::MaybeUninit;
 
@@ -11,30 +13,50 @@ pub trait InfoType<I: Ident, V: OdbcVersion>:
 }
 
 // Implement InfoType for all versions of info type attributes
-impl<I: Ident, T: Ident> InfoType<I, SQL_OV_ODBC3_80> for T where T: InfoType<I, SQL_OV_ODBC3> {}
-impl<I: Ident, T: Ident> InfoType<I, SQL_OV_ODBC4> for T where T: InfoType<I, SQL_OV_ODBC3_80> {}
+impl<I: Ident, T: Scalar> InfoType<I, SQL_OV_ODBC3_80> for T where
+    T: InfoType<I, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
+{
+}
+impl<I: Ident, T: Scalar> InfoType<I, SQL_OV_ODBC4> for T where
+    T: InfoType<I, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
+{
+}
+impl<I: Ident, T: Scalar> InfoType<I, SQL_OV_ODBC3_80> for [T] where
+    [T]: InfoType<I, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
+{
+}
+impl<I: Ident, T: Scalar> InfoType<I, SQL_OV_ODBC4> for [T] where
+    [T]: InfoType<I, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
+{
+}
 impl<I: Ident, CH: OdbcChar> InfoType<I, SQL_OV_ODBC3_80> for OdbcStr<CH> where
-    OdbcStr<CH>: InfoType<I, SQL_OV_ODBC3>
+    OdbcStr<CH>: InfoType<I, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
 {
 }
 impl<I: Ident, CH: OdbcChar> InfoType<I, SQL_OV_ODBC4> for OdbcStr<CH> where
-    OdbcStr<CH>: InfoType<I, SQL_OV_ODBC3_80>
+    OdbcStr<CH>: InfoType<I, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
 {
 }
 
 // Implement InfoType for uninitialized info type attributes
-impl<I: Ident, T: Ident, V: OdbcVersion> InfoType<I, V> for MaybeUninit<T>
+impl<I: Ident, T: Scalar, V: OdbcVersion> InfoType<I, V> for MaybeUninit<T>
 where
-    T: InfoType<I, V>,
+    T: InfoType<I, V> + AttrGet<I>,
+    Self: AttrLen<Self::DefinedBy, SQLSMALLINT>,
+{
+}
+impl<I: Ident, T: Scalar, V: OdbcVersion> InfoType<I, V> for [MaybeUninit<T>]
+where
+    [T]: InfoType<I, V> + AttrGet<I>,
     Self: AttrLen<Self::DefinedBy, SQLSMALLINT>,
 {
 }
 impl<I: Ident, V: OdbcVersion> InfoType<I, V> for OdbcStr<MaybeUninit<SQLCHAR>> where
-    OdbcStr<SQLCHAR>: InfoType<I, V>
+    OdbcStr<SQLCHAR>: InfoType<I, V> + AttrGet<I>
 {
 }
 impl<I: Ident, V: OdbcVersion> InfoType<I, V> for OdbcStr<MaybeUninit<SQLWCHAR>> where
-    OdbcStr<SQLWCHAR>: InfoType<I, V>
+    OdbcStr<SQLWCHAR>: InfoType<I, V> + AttrGet<I>
 {
 }
 

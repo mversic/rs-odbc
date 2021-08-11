@@ -1,10 +1,9 @@
 #[double]
 use crate::api::ffi;
-use crate::api::{Allocate, Handle, Descriptor};
-use crate::c_types::DeferredBuf;
+use crate::api::{Allocate, Handle};
 use crate::conn::{ConnState, C2, C3, C4};
 use crate::convert::{AsSQLHANDLE, IntoSQLPOINTER};
-use crate::desc::{AppDesc, DescType, ImplDesc, IPD, IRD};
+use crate::desc::{AppDesc, DescType, IPD, IRD};
 use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION};
 #[cfg(feature = "odbc_debug")]
 use crate::stmt::{
@@ -13,10 +12,9 @@ use crate::stmt::{
 use crate::{sqlreturn::SQL_SUCCESS, Ident, StrLenOrInd, SQLPOINTER};
 use mockall_double::double;
 use std::any::type_name;
-use std::cell::{Cell, UnsafeCell};
+use std::cell::Cell;
 use std::marker::PhantomData;
 use std::mem::{ManuallyDrop, MaybeUninit};
-use std::ops::{Deref, DerefMut};
 use std::thread::panicking;
 
 #[derive(rs_odbc_derive::Ident)]
@@ -301,9 +299,9 @@ pub struct UnsafeSQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion> {
     #[cfg(feature = "odbc_debug")]
     pub(crate) apd: ManuallyDrop<UnsafeSQLHDESC<'desc, AppDesc<'buf>, V>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) ird: ManuallyDrop<UnsafeSQLHDESC<'desc, ImplDesc<IRD>, V>>,
+    pub(crate) ird: ManuallyDrop<UnsafeSQLHDESC<'desc, IRD, V>>,
     #[cfg(feature = "odbc_debug")]
-    pub(crate) ipd: ManuallyDrop<UnsafeSQLHDESC<'desc, ImplDesc<IPD>, V>>,
+    pub(crate) ipd: ManuallyDrop<UnsafeSQLHDESC<'desc, IPD, V>>,
 
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) explicit_ard: Cell<PhantomData<&'desc UnsafeSQLHDESC<'desc, AppDesc<'buf>, V>>>,
@@ -315,9 +313,9 @@ pub struct UnsafeSQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion> {
     #[cfg(not(feature = "odbc_debug"))]
     pub(crate) apd: PhantomData<UnsafeSQLHDESC<'desc, AppDesc<'buf>, V>>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) ird: PhantomData<UnsafeSQLHDESC<'desc, ImplDesc<IRD>, V>>,
+    pub(crate) ird: PhantomData<UnsafeSQLHDESC<'desc, IRD, V>>,
     #[cfg(not(feature = "odbc_debug"))]
-    pub(crate) ipd: PhantomData<UnsafeSQLHDESC<'desc, ImplDesc<IPD>, V>>,
+    pub(crate) ipd: PhantomData<UnsafeSQLHDESC<'desc, IPD, V>>,
 }
 
 unsafe impl<V: OdbcVersion> Send for UnsafeSQLHSTMT<'_, '_, '_, V> {}
@@ -445,8 +443,6 @@ impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'b
     }
 }
 
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for SQLHDESC<'_, DT, V> {}
-
 /// A descriptor is a collection of metadata that describes the parameters of an SQL
 /// statement or the columns of a result set. Thus, a descriptor can fill four roles:
 /// * (APD)Application Parameter Descriptor:
@@ -506,8 +502,6 @@ impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for UnsafeSQLHDESC<'conn, AppD
     }
 }
 
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for UnsafeSQLHDESC<'_, DT, V> {}
-
 impl<V: OdbcVersion, T> Drop for UnsafeSQLHDESC<'_, T, V> {
     fn drop(&mut self) {
         drop_handle(self);
@@ -517,20 +511,19 @@ impl<V: OdbcVersion, T> Drop for UnsafeSQLHDESC<'_, T, V> {
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct RefUnsafeSQLHDESC<'conn, DT, V: OdbcVersion>(ManuallyDrop<UnsafeSQLHDESC<'conn, DT, V>>);
-unsafe impl<V: OdbcVersion, T> AsSQLHANDLE for RefUnsafeSQLHDESC<'_, T, V> {
+unsafe impl<DT, V: OdbcVersion> AsSQLHANDLE for RefUnsafeSQLHDESC<'_, DT, V> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        self.0.handle
+        self.0.as_SQLHANDLE()
     }
 }
-impl<V: OdbcVersion, T> Handle for RefUnsafeSQLHDESC<'_, T, V> {
+impl<V: OdbcVersion, DT> Handle for RefUnsafeSQLHDESC<'_, DT, V> {
     type Ident = SQL_HANDLE_DESC;
 }
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefUnsafeSQLHDESC<'_, DT, V> {}
 
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct RefSQLHDESC<'conn, DT, V: OdbcVersion>(RefUnsafeSQLHDESC<'conn, DT, V>);
-unsafe impl<V: OdbcVersion, T> AsSQLHANDLE for RefSQLHDESC<'_, T, V> {
+unsafe impl<DT, V: OdbcVersion> AsSQLHANDLE for RefSQLHDESC<'_, DT, V> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.0.as_SQLHANDLE()
     }
@@ -538,7 +531,6 @@ unsafe impl<V: OdbcVersion, T> AsSQLHANDLE for RefSQLHDESC<'_, T, V> {
 impl<V: OdbcVersion, T> Handle for RefSQLHDESC<'_, T, V> {
     type Ident = SQL_HANDLE_DESC;
 }
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefSQLHDESC<'_, DT, V> {}
 
 fn drop_handle<H: Handle>(handle: &mut H) {
     let sql_return = unsafe { ffi::SQLFreeHandle(H::Ident::IDENTIFIER, handle.as_SQLHANDLE()) };

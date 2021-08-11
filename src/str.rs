@@ -93,11 +93,11 @@ impl Unicode for OdbcStr<MaybeUninit<SQLWCHAR>> {}
 impl<CH: OdbcChar> Ansi for &OdbcStr<CH> where OdbcStr<CH>: Ansi {}
 impl<CH: OdbcChar> Unicode for &OdbcStr<CH> where OdbcStr<CH>: Unicode {}
 
-impl<V: OdbcVersion> Ansi for MaybeUninit<RefSQLHDESC<'_, AppDesc<'_>, V>> {}
-impl<V: OdbcVersion> Unicode for MaybeUninit<RefSQLHDESC<'_, AppDesc<'_>, V>> {}
+impl<DT, V: OdbcVersion> Ansi for MaybeUninit<RefSQLHDESC<'_, DT, V>> {}
+impl<DT, V: OdbcVersion> Unicode for MaybeUninit<RefSQLHDESC<'_, DT, V>> {}
 
-impl<V: OdbcVersion> Ansi for MaybeUninit<RefUnsafeSQLHDESC<'_, AppDesc<'_>, V>> {}
-impl<V: OdbcVersion> Unicode for MaybeUninit<RefUnsafeSQLHDESC<'_, AppDesc<'_>, V>> {}
+impl<DT, V: OdbcVersion> Ansi for MaybeUninit<RefUnsafeSQLHDESC<'_, DT, V>> {}
+impl<DT, V: OdbcVersion> Unicode for MaybeUninit<RefUnsafeSQLHDESC<'_, DT, V>> {}
 
 impl<DT, V: OdbcVersion> Ansi for Option<&SQLHDESC<'_, DT, V>> {}
 impl<DT, V: OdbcVersion> Unicode for Option<&SQLHDESC<'_, DT, V>> {}

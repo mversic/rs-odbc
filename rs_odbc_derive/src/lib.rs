@@ -53,6 +53,7 @@ fn parse_inner_type(mut args: token_stream::IntoIter) -> Ident {
     }
 
     match inner_type.to_string().as_str() {
+        // TODO: Expand with other types. Maybe use Copy trait. Then implement Ident only if inner_type implements inner
         // REQUIREMENT1: supported types must have a valid zero-byte representation because of AttrZeroFill
         // REQUIREMENT2: supported types must have the same representation as SQLPOINTER because of Ident
         "SQLINTEGER" | "SQLUINTEGER" | "SQLSMALLINT" | "SQLUSMALLINT" | "SQLLEN" | "SQLULEN" => {}
@@ -134,10 +135,12 @@ fn odbc_derive(ast: &mut syn::DeriveInput, inner_type: &Ident) -> TokenStream2 {
     };
 
     ret.extend(quote! {
-        impl crate::Ident for #type_name {
+        impl crate::Ident for #type_name where crate::#inner_type: crate::Ident {
             type Type = <crate::#inner_type as crate::Ident>::Type;
             const IDENTIFIER: Self::Type = <crate::#inner_type as crate::Ident>::IDENTIFIER;
         }
+
+        impl crate::Scalar for #type_name where crate::#inner_type: crate::Scalar {}
 
         unsafe impl crate::convert::IntoSQLPOINTER for #type_name {
             fn into_SQLPOINTER(self) -> crate::SQLPOINTER {
@@ -172,7 +175,7 @@ pub fn odbc_bitmask(args: TokenStream, input: TokenStream) -> TokenStream {
             type Output = crate::#inner_type;
 
             fn bitand(self, other: #type_name) -> Self::Output {
-                Self::identifier(&self) & Self::identifier(&other)
+                Self::identifier(&self) &Self::identifier(&other)
             }
         }
         impl std::ops::BitAnd<crate::#inner_type> for #type_name {

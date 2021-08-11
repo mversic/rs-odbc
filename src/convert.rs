@@ -1,4 +1,4 @@
-use crate::c_types::{ScalarCType, StrLenOrInd};
+use crate::c_types::{CScalar, StrLenOrInd};
 use crate::conn::ConnState;
 use crate::desc::DescType;
 use crate::env::OdbcVersion;
@@ -8,7 +8,7 @@ use crate::handle::{
 };
 use crate::str::{Ansi, OdbcChar, OdbcStr, Unicode};
 use crate::{
-    slice_len, Ident, Void, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLUINTEGER,
+    slice_len, Scalar, Void, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLUINTEGER,
     SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
 use std::cell::UnsafeCell;
@@ -68,7 +68,7 @@ unsafe impl<T> AsMutPtr<T> for MaybeUninit<T> {
         self.as_mut_ptr()
     }
 }
-unsafe impl<T: Ident> AsMutPtr<T> for MaybeUninit<Void> {
+unsafe impl<T: Scalar> AsMutPtr<T> for MaybeUninit<Void> {
     fn as_mut_ptr(&mut self) -> *mut T {
         // SAFETY:
         // Acording to the ODBC specification returning `self.as_mut_ptr().cast()` here
@@ -77,9 +77,9 @@ unsafe impl<T: Ident> AsMutPtr<T> for MaybeUninit<Void> {
         std::ptr::null_mut()
     }
 }
-unsafe impl<T: ScalarCType> IntoSQLPOINTER for &UnsafeCell<T> {
+unsafe impl<T: Scalar> IntoSQLPOINTER for &T {
     fn into_SQLPOINTER(self) -> SQLPOINTER {
-        self.get().cast()
+        self as *const _ as SQLPOINTER
     }
 }
 unsafe impl<T> IntoSQLPOINTER for &[T] {
@@ -96,15 +96,20 @@ unsafe impl<CH: OdbcChar> IntoSQLPOINTER for &OdbcStr<CH> {
         (self.as_ptr() as *mut CH).cast()
     }
 }
-unsafe impl<T: ScalarCType> AsSQLPOINTER for T {
+unsafe impl<T: CScalar> IntoSQLPOINTER for &UnsafeCell<T> {
+    fn into_SQLPOINTER(self) -> SQLPOINTER {
+        self.get().cast()
+    }
+}
+unsafe impl<T: CScalar> AsSQLPOINTER for T {
     fn as_SQLPOINTER(&self) -> SQLPOINTER {
-        // ScalarCType is guaranteed to have SQLPOINTER representation
+        // CScalar is guaranteed to have SQLPOINTER representation
         self as *const _ as SQLPOINTER
     }
 }
-unsafe impl<T: ScalarCType> AsSQLPOINTER for UnsafeCell<T> {
+unsafe impl<T: CScalar> AsSQLPOINTER for UnsafeCell<T> {
     fn as_SQLPOINTER(&self) -> SQLPOINTER {
-        // ScalarCType is guaranteed to have SQLPOINTER representation
+        // CScalar is guaranteed to have SQLPOINTER representation
         self.get().cast()
     }
 }
@@ -123,15 +128,15 @@ unsafe impl<T> AsSQLPOINTER for OdbcStr<T> {
     }
 }
 
-unsafe impl<T: ScalarCType> AsMutSQLPOINTER for T {
+unsafe impl<T: CScalar> AsMutSQLPOINTER for T {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        // ScalarCType is guaranteed to have SQLPOINTER representation
+        // CScalar is guaranteed to have SQLPOINTER representation
         (self as *mut Self).cast()
     }
 }
-unsafe impl<T: ScalarCType> AsMutSQLPOINTER for MaybeUninit<T> {
+unsafe impl<T: CScalar> AsMutSQLPOINTER for MaybeUninit<T> {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        // ScalarCType is guaranteed to have SQLPOINTER representation
+        // CScalar is guaranteed to have SQLPOINTER representation
         self.as_mut_ptr().cast()
     }
 }
@@ -272,28 +277,10 @@ unsafe impl<DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<RefUnsafeSQLHDES
         self.as_mut_ptr().cast()
     }
 }
-unsafe impl<'conn, DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<RefSQLHDESC<'conn, DT, V>> {
+unsafe impl<'conn, 'desc, DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<RefSQLHDESC<'conn, DT, V>> {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
         // Valid because RefSQLHDESC is a transparent newtype wrapper over RefUnsafeSQLHDESC
         unsafe { std::mem::transmute::<_, &mut MaybeUninit<RefUnsafeSQLHDESC<'conn, DT, V>>>(self) }
-            .as_mut_SQLPOINTER()
-    }
-}
-unsafe impl<'conn, 'desc, DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<&'desc UnsafeSQLHDESC<'conn, DT, V>> {
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        if cfg!(feature = "odbc_debug") {
-            // SQLHDESC is not transparent
-            unimplemented!("This method should never be called")
-        }
-
-        // SQLHDESC is transparent
-        self.as_mut_ptr().cast()
-    }
-}
-unsafe impl<'conn, 'desc, DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<&'desc SQLHDESC<'conn, DT, V>> {
-    fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
-        // Valid because RefSQLHDESC is a transparent newtype wrapper over RefUnsafeSQLHDESC
-        unsafe { std::mem::transmute::<_, &mut MaybeUninit<&'desc UnsafeSQLHDESC<'conn, DT, V>>>(self) }
             .as_mut_SQLPOINTER()
     }
 }

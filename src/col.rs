@@ -1,7 +1,7 @@
 use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::str::{OdbcChar, OdbcStr};
-use crate::{Ident, OdbcDefined, SQLCHAR, SQLLEN, SQLSMALLINT, SQLWCHAR};
+use crate::{Ident, OdbcDefined, Scalar, SQLCHAR, SQLLEN, SQLSMALLINT, SQLWCHAR};
 use rs_odbc_derive::Ident;
 use std::mem::MaybeUninit;
 
@@ -11,34 +11,66 @@ pub trait ColAttr<A: Ident, V: OdbcVersion>:
 }
 
 // Implement ColAttr for all versions of column attributes
-impl<A: Ident, T: Ident> ColAttr<A, SQL_OV_ODBC3_80> for T where T: ColAttr<A, SQL_OV_ODBC3> {}
-impl<A: Ident, T: Ident> ColAttr<A, SQL_OV_ODBC4> for T where T: ColAttr<A, SQL_OV_ODBC3_80> {}
+impl<A: Ident, T: Scalar> ColAttr<A, SQL_OV_ODBC3_80> for T where
+    T: ColAttr<A, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
+{
+}
+impl<A: Ident, T: Scalar> ColAttr<A, SQL_OV_ODBC4> for T where
+    T: ColAttr<A, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
+{
+}
+impl<A: Ident, T: Scalar> ColAttr<A, SQL_OV_ODBC3_80> for [T] where
+    [T]: ColAttr<A, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
+{
+}
+impl<A: Ident, T: Scalar> ColAttr<A, SQL_OV_ODBC4> for [T] where
+    [T]: ColAttr<A, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
+{
+}
 impl<A: Ident, CH: OdbcChar> ColAttr<A, SQL_OV_ODBC3_80> for OdbcStr<CH> where
-    OdbcStr<CH>: ColAttr<A, SQL_OV_ODBC3>
+    OdbcStr<CH>: ColAttr<A, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
 {
 }
 impl<A: Ident, CH: OdbcChar> ColAttr<A, SQL_OV_ODBC4> for OdbcStr<CH> where
-    OdbcStr<CH>: ColAttr<A, SQL_OV_ODBC3_80>
+    OdbcStr<CH>: ColAttr<A, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
 {
 }
 
 // Implement ColAttr for uninitialized column attributes
-impl<A: Ident, T: Ident, V: OdbcVersion> ColAttr<A, V> for MaybeUninit<T>
+impl<A: Ident, T: Scalar, V: OdbcVersion> ColAttr<A, V> for MaybeUninit<T>
 where
-    T: ColAttr<A, V>,
+    T: ColAttr<A, V> + AttrGet<A>,
+    Self: AttrLen<Self::DefinedBy, SQLSMALLINT>,
+{
+}
+impl<A: Ident, T: Scalar, V: OdbcVersion> ColAttr<A, V> for [MaybeUninit<T>]
+where
+    [T]: ColAttr<A, V> + AttrGet<A>,
     Self: AttrLen<Self::DefinedBy, SQLSMALLINT>,
 {
 }
 impl<A: Ident, V: OdbcVersion> ColAttr<A, V> for OdbcStr<MaybeUninit<SQLCHAR>> where
-    OdbcStr<SQLCHAR>: ColAttr<A, V>
+    OdbcStr<SQLCHAR>: ColAttr<A, V> + AttrGet<A>
 {
 }
 impl<A: Ident, V: OdbcVersion> ColAttr<A, V> for OdbcStr<MaybeUninit<SQLWCHAR>> where
-    OdbcStr<SQLWCHAR>: ColAttr<A, V>
+    OdbcStr<SQLWCHAR>: ColAttr<A, V> + AttrGet<A>
 {
 }
 
-// Implement ColAttr for references to character column attributes (used by AttrSet)
+// Implement ColAttr for references to column attributes (used by AttrSet)
+impl<A: Ident, T: Scalar> ColAttr<A, SQL_OV_ODBC3> for &T
+where
+    T: ColAttr<A, SQL_OV_ODBC3>,
+    Self: AttrSet<A> + AttrLen<Self::DefinedBy, SQLSMALLINT>,
+{
+}
+impl<A: Ident, T: Scalar, V: OdbcVersion> ColAttr<A, V> for &[T]
+where
+    [T]: ColAttr<A, V>,
+    Self: AttrSet<A>,
+{
+}
 impl<A: Ident, CH: OdbcChar, V: OdbcVersion> ColAttr<A, V> for &OdbcStr<CH>
 where
     OdbcStr<CH>: ColAttr<A, V>,

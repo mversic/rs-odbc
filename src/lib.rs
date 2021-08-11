@@ -64,6 +64,12 @@ pub type SQLPOINTER = *mut c_void;
 // Use uninhabited type ! when it is available in stable
 pub enum Void {}
 
+// TODO: Won't be required once GATs are implemented because
+// implicit handles will be able to use type constructors
+// https://github.com/rust-lang/rust/issues/44265
+/// Marker trait for binding lifetimes
+pub trait Ref<'a> {}
+
 pub trait Def {}
 pub enum OdbcDefined {}
 pub enum DriverDefined {}
@@ -117,28 +123,34 @@ impl Ident for SQLULEN {
 
     const IDENTIFIER: Self::Type = SQL_IS_ULEN;
 }
-impl<T: Ident> Ident for &T {
+impl<T> Ident for [T] {
     type Type = SQLSMALLINT;
 
     const IDENTIFIER: Self::Type = SQL_IS_POINTER;
 }
-impl<T: Ident> Ident for &mut T {
+impl<T> Ident for &T {
     type Type = SQLSMALLINT;
 
     const IDENTIFIER: Self::Type = SQL_IS_POINTER;
 }
-impl<T: Ident> Ident for Option<&T> {
-    type Type = SQLSMALLINT;
-
-    const IDENTIFIER: Self::Type = SQL_IS_POINTER;
-}
-impl<T: Ident> Ident for Option<&mut T> {
+impl<T> Ident for &mut T {
     type Type = SQLSMALLINT;
 
     const IDENTIFIER: Self::Type = SQL_IS_POINTER;
 }
 
-// TODO: Comapare attribute types: <attribute>(type, default)
+// TODO: Make private?
+pub trait Scalar {}
+impl Scalar for SQLSCHAR {}
+impl Scalar for SQLCHAR {}
+impl Scalar for SQLSMALLINT {}
+impl Scalar for SQLUSMALLINT {}
+impl Scalar for SQLINTEGER {}
+impl Scalar for SQLUINTEGER {}
+impl Scalar for SQLLEN {}
+impl Scalar for SQLULEN {}
+
+// TODO: Comapare all attribute types that use OdbcBool: <attribute>(type, default)
 // SQL_ATTR_OUTPUT_NTS(u32, true), SQL_ATTR_AUTO_IPD(u32, _)
 // WARN: SQL_ATTR_METADATA_ID is SQLULEN
 #[odbc_type(SQLUINTEGER)]

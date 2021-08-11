@@ -1,11 +1,11 @@
-use crate::c_types::ScalarCType;
+use crate::c_types::CScalar;
 use crate::convert::{AsMutSQLPOINTER, IntoSQLPOINTER};
 use crate::desc::AppDesc;
 use crate::env::OdbcVersion;
 use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, SQLHDESC};
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{
-    slice_len, Def, DriverDefined, Ident, OdbcDefined, Void, SQLCHAR, SQLINTEGER, SQLLEN,
+    slice_len, Def, DriverDefined, Ident, OdbcDefined, Scalar, Void, SQLCHAR, SQLINTEGER, SQLLEN,
     SQLSMALLINT, SQLUINTEGER, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
 use std::cell::UnsafeCell;
@@ -48,23 +48,41 @@ pub trait AttrZeroAssert {
 // GENERIC IMPLS
 ////////////////////////////////////////////////////////////////////////////////
 
-unsafe impl<A: Ident, T: Ident> Attr<A> for MaybeUninit<T>
+unsafe impl<A: Ident, T: Scalar> Attr<A> for MaybeUninit<T>
 where
-    T: Attr<A>,
+    T: Attr<A> + AttrGet<A>,
 {
     type DefinedBy = T::DefinedBy;
 }
+unsafe impl<A: Ident, T> Attr<A> for [MaybeUninit<T>]
+where
+    [T]: Attr<A> + AttrGet<A>,
+{
+    type DefinedBy = <[T] as Attr<A>>::DefinedBy;
+}
 unsafe impl<A: Ident> Attr<A> for OdbcStr<MaybeUninit<SQLCHAR>>
 where
-    OdbcStr<SQLCHAR>: Attr<A>,
+    OdbcStr<SQLCHAR>: Attr<A> + AttrGet<A>,
 {
     type DefinedBy = <OdbcStr<SQLCHAR> as Attr<A>>::DefinedBy;
 }
 unsafe impl<A: Ident> Attr<A> for OdbcStr<MaybeUninit<SQLWCHAR>>
 where
-    OdbcStr<SQLWCHAR>: Attr<A>,
+    OdbcStr<SQLWCHAR>: Attr<A> + AttrGet<A>,
 {
     type DefinedBy = <OdbcStr<SQLWCHAR> as Attr<A>>::DefinedBy;
+}
+unsafe impl<A: Ident, T: Scalar> Attr<A> for &T
+where
+    T: Attr<A>,
+{
+    type DefinedBy = T::DefinedBy;
+}
+unsafe impl<A: Ident, T> Attr<A> for &[T]
+where
+    [T]: Attr<A>,
+{
+    type DefinedBy = <[T] as Attr<A>>::DefinedBy;
 }
 unsafe impl<A: Ident, CH: OdbcChar> Attr<A> for &OdbcStr<CH>
 where
@@ -73,10 +91,10 @@ where
     type DefinedBy = <OdbcStr<CH> as Attr<A>>::DefinedBy;
 }
 
-unsafe impl<A: Ident, T: Ident> AttrGet<A> for MaybeUninit<T>
+unsafe impl<A: Ident, T: Scalar> AttrGet<A> for MaybeUninit<T>
 where
-    Self: AsMutSQLPOINTER,
     T: AttrGet<A>,
+    Self: AsMutSQLPOINTER,
 {
 }
 unsafe impl<A: Ident> AttrGet<A> for OdbcStr<MaybeUninit<SQLCHAR>> where OdbcStr<SQLCHAR>: AttrGet<A>
@@ -86,14 +104,14 @@ unsafe impl<A: Ident> AttrGet<A> for OdbcStr<MaybeUninit<SQLWCHAR>> where
 {
 }
 
-unsafe impl<A: Ident, T: Ident> AttrSet<A> for MaybeUninit<T>
+unsafe impl<A: Ident, T: Scalar> AttrSet<A> for MaybeUninit<T>
 where
     Self: IntoSQLPOINTER,
     T: AttrSet<A>,
 {
 }
 
-unsafe impl<AD: Def, LEN: Copy, T: Ident> AttrLen<AD, LEN> for T
+unsafe impl<AD: Def, T: Ident, LEN: Copy> AttrLen<AD, LEN> for T
 where
     MaybeUninit<T>: AttrLen<AD, LEN>,
     LEN: From<SQLSMALLINT>,
@@ -105,7 +123,7 @@ where
         <MaybeUninit<_> as AttrLen<AD, LEN>>::len(unsafe { std::mem::transmute(self) })
     }
 }
-unsafe impl<LEN: Copy, T: Ident> AttrLen<OdbcDefined, LEN> for MaybeUninit<T>
+unsafe impl<T: Ident, LEN: Copy> AttrLen<OdbcDefined, LEN> for MaybeUninit<T>
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -115,7 +133,7 @@ where
         LEN::from(0)
     }
 }
-unsafe impl<LEN: Copy, T: Ident> AttrLen<DriverDefined, LEN> for MaybeUninit<T>
+unsafe impl<T: Ident, LEN: Copy> AttrLen<DriverDefined, LEN> for MaybeUninit<T>
 where
     LEN: From<T::Type>,
 {
@@ -186,7 +204,7 @@ where
         <[MaybeUninit<SQLCHAR>] as AttrLen<AD, LEN>>::len(unsafe { std::mem::transmute(self) })
     }
 }
-unsafe impl<AD: Def, LEN: Copy, T: Ident> AttrLen<AD, LEN> for [T]
+unsafe impl<AD: Def, T: Ident, LEN: Copy> AttrLen<AD, LEN> for [T]
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -217,7 +235,7 @@ where
     }
 }
 // Deferred buffers are used only through SQLSetDescAttr and SQLGetDescAttr
-unsafe impl<AD: Def, T: ScalarCType> AttrLen<AD, SQLINTEGER> for UnsafeCell<T> {
+unsafe impl<AD: Def, T: CScalar> AttrLen<AD, SQLINTEGER> for UnsafeCell<T> {
     type StrLen = Void;
 
     fn len(&self) -> SQLINTEGER {
@@ -304,27 +322,13 @@ where
             .len()
     }
 }
-unsafe impl<DT, V: OdbcVersion> AttrLen<OdbcDefined, SQLINTEGER> for MaybeUninit<&UnsafeSQLHDESC<'_, DT, V>> {
-    type StrLen = Void;
-
-    fn len(&self) -> SQLINTEGER {
-        0
-    }
-}
-unsafe impl<DT, V: OdbcVersion> AttrLen<OdbcDefined, SQLINTEGER> for MaybeUninit<&SQLHDESC<'_, DT, V>> {
-    type StrLen = Void;
-
-    fn len(&self) -> SQLINTEGER {
-        0
-    }
-}
 
 impl<T> AttrZeroAssert for MaybeUninit<T> {
     // MaybeUninit must not be read
 }
 impl<T> AttrZeroAssert for [T] {}
 impl<T> AttrZeroAssert for OdbcStr<T> {}
-impl<T: ScalarCType> AttrZeroAssert for UnsafeCell<T> {
+impl<T: CScalar> AttrZeroAssert for UnsafeCell<T> {
     // Deferred buffers don't need to be zeroed
 }
 

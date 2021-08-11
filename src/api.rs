@@ -1,4 +1,6 @@
 use crate::handle::*;
+#[cfg(test)]
+use mockall::automock;
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
 use std::ptr;
@@ -9,20 +11,23 @@ use crate::{
     c_types::DeferredBuf,
     col::ColAttr,
     conn::{BrowseConnect, ConnAttr, ConnState, Disconnect, C2, C3, C4},
-    convert::{AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLPOINTER, IntoSQLPOINTER, AsSQLHANDLE},
-    desc::{DescField, DescType},
+    convert::{
+        AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLHANDLE, AsSQLPOINTER,
+        IntoSQLPOINTER,
+    },
+    desc::{DescField, DescType, AppDesc, IRD, IPD},
     diag::{DiagField, SQLSTATE},
     env::{EnvAttr, OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4},
     handle::{UnsafeSQLHSTMT, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
     info::InfoType,
     sql_types::SqlType,
     sqlreturn::{SQLRETURN, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_SUCCEEDED},
-    stmt::{StmtAttr, private::BaseStmtAttr},
+    stmt::{private::BaseStmtAttr, StmtAttr},
     str::{Ansi, OdbcStr, Unicode},
     BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion, FreeStmtOption,
-    FunctionId, IOType, Ident, IdentifierType, LockType, NullAllowed, Operation, Reserved, Scope,
-    StrLenOrInd, Unique, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW,
-    SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
+    FunctionId, IOType, Ident, IdentifierType, LockType, NullAllowed, Operation, Reserved,
+    Scope, StrLenOrInd, Unique, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW,
+    SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR, Ref,
 };
 
 pub trait Handle: AsSQLHANDLE + Sized {
@@ -37,16 +42,16 @@ pub trait Handle: AsSQLHANDLE + Sized {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    fn SQLGetDiagFieldA<D: Ident<Type = SQLSMALLINT>, T: DiagField<D, Self>>(
+    fn SQLGetDiagFieldA<A: Ident<Type = SQLSMALLINT>, T: DiagField<Self, A>>(
         &self,
         // TODO: Use NoneZeroI16?
         RecNumber: std::num::NonZeroI16,
-        DiagIdentifier: D,
+        DiagIdentifier: A,
         DiagInfoPtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<D> + Ansi + ?Sized,
+        T: AttrGet<A> + Ansi + ?Sized,
         MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
     {
         let DiagInfoPtr = DiagInfoPtr.map_or((ptr::null_mut(), 0), |DiagInfoPtr| {
@@ -62,7 +67,7 @@ pub trait Handle: AsSQLHANDLE + Sized {
                 Self::Ident::IDENTIFIER,
                 self.as_SQLHANDLE(),
                 RecNumber.get(),
-                D::IDENTIFIER,
+                A::IDENTIFIER,
                 DiagInfoPtr.0,
                 DiagInfoPtr.1,
                 StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
@@ -79,16 +84,16 @@ pub trait Handle: AsSQLHANDLE + Sized {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    fn SQLGetDiagFieldW<D: Ident<Type = SQLSMALLINT>, T: DiagField<D, Self>>(
+    fn SQLGetDiagFieldW<A: Ident<Type = SQLSMALLINT>, T: DiagField<Self, A>>(
         &self,
         // TODO: Use NoneZeroI16?
         RecNumber: std::num::NonZeroI16,
-        DiagIdentifier: D,
+        DiagIdentifier: A,
         DiagInfoPtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<D> + Unicode + ?Sized,
+        T: AttrGet<A> + Unicode + ?Sized,
         MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
     {
         let DiagInfoPtr = DiagInfoPtr.map_or((ptr::null_mut(), 0), |DiagInfoPtr| {
@@ -104,7 +109,7 @@ pub trait Handle: AsSQLHANDLE + Sized {
                 Self::Ident::IDENTIFIER,
                 self.as_SQLHANDLE(),
                 RecNumber.get(),
-                D::IDENTIFIER,
+                A::IDENTIFIER,
                 DiagInfoPtr.0,
                 DiagInfoPtr.1,
                 StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
@@ -233,1095 +238,22 @@ pub trait Allocate<'src>: Handle {
     }
 }
 
-impl<V: OdbcVersion> SQLHENV<V> {
-    /// Returns information about a data source. This function is implemented only by the Driver Manager.
-    ///
-    /// For complete documentation on SQLDataSourcesA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldatasources-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLDataSourcesA(
-        &self,
-        Direction: SQLUSMALLINT,
-        ServerName: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
-        NameLength1Ptr: &mut MaybeUninit<SQLSMALLINT>,
-        Description: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
-        NameLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-    ) -> SQLRETURN {
-        let ServerName = ServerName.as_mut_raw_slice();
-        let Description = Description.as_mut_raw_slice();
-
-        unsafe {
-            ffi::SQLDataSourcesA(
-                self.as_SQLHANDLE(),
-                Direction,
-                ServerName.0,
-                ServerName.1,
-                NameLength1Ptr.as_mut_ptr(),
-                Description.0,
-                Description.1,
-                NameLength2Ptr.as_mut_ptr(),
-            )
-        }
-    }
-
-    /// Returns information about a data source. This function is implemented only by the Driver Manager.
-    ///
-    /// For complete documentation on SQLDataSourcesW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldatasources-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLDataSourcesW(
-        &self,
-        Direction: SQLUSMALLINT,
-        ServerName: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
-        NameLength1Ptr: &mut MaybeUninit<SQLSMALLINT>,
-        Description: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
-        NameLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-    ) -> SQLRETURN {
-        let ServerName = ServerName.as_mut_raw_slice();
-        let Description = Description.as_mut_raw_slice();
-
-        unsafe {
-            ffi::SQLDataSourcesW(
-                self.as_SQLHANDLE(),
-                Direction,
-                ServerName.0,
-                ServerName.1,
-                NameLength1Ptr.as_mut_ptr(),
-                Description.0,
-                Description.1,
-                NameLength2Ptr.as_mut_ptr(),
-            )
-        }
-    }
-
-    /// Lists driver descriptions and driver attribute keywords. This function is implemented only by the Driver Manager.
-    ///
-    /// For complete documentation on SQLDriversA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldrivers-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLDriversA(
-        &self,
-        Direction: SQLUSMALLINT,
-        DriverDescription: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
-        DescriptionLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-        DriverAttributes: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
-        AttributesLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-    ) -> SQLRETURN {
-        let DriverDescription = DriverDescription.as_mut_raw_slice();
-        let DriverAttributes = DriverAttributes.as_mut_raw_slice();
-
-        unsafe {
-            ffi::SQLDriversA(
-                self.as_SQLHANDLE(),
-                Direction,
-                DriverDescription.0,
-                DriverDescription.1,
-                DescriptionLengthPtr.as_mut_ptr(),
-                DriverAttributes.0,
-                DriverAttributes.1,
-                AttributesLengthPtr.as_mut_ptr(),
-            )
-        }
-    }
-
-    /// Lists driver descriptions and driver attribute keywords. This function is implemented only by the Driver Manager.
-    ///
-    /// For complete documentation on SQLDriversW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldrivers-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLDriversW(
-        &self,
-        Direction: SQLUSMALLINT,
-        DriverDescription: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
-        DescriptionLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-        DriverAttributes: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
-        AttributesLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-    ) -> SQLRETURN {
-        let DriverDescription = DriverDescription.as_mut_raw_slice();
-        let DriverAttributes = DriverAttributes.as_mut_raw_slice();
-
-        unsafe {
-            ffi::SQLDriversW(
-                self.as_SQLHANDLE(),
-                Direction,
-                DriverDescription.0,
-                DriverDescription.1,
-                DescriptionLengthPtr.as_mut_ptr(),
-                DriverAttributes.0,
-                DriverAttributes.1,
-                AttributesLengthPtr.as_mut_ptr(),
-            )
-        }
-    }
-
-    /// Returns the current setting of an environment attribute.
-    ///
-    /// For complete documentation on SQLGetEnvAttr, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetenvattr-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
-    pub fn SQLGetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>>(
-        &self,
-        Attribute: A,
-        ValuePtr: Option<&mut T>,
-        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
-    ) -> SQLRETURN
-    where
-        T: AttrGet<A> + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
-    {
-        let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
-            (ValuePtr.as_mut_SQLPOINTER(), ValuePtr.len())
-        });
-
-        unsafe {
-            ffi::SQLGetEnvAttr(
-                self.as_SQLHANDLE(),
-                A::IDENTIFIER,
-                ValuePtr.0,
-                ValuePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
-            )
-        }
-    }
-
-    /// Sets attributes that govern aspects of environments.
-    ///
-    /// For complete documentation on SQLSetEnvAttr, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetenvattr-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
-    pub fn SQLSetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>>(
-        // Reference to SQLHENV is mutable to make it impossible to have a connection
-        // handle allocated on the environment handle when calling this function
-        &mut self,
-        Attribute: A,
-        ValuePtr: T,
-    ) -> SQLRETURN
-    where
-        T: AttrSet<A>,
-    {
-        unsafe {
-            ffi::SQLSetEnvAttr(
-                self.as_SQLHANDLE(),
-                A::IDENTIFIER,
-                ValuePtr.into_SQLPOINTER(),
-                ValuePtr.len(),
-            )
-        }
-    }
-}
-
-impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
-    /// Supports an iterative method of discovering and enumerating the attributes and attribute values required to connect to a data source. Each call to **SQLBrowseConnect** returns successive levels of attributes and attribute values. When all levels have been enumerated, a connection to the data source is completed and a complete connection string is returned by **SQLBrowseConnect**. A return code of SQL_SUCCESS or SQL_SUCCESS_WITH_INFO indicates that all connection information has been specified and the application is now connected to the data source.
-    ///
-    /// For complete documentation on SQLBrowseConnectA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlbrowseconnect-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLBrowseConnectA(
-        self,
-        InConnectionString: &OdbcStr<SQLCHAR>,
-        OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
-        StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-    ) -> (
-        Result<SQLHDBC<'env, C4, V>, Result<SQLHDBC<'env, C3, V>, SQLHDBC<'env, C2, V>>>,
-        SQLRETURN,
-    )
-    where
-        Self: BrowseConnect,
-    {
-        let InConnectionString = InConnectionString.as_raw_slice();
-        let OutConnectionString =
-            OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
-
-        let sql_return = unsafe {
-            ffi::SQLBrowseConnectA(
-                self.as_SQLHANDLE(),
-                InConnectionString.0,
-                InConnectionString.1,
-                OutConnectionString.0,
-                OutConnectionString.1,
-                StringLength2Ptr.as_mut_ptr(),
-            )
-        };
-
-        if SQL_SUCCEEDED(sql_return) {
-            (Ok(self.connect()), sql_return)
-        } else if sql_return == SQL_NEED_DATA {
-            (Err(Ok(self.need_data())), sql_return)
-        } else if sql_return == SQL_STILL_EXECUTING {
-            unimplemented!("Asynchronous execution not supported")
-        } else {
-            (Err(Err(self.disconnect())), sql_return)
-        }
-    }
-
-    /// Supports an iterative method of discovering and enumerating the attributes and attribute values required to connect to a data source. Each call to **SQLBrowseConnect** returns successive levels of attributes and attribute values. When all levels have been enumerated, a connection to the data source is completed and a complete connection string is returned by **SQLBrowseConnect**. A return code of SQL_SUCCESS or SQL_SUCCESS_WITH_INFO indicates that all connection information has been specified and the application is now connected to the data source.
-    ///
-    /// For complete documentation on SQLBrowseConnectW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlbrowseconnect-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLBrowseConnectW(
-        self,
-        InConnectionString: &OdbcStr<SQLWCHAR>,
-        OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
-        StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-    ) -> (
-        Result<SQLHDBC<'env, C4, V>, Result<SQLHDBC<'env, C3, V>, SQLHDBC<'env, C2, V>>>,
-        SQLRETURN,
-    )
-    where
-        Self: BrowseConnect,
-    {
-        let InConnectionString = InConnectionString.as_raw_slice();
-        let OutConnectionString =
-            OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
-
-        let sql_return = unsafe {
-            ffi::SQLBrowseConnectW(
-                self.as_SQLHANDLE(),
-                InConnectionString.0,
-                InConnectionString.1,
-                OutConnectionString.0,
-                OutConnectionString.1,
-                StringLength2Ptr.as_mut_ptr(),
-            )
-        };
-
-        if SQL_SUCCEEDED(sql_return) {
-            (Ok(self.connect()), sql_return)
-        } else if sql_return == SQL_NEED_DATA {
-            (Err(Ok(self.need_data())), sql_return)
-        } else if sql_return == SQL_STILL_EXECUTING {
-            unimplemented!("Asynchronous execution not supported")
-        } else {
-            (Err(Err(self.disconnect())), sql_return)
-        }
-    }
-
-    /// Closes the connection associated with a specific connection handle.
-    ///
-    /// For complete documentation on SQLDisconnect, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldisconnect-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLDisconnect(self) -> (Result<SQLHDBC<'env, C2, V>, Self>, SQLRETURN)
-    where
-        Self: Disconnect,
-    {
-        let sql_return = unsafe { ffi::SQLDisconnect(self.as_SQLHANDLE()) };
-
-        if SQL_SUCCEEDED(sql_return) {
-            (Ok(self.disconnect()), sql_return)
-        } else {
-            (Err(self), sql_return)
-        }
-    }
-
-    /// Returns the current setting of a connection attribute.
-    ///
-    /// For complete documentation on SQLGetConnectAttrA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetconnectattr-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
-    pub fn SQLGetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, C, V>>(
-        // TODO: Not sure whether attributes should be checked when getting them with SQLGetConnectAttr
-        &self,
-        Attribute: A,
-        ValuePtr: Option<&mut T>,
-        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
-    ) -> SQLRETURN
-    where
-        T: AttrGet<A> + Ansi + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
-    {
-        let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
-            if cfg!(feature = "odbc_debug") {
-                ValuePtr.assert_zeroed();
-            }
-
-            (ValuePtr.as_mut_SQLPOINTER(), ValuePtr.len())
-        });
-
-        unsafe {
-            ffi::SQLGetConnectAttrA(
-                self.as_SQLHANDLE(),
-                A::IDENTIFIER,
-                ValuePtr.0,
-                ValuePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
-            )
-        }
-    }
-
-    /// Returns the current setting of a connection attribute.
-    ///
-    /// For complete documentation on SQLGetConnectAttrW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetconnectattr-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
-    pub fn SQLGetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, C, V>>(
-        // TODO: Not really sure whether attributes should be checked when getting them with SQLGetConnectAttr
-        &self,
-        Attribute: A,
-        ValuePtr: Option<&mut T>,
-        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
-    ) -> SQLRETURN
-    where
-        T: AttrGet<A> + Unicode + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
-    {
-        let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
-            if cfg!(feature = "odbc_debug") {
-                ValuePtr.assert_zeroed();
-            }
-
-            (ValuePtr.as_mut_SQLPOINTER(), ValuePtr.len())
-        });
-
-        unsafe {
-            ffi::SQLGetConnectAttrW(
-                self.as_SQLHANDLE(),
-                A::IDENTIFIER,
-                ValuePtr.0,
-                ValuePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
-            )
-        }
-    }
-
-    /// Sets attributes that govern aspects of connections.
-    ///
-    /// For complete documentation on SQLSetConnectAttrA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetconnectattr-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
-    pub fn SQLSetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, C, V>>(
-        &self,
-        Attribute: A,
-        ValuePtr: T,
-    ) -> SQLRETURN
-    where
-        T: AttrSet<A> + Ansi,
-    {
-        unsafe {
-            ffi::SQLSetConnectAttrA(
-                self.as_SQLHANDLE(),
-                A::IDENTIFIER,
-                ValuePtr.into_SQLPOINTER(),
-                ValuePtr.len(),
-            )
-        }
-    }
-
-    /// Sets attributes that govern aspects of connections.
-    ///
-    /// For complete documentation on SQLSetConnectAttrW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetconnectattr-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
-    pub fn SQLSetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<A, C, V>>(
-        &self,
-        Attribute: A,
-        ValuePtr: T,
-    ) -> SQLRETURN
-    where
-        T: AttrSet<A> + Unicode,
-    {
-        unsafe {
-            ffi::SQLSetConnectAttrW(
-                self.as_SQLHANDLE(),
-                A::IDENTIFIER,
-                ValuePtr.into_SQLPOINTER(),
-                ValuePtr.len(),
-            )
-        }
-    }
-}
-
-impl<'env, V: OdbcVersion> SQLHDBC<'env, C2, V> {
-    /// Establishes connections to a driver and a data source. The connection handle references storage of all information about the connection to the data source, including status, transaction state, and error information.
-    ///
-    /// For complete documentation on SQLConnectA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlconnect-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLConnectA(
-        self,
-        ServerName: &OdbcStr<SQLCHAR>,
-        UserName: &OdbcStr<SQLCHAR>,
-        Authentication: &OdbcStr<SQLCHAR>,
-    ) -> (
-        Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
-        SQLRETURN,
-    ) {
-        let ServerName = ServerName.as_raw_slice();
-        let UserName = UserName.as_raw_slice();
-        let Authentication = Authentication.as_raw_slice();
-
-        let sql_return = unsafe {
-            ffi::SQLConnectA(
-                self.as_SQLHANDLE(),
-                ServerName.0,
-                ServerName.1,
-                UserName.0,
-                UserName.1,
-                Authentication.0,
-                Authentication.1,
-            )
-        };
-
-        if SQL_SUCCEEDED(sql_return) {
-            (Ok(self.connect()), sql_return)
-        } else {
-            (Err(self), sql_return)
-        }
-    }
-
-    /// Establishes connections to a driver and a data source. The connection handle references storage of all information about the connection to the data source, including status, transaction state, and error information.
-    ///
-    /// For complete documentation on SQLConnectW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlconnect-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLConnectW(
-        self,
-        ServerName: &OdbcStr<SQLWCHAR>,
-        UserName: &OdbcStr<SQLWCHAR>,
-        Authentication: &OdbcStr<SQLWCHAR>,
-    ) -> (
-        Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
-        SQLRETURN,
-    ) {
-        let ServerName = ServerName.as_raw_slice();
-        let UserName = UserName.as_raw_slice();
-        let Authentication = Authentication.as_raw_slice();
-
-        let sql_return = unsafe {
-            ffi::SQLConnectW(
-                self.as_SQLHANDLE(),
-                ServerName.0,
-                ServerName.1,
-                UserName.0,
-                UserName.1,
-                Authentication.0,
-                Authentication.1,
-            )
-        };
-
-        if SQL_SUCCEEDED(sql_return) {
-            (Ok(self.connect()), sql_return)
-        } else {
-            (Err(self), sql_return)
-        }
-    }
-
-    /// An alternative to **SQLConnect**. It supports data sources that require more connection information than the three arguments in **SQLConnect**, dialog boxes to prompt the user for all connection information, and data sources that are not defined in the system information. For more information, see Connecting with SQLDriverConnect.
-    ///
-    /// For complete documentation on SQLDriverConnectA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldriverconnect-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLDriverConnectA(
-        self,
-        WindowHandle: Option<SQLHWND>,
-        InConnectionString: &OdbcStr<SQLCHAR>,
-        OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
-        StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-        DriverCompletion: DriverCompletion,
-    ) -> (
-        Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
-        SQLRETURN,
-    ) {
-        let InConnectionString = InConnectionString.as_raw_slice();
-        let OutConnectionString =
-            OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
-
-        let sql_return = unsafe {
-            ffi::SQLDriverConnectA(
-                self.as_SQLHANDLE(),
-                // TODO: Fix this
-                ptr::null_mut(),
-                InConnectionString.0,
-                InConnectionString.1,
-                OutConnectionString.0,
-                OutConnectionString.1,
-                StringLength2Ptr.as_mut_ptr(),
-                DriverCompletion as SQLUSMALLINT,
-            )
-        };
-
-        if SQL_SUCCEEDED(sql_return) {
-            (Ok(self.connect()), sql_return)
-        } else {
-            (Err(self), sql_return)
-        }
-    }
-
-    /// An alternative to **SQLConnect**. It supports data sources that require more connection information than the three arguments in **SQLConnect**, dialog boxes to prompt the user for all connection information, and data sources that are not defined in the system information. For more information, see Connecting with SQLDriverConnect.
-    ///
-    /// For complete documentation on SQLDriverConnectW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldriverconnect-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLDriverConnectW(
-        self,
-        WindowHandle: Option<SQLHWND>,
-        InConnectionString: &OdbcStr<SQLWCHAR>,
-        OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
-        StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
-        DriverCompletion: DriverCompletion,
-    ) -> (
-        Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
-        SQLRETURN,
-    ) {
-        let InConnectionString = InConnectionString.as_raw_slice();
-        let OutConnectionString =
-            OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
-
-        let sql_return = unsafe {
-            ffi::SQLDriverConnectW(
-                self.as_SQLHANDLE(),
-                // TODO: Fix this
-                ptr::null_mut(),
-                InConnectionString.0,
-                InConnectionString.1,
-                OutConnectionString.0,
-                OutConnectionString.1,
-                StringLength2Ptr.as_mut_ptr(),
-                DriverCompletion as SQLUSMALLINT,
-            )
-        };
-
-        if SQL_SUCCEEDED(sql_return) {
-            (Ok(self.connect()), sql_return)
-        } else {
-            (Err(self), sql_return)
-        }
-    }
-}
-
-impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
-    /// Returns information about whether a driver supports a specific ODBC function. This function is implemented in the Driver Manager; it can also be implemented in drivers. If a driver implements **SQLGetFunctions**, the Driver Manager calls the function in the driver. Otherwise, it executes the function itself.
-    ///
-    /// For complete documentation on SQLGetFunctions, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetfunctions-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLGetFunctions(
-        &self,
-        FunctionId: FunctionId,
-        SupportedPtr: &mut MaybeUninit<SQLUSMALLINT>,
-    ) -> SQLRETURN {
-        unsafe {
-            ffi::SQLGetFunctions(
-                self.as_SQLHANDLE(),
-                FunctionId as SQLUSMALLINT,
-                SupportedPtr.as_mut_ptr(),
-            )
-        }
-    }
-
-    /// Returns general information about the driver and data source associated with a connection.
-    ///
-    /// For complete documentation on SQLGetInfoA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetinfo-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
-    pub fn SQLGetInfoA<I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>>(
-        // TODO: SQL_ODBC_VER can be called on connection that is not open
-        &self,
-        InfoType: I,
-        InfoValuePtr: Option<&mut T>,
-        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
-    ) -> SQLRETURN
-    where
-        T: AttrGet<I> + Ansi + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
-    {
-        let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
-            (InfoValuePtr.as_mut_SQLPOINTER(), InfoValuePtr.len())
-        });
-
-        unsafe {
-            ffi::SQLGetInfoA(
-                self.as_SQLHANDLE(),
-                I::IDENTIFIER,
-                InfoValuePtr.0,
-                InfoValuePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
-            )
-        }
-    }
-
-    /// Returns general information about the driver and data source associated with a connection.
-    ///
-    /// For complete documentation on SQLGetInfoW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetinfo-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
-    pub fn SQLGetInfoW<I: Ident<Type = SQLUSMALLINT>, T: InfoType<I, V>>(
-        // TODO: SQL_ODBC_VER can be called on connection that is not open
-        &self,
-        InfoType: I,
-        InfoValuePtr: Option<&mut T>,
-        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
-    ) -> SQLRETURN
-    where
-        T: AttrGet<I> + Unicode + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
-    {
-        let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
-            (InfoValuePtr.as_mut_SQLPOINTER(), InfoValuePtr.len())
-        });
-
-        unsafe {
-            ffi::SQLGetInfoW(
-                self.as_SQLHANDLE(),
-                I::IDENTIFIER,
-                InfoValuePtr.0,
-                InfoValuePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
-            )
-        }
-    }
-
-    /// Returns the SQL string as modified by the driver. **SQLNativeSql** does not execute the SQL statement.
-    ///
-    /// For complete documentation on SQLNativeSqlA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlnativesql-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLNativeSqlA(
-        &self,
-        InStatementText: &OdbcStr<SQLCHAR>,
-        OutStatementText: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
-        TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
-    ) -> SQLRETURN {
-        let InStatementText = InStatementText.as_raw_slice();
-        let OutStatementText = OutStatementText.as_mut_raw_slice();
-
-        unsafe {
-            ffi::SQLNativeSqlA(
-                self.as_SQLHANDLE(),
-                InStatementText.0,
-                InStatementText.1,
-                OutStatementText.0,
-                OutStatementText.1,
-                TextLength2Ptr.as_mut_ptr(),
-            )
-        }
-    }
-
-    /// Returns the SQL string as modified by the driver. **SQLNativeSql** does not execute the SQL statement.
-    ///
-    /// For complete documentation on SQLNativeSqlW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlnativesql-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLNativeSqlW(
-        &self,
-        InStatementText: &OdbcStr<SQLWCHAR>,
-        OutStatementText: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
-        TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
-    ) -> SQLRETURN {
-        let InStatementText = InStatementText.as_raw_slice();
-        let OutStatementText = OutStatementText.as_mut_raw_slice();
-
-        unsafe {
-            ffi::SQLNativeSqlW(
-                self.as_SQLHANDLE(),
-                InStatementText.0,
-                InStatementText.1,
-                OutStatementText.0,
-                OutStatementText.1,
-                TextLength2Ptr.as_mut_ptr(),
-            )
-        }
-    }
-
-    /// Requests a commit or rollback operation for all active operations on all statements associated with a connection. **SQLEndTran** can also request that a commit or rollback operation be performed for all connections associated with an environment.
-    ///
-    /// For complete documentation on SQLEndTran, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlendtran-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLEndTran(&self, CompletionType: CompletionType) -> SQLRETURN {
-        // Not implemented on SQLHENV so as to to avoid confusion, considering that the same
-        // functionality can be achieved by calling SQLEndTran repeatedly on SQLHDBC handle
-
-        unsafe {
-            ffi::SQLEndTran(
-                <Self as Handle>::Ident::IDENTIFIER,
-                self.as_SQLHANDLE(),
-                CompletionType as SQLSMALLINT,
-            )
-        }
-    }
-
-    /// Cancels the processing on a connection or statement. The Driver Manager maps a call to **SQLCancelHandle** to a call to **SQLCancel** when `HandleType` is SQL_HANDLE_STMT.
-    ///
-    /// For complete documentation on SQLCancelHandle, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcancelhandle-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLCancelHandle(&self) -> SQLRETURN {
-        // Not implemented on SQLHSTMT because SQLHSTMT can also be cancelled via SQLCancel
-        unsafe { ffi::SQLCancelHandle(<Self as Handle>::Ident::IDENTIFIER, self.as_SQLHANDLE()) }
-    }
-}
-
-impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
-    /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
-    ///
-    /// For complete documentation on SQLExecDirectA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    pub fn SQLExecDirectA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
-        let StatementText = StatementText.as_raw_slice();
-
-        unsafe {ffi::SQLExecDirectA(self.as_SQLHANDLE(), StatementText.0, StatementText.1)}
-    }
-
-    /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
-    ///
-    /// For complete documentation on SQLExecDirectW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    pub fn SQLExecDirectW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
-        let StatementText = StatementText.as_raw_slice();
-
-        unsafe {ffi::SQLExecDirectW(self.as_SQLHANDLE(), StatementText.0, StatementText.1)}
-    }
-
-    /// Executes a prepared statement, using the current values of the parameter marker variables if any parameter markers exist in the statement.
-    ///
-    /// For complete documentation on SQLExecute, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecute-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    pub fn SQLExecute(&self) -> SQLRETURN {
-        unsafe {ffi::SQLExecute(self.as_SQLHANDLE())}
-    }
-
-    /// Fetches the next rowset of data from the result set and returns data for all bound columns.
-    ///
-    /// For complete documentation on SQLFetch, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetch-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    pub fn SQLFetch(&self) -> SQLRETURN {
-        unsafe {ffi::SQLFetch(self.as_SQLHANDLE())}
-    }
-
-    /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
-    /// When working with an ODBC 2.x driver, the Driver Manager maps this function to **SQLExtendedFetch**. For more information, see Mapping Replacement Functions for Backward Compatibility of Applications.
-    ///
-    /// For complete documentation on SQLFetchScroll, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetchscroll-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    pub fn SQLFetchScroll(
-        &self,
-        FetchOrientation: SQLSMALLINT,
-        FetchOffset: SQLLEN,
-    ) -> SQLRETURN {
-        unsafe {ffi::SQLFetchScroll(self.as_SQLHANDLE(), FetchOrientation, FetchOffset)}
-    }
-
-    /// Sets the cursor position in a rowset and allows an application to refresh data in the rowset or to update or delete data in the result set.
-    ///
-    /// For complete documentation on SQLSetPos, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetpos-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    pub fn SQLSetPos(
-        &self,
-        RowNumber: SQLSETPOSIROW,
-        Operation: Operation,
-        LockType: LockType,
-    ) -> SQLRETURN {
-        unsafe {ffi::SQLSetPos(
-            self.as_SQLHANDLE(),
-            RowNumber,
-            Operation as SQLUSMALLINT,
-            LockType as SQLUSMALLINT,
-        )}
-    }
-}
-
-impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
-    /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
-    ///
-    /// For complete documentation on SQLExecDirectA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    pub unsafe fn SQLExecDirectA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
-        let StatementText = StatementText.as_raw_slice();
-
-        ffi::SQLExecDirectA(self.as_SQLHANDLE(), StatementText.0, StatementText.1)
-    }
-
-    /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
-    ///
-    /// For complete documentation on SQLExecDirectW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    pub unsafe fn SQLExecDirectW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
-        let StatementText = StatementText.as_raw_slice();
-
-        ffi::SQLExecDirectW(self.as_SQLHANDLE(), StatementText.0, StatementText.1)
-    }
-
-    /// Executes a prepared statement, using the current values of the parameter marker variables if any parameter markers exist in the statement.
-    ///
-    /// For complete documentation on SQLExecute, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecute-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    pub unsafe fn SQLExecute(&self) -> SQLRETURN {
-        ffi::SQLExecute(self.as_SQLHANDLE())
-    }
-
-    /// Fetches the next rowset of data from the result set and returns data for all bound columns.
-    ///
-    /// For complete documentation on SQLFetch, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetch-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    pub unsafe fn SQLFetch(&self) -> SQLRETURN {
-        ffi::SQLFetch(self.as_SQLHANDLE())
-    }
-
-    /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
-    /// When working with an ODBC 2.x driver, the Driver Manager maps this function to **SQLExtendedFetch**. For more information, see Mapping Replacement Functions for Backward Compatibility of Applications.
-    ///
-    /// For complete documentation on SQLFetchScroll, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetchscroll-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    pub unsafe fn SQLFetchScroll(
-        &self,
-        FetchOrientation: SQLSMALLINT,
-        FetchOffset: SQLLEN,
-    ) -> SQLRETURN {
-        ffi::SQLFetchScroll(self.as_SQLHANDLE(), FetchOrientation, FetchOffset)
-    }
-
-    /// Sets the cursor position in a rowset and allows an application to refresh data in the rowset or to update or delete data in the result set.
-    ///
-    /// For complete documentation on SQLSetPos, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetpos-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[allow(non_snake_case)]
-    pub unsafe fn SQLSetPos(
-        &self,
-        RowNumber: SQLSETPOSIROW,
-        Operation: Operation,
-        LockType: LockType,
-    ) -> SQLRETURN {
-        ffi::SQLSetPos(
-            self.as_SQLHANDLE(),
-            RowNumber,
-            Operation as SQLUSMALLINT,
-            LockType as SQLUSMALLINT,
-        )
-    }
-}
-
-impl<'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V> for UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
-    // TODO: Don't bind (SQLPOINTER, SQLLEN) fat pointer when using raw_api
-    #[cfg(not(feature = "odbc_debug"))]
-    fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
-    where
-        B: ?Sized,
-    {
-    }
-    #[cfg(not(feature = "odbc_debug"))]
-    fn bind_param<TT: Ident, B: DeferredBuf<TT, V>>(
-        &self,
-        TargetValuePtr: Option<&'buf B>,
-    ) where
-        B: ?Sized,
-    {
-    }
-    #[cfg(not(feature = "odbc_debug"))]
-    fn bind_strlen_or_ind(
-        &self,
-        StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
-    ) {
-    }
-
-    #[cfg(feature = "odbc_debug")]
-    fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
-    where
-        B: ?Sized,
-    {
-        if let Some(explicit_ard) = self.explicit_ard.get() {
-            // TODO:
-            //explicit_ard.bind_col(TargetValuePtr);
-        } else {
-            // TODO:
-            //self.ard.bind_col(TargetValuePtr);
-        }
-    }
-    #[cfg(feature = "odbc_debug")]
-    fn bind_param<TT: Ident, B: DeferredBuf<TT, V>>(
-        &self,
-        TargetValuePtr: Option<&'buf B>,
-    ) where
-        B: ?Sized,
-    {
-        if let Some(explicit_apd) = self.explicit_apd.get() {
-            // TODO:
-            //explicit_apd.bind_param(TargetValuePtr);
-        } else {
-            // TODO:
-            //self.apd.bind_param(TargetValuePtr);
-        }
-    }
-    #[cfg(feature = "odbc_debug")]
-    fn bind_strlen_or_ind(
-        &self,
-        StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
-    ) {
-        unimplemented!();
-    }
-}
-impl<'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V> for SQLHSTMT<'_, 'desc, 'buf, V> {
-    fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
-    where
-        B: ?Sized,
-    {
-        self.0.bind_col(TargetValuePtr)
-    }
-
-    fn bind_param<TT: Ident, B: DeferredBuf<TT, V>>(
-        &self,
-        TargetValuePtr: Option<&'buf B>,
-    ) where
-        B: ?Sized,
-    {
-        self.0.bind_param(TargetValuePtr)
-    }
-
-    fn bind_strlen_or_ind(
-        &self,
-        StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
-    ) {
-        self.0.bind_strlen_or_ind(StrLen_or_IndPtr)
-    }
-}
-
 pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
-    fn bind_col<TT: Ident, B: DeferredBuf<TT, V>>(&self, TargetValuePtr: Option<&'buf B>) where B: ?Sized;
-    fn bind_param<TT: Ident, B: DeferredBuf<TT, V>>(&self, TargetValuePtr: Option<&'buf B>) where B: ?Sized;
+
+    type ARD: Descriptor<'buf, AppDesc<'buf>, V>;
+    type APD: Descriptor<'buf, AppDesc<'buf>, V>;
+    type IRD: Descriptor<'buf, IRD, V>;
+    type IPD: Descriptor<'buf, IPD, V>;
+
+    type ExplicitARD: Descriptor<'buf, AppDesc<'buf>, V>;
+    type ExplicitAPD: Descriptor<'buf, AppDesc<'buf>, V>;
+
+    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    where
+        B: ?Sized;
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    where
+        B: ?Sized;
     fn bind_strlen_or_ind(&self, StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>);
 
     /// Binds application data buffers to columns in the result set.
@@ -1333,7 +265,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    fn SQLBindCol<TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<TT, V>>(
+    fn SQLBindCol<TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<Self::ARD, TT, V>>(
         &self,
         ColumnNumber: SQLUSMALLINT,
         TargetType: TT,
@@ -1381,7 +313,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
         TT: Ident<Type = SQLSMALLINT>,
         // TODO: Check which type is used for ParameterType
         ST: SqlType<V>,
-        B: DeferredBuf<TT, V>,
+        B: DeferredBuf<Self::APD, TT, V>,
     >(
         &self,
         ParameterNumber: SQLUSMALLINT,
@@ -2009,14 +941,14 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    fn SQLGetStmtAttrA<'stmt, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'stmt, 'desc, 'buf, A, Self, V>>(
+    fn SQLGetStmtAttrA<'stmt, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, Self, A, V>>(
         &'stmt self,
         Attribute: A,
         ValuePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Ansi + ?Sized,
+        T: AttrGet<A> + Ansi + Ref<'stmt> + ?Sized,
         MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
     {
         SQLGetStmtAttrA(self, Attribute, ValuePtr, StringLengthPtr)
@@ -2031,14 +963,14 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    fn SQLGetStmtAttrW<'stmt, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'stmt, 'desc, 'buf, A, Self, V>>(
+    fn SQLGetStmtAttrW<'stmt, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, Self, A, V>>(
         &'stmt self,
         Attribute: A,
         ValuePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Unicode + ?Sized,
+        T: AttrGet<A> + Unicode + Ref<'stmt> + ?Sized,
         MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
     {
         SQLGetStmtAttrW(self, Attribute, ValuePtr, StringLengthPtr)
@@ -2425,7 +1357,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    fn SQLSetStmtAttrA<A: Ident<Type = SQLINTEGER>, T: for<'stmt> StmtAttr<'stmt, 'desc, 'buf, A, Self, V>>(
+    fn SQLSetStmtAttrA<A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, Self, A, V>>(
         &self,
         Attribute: A,
         ValuePtr: T,
@@ -2445,7 +1377,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    fn SQLSetStmtAttrW<A: Ident<Type = SQLINTEGER>, T: for<'stmt> StmtAttr<'stmt, 'desc, 'buf, A, Self, V>>(
+    fn SQLSetStmtAttrW<A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, Self, A, V>>(
         &self,
         Attribute: A,
         ValuePtr: T,
@@ -2760,10 +1692,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     #[must_use]
     // TODO: Do they have to have the same version?
     // TODO: Is lifetime the same?
-    fn SQLCopyDesc<DT2: DescType<'buf>>(
-        &self,
-        TargetDescHandle: &SQLHDESC<DT2, V>,
-    ) -> SQLRETURN {
+    fn SQLCopyDesc<DT2: DescType<'buf>>(&self, TargetDescHandle: &SQLHDESC<DT2, V>) -> SQLRETURN {
         unsafe { ffi::SQLCopyDesc(self.as_SQLHANDLE(), TargetDescHandle.as_SQLHANDLE()) }
     }
 
@@ -2776,7 +1705,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    fn SQLGetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, A, Self, DT, V>>(
+    fn SQLGetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, Self, DT, A, V>>(
         &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
@@ -2816,7 +1745,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    fn SQLGetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, A, Self, DT, V>>(
+    fn SQLGetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, Self, DT, A, V>>(
         &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
@@ -2936,7 +1865,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    fn SQLSetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, A, Self, DT, V>>(
+    fn SQLSetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, Self, DT, A, V>>(
         &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
@@ -2975,7 +1904,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     #[inline]
     #[must_use]
     #[allow(non_snake_case, unused_variables)]
-    fn SQLSetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, A, Self, DT, V>>(
+    fn SQLSetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, Self, DT, A, V>>(
         &self,
         RecNumber: SQLSMALLINT,
         FieldIdentifier: A,
@@ -3074,20 +2003,1126 @@ pub trait Async: Handle {
     }
 }
 
+impl<V: OdbcVersion> SQLHENV<V> {
+    /// Returns information about a data source. This function is implemented only by the Driver Manager.
+    ///
+    /// For complete documentation on SQLDataSourcesA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldatasources-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLDataSourcesA(
+        &self,
+        Direction: SQLUSMALLINT,
+        ServerName: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
+        NameLength1Ptr: &mut MaybeUninit<SQLSMALLINT>,
+        Description: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
+        NameLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
+    ) -> SQLRETURN {
+        let ServerName = ServerName.as_mut_raw_slice();
+        let Description = Description.as_mut_raw_slice();
+
+        unsafe {
+            ffi::SQLDataSourcesA(
+                self.as_SQLHANDLE(),
+                Direction,
+                ServerName.0,
+                ServerName.1,
+                NameLength1Ptr.as_mut_ptr(),
+                Description.0,
+                Description.1,
+                NameLength2Ptr.as_mut_ptr(),
+            )
+        }
+    }
+
+    /// Returns information about a data source. This function is implemented only by the Driver Manager.
+    ///
+    /// For complete documentation on SQLDataSourcesW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldatasources-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLDataSourcesW(
+        &self,
+        Direction: SQLUSMALLINT,
+        ServerName: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
+        NameLength1Ptr: &mut MaybeUninit<SQLSMALLINT>,
+        Description: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
+        NameLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
+    ) -> SQLRETURN {
+        let ServerName = ServerName.as_mut_raw_slice();
+        let Description = Description.as_mut_raw_slice();
+
+        unsafe {
+            ffi::SQLDataSourcesW(
+                self.as_SQLHANDLE(),
+                Direction,
+                ServerName.0,
+                ServerName.1,
+                NameLength1Ptr.as_mut_ptr(),
+                Description.0,
+                Description.1,
+                NameLength2Ptr.as_mut_ptr(),
+            )
+        }
+    }
+
+    /// Lists driver descriptions and driver attribute keywords. This function is implemented only by the Driver Manager.
+    ///
+    /// For complete documentation on SQLDriversA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldrivers-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLDriversA(
+        &self,
+        Direction: SQLUSMALLINT,
+        DriverDescription: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
+        DescriptionLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        DriverAttributes: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
+        AttributesLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+    ) -> SQLRETURN {
+        let DriverDescription = DriverDescription.as_mut_raw_slice();
+        let DriverAttributes = DriverAttributes.as_mut_raw_slice();
+
+        unsafe {
+            ffi::SQLDriversA(
+                self.as_SQLHANDLE(),
+                Direction,
+                DriverDescription.0,
+                DriverDescription.1,
+                DescriptionLengthPtr.as_mut_ptr(),
+                DriverAttributes.0,
+                DriverAttributes.1,
+                AttributesLengthPtr.as_mut_ptr(),
+            )
+        }
+    }
+
+    /// Lists driver descriptions and driver attribute keywords. This function is implemented only by the Driver Manager.
+    ///
+    /// For complete documentation on SQLDriversW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldrivers-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLDriversW(
+        &self,
+        Direction: SQLUSMALLINT,
+        DriverDescription: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
+        DescriptionLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        DriverAttributes: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
+        AttributesLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+    ) -> SQLRETURN {
+        let DriverDescription = DriverDescription.as_mut_raw_slice();
+        let DriverAttributes = DriverAttributes.as_mut_raw_slice();
+
+        unsafe {
+            ffi::SQLDriversW(
+                self.as_SQLHANDLE(),
+                Direction,
+                DriverDescription.0,
+                DriverDescription.1,
+                DescriptionLengthPtr.as_mut_ptr(),
+                DriverAttributes.0,
+                DriverAttributes.1,
+                AttributesLengthPtr.as_mut_ptr(),
+            )
+        }
+    }
+
+    /// Returns the current setting of an environment attribute.
+    ///
+    /// For complete documentation on SQLGetEnvAttr, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetenvattr-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLGetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>>(
+        &self,
+        Attribute: A,
+        ValuePtr: Option<&mut T>,
+        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
+    ) -> SQLRETURN
+    where
+        T: AttrGet<A> + ?Sized,
+        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+    {
+        let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
+            (ValuePtr.as_mut_SQLPOINTER(), ValuePtr.len())
+        });
+
+        unsafe {
+            ffi::SQLGetEnvAttr(
+                self.as_SQLHANDLE(),
+                A::IDENTIFIER,
+                ValuePtr.0,
+                ValuePtr.1,
+                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+            )
+        }
+    }
+
+    /// Sets attributes that govern aspects of environments.
+    ///
+    /// For complete documentation on SQLSetEnvAttr, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetenvattr-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLSetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>>(
+        // Reference to SQLHENV is mutable to make it impossible to have a connection
+        // handle allocated on the environment handle when calling this function
+        &mut self,
+        Attribute: A,
+        ValuePtr: T,
+    ) -> SQLRETURN
+    where
+        T: AttrSet<A>,
+    {
+        unsafe {
+            ffi::SQLSetEnvAttr(
+                self.as_SQLHANDLE(),
+                A::IDENTIFIER,
+                ValuePtr.into_SQLPOINTER(),
+                ValuePtr.len(),
+            )
+        }
+    }
+}
+
+impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
+    /// Supports an iterative method of discovering and enumerating the attributes and attribute values required to connect to a data source. Each call to **SQLBrowseConnect** returns successive levels of attributes and attribute values. When all levels have been enumerated, a connection to the data source is completed and a complete connection string is returned by **SQLBrowseConnect**. A return code of SQL_SUCCESS or SQL_SUCCESS_WITH_INFO indicates that all connection information has been specified and the application is now connected to the data source.
+    ///
+    /// For complete documentation on SQLBrowseConnectA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlbrowseconnect-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLBrowseConnectA(
+        self,
+        InConnectionString: &OdbcStr<SQLCHAR>,
+        OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
+        StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
+    ) -> (
+        Result<SQLHDBC<'env, C4, V>, Result<SQLHDBC<'env, C3, V>, SQLHDBC<'env, C2, V>>>,
+        SQLRETURN,
+    )
+    where
+        Self: BrowseConnect,
+    {
+        let InConnectionString = InConnectionString.as_raw_slice();
+        let OutConnectionString =
+            OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
+
+        let sql_return = unsafe {
+            ffi::SQLBrowseConnectA(
+                self.as_SQLHANDLE(),
+                InConnectionString.0,
+                InConnectionString.1,
+                OutConnectionString.0,
+                OutConnectionString.1,
+                StringLength2Ptr.as_mut_ptr(),
+            )
+        };
+
+        if SQL_SUCCEEDED(sql_return) {
+            (Ok(self.connect()), sql_return)
+        } else if sql_return == SQL_NEED_DATA {
+            (Err(Ok(self.need_data())), sql_return)
+        } else if sql_return == SQL_STILL_EXECUTING {
+            unimplemented!("Asynchronous execution not supported")
+        } else {
+            (Err(Err(self.disconnect())), sql_return)
+        }
+    }
+
+    /// Supports an iterative method of discovering and enumerating the attributes and attribute values required to connect to a data source. Each call to **SQLBrowseConnect** returns successive levels of attributes and attribute values. When all levels have been enumerated, a connection to the data source is completed and a complete connection string is returned by **SQLBrowseConnect**. A return code of SQL_SUCCESS or SQL_SUCCESS_WITH_INFO indicates that all connection information has been specified and the application is now connected to the data source.
+    ///
+    /// For complete documentation on SQLBrowseConnectW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlbrowseconnect-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLBrowseConnectW(
+        self,
+        InConnectionString: &OdbcStr<SQLWCHAR>,
+        OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
+        StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
+    ) -> (
+        Result<SQLHDBC<'env, C4, V>, Result<SQLHDBC<'env, C3, V>, SQLHDBC<'env, C2, V>>>,
+        SQLRETURN,
+    )
+    where
+        Self: BrowseConnect,
+    {
+        let InConnectionString = InConnectionString.as_raw_slice();
+        let OutConnectionString =
+            OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
+
+        let sql_return = unsafe {
+            ffi::SQLBrowseConnectW(
+                self.as_SQLHANDLE(),
+                InConnectionString.0,
+                InConnectionString.1,
+                OutConnectionString.0,
+                OutConnectionString.1,
+                StringLength2Ptr.as_mut_ptr(),
+            )
+        };
+
+        if SQL_SUCCEEDED(sql_return) {
+            (Ok(self.connect()), sql_return)
+        } else if sql_return == SQL_NEED_DATA {
+            (Err(Ok(self.need_data())), sql_return)
+        } else if sql_return == SQL_STILL_EXECUTING {
+            unimplemented!("Asynchronous execution not supported")
+        } else {
+            (Err(Err(self.disconnect())), sql_return)
+        }
+    }
+
+    /// Closes the connection associated with a specific connection handle.
+    ///
+    /// For complete documentation on SQLDisconnect, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldisconnect-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLDisconnect(self) -> (Result<SQLHDBC<'env, C2, V>, Self>, SQLRETURN)
+    where
+        Self: Disconnect,
+    {
+        let sql_return = unsafe { ffi::SQLDisconnect(self.as_SQLHANDLE()) };
+
+        if SQL_SUCCEEDED(sql_return) {
+            (Ok(self.disconnect()), sql_return)
+        } else {
+            (Err(self), sql_return)
+        }
+    }
+
+    /// Returns the current setting of a connection attribute.
+    ///
+    /// For complete documentation on SQLGetConnectAttrA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetconnectattr-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLGetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<C, A, V>>(
+        // TODO: Not sure whether attributes should be checked when getting them with SQLGetConnectAttr
+        &self,
+        Attribute: A,
+        ValuePtr: Option<&mut T>,
+        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
+    ) -> SQLRETURN
+    where
+        T: AttrGet<A> + Ansi + ?Sized,
+        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+    {
+        let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
+            if cfg!(feature = "odbc_debug") {
+                ValuePtr.assert_zeroed();
+            }
+
+            (ValuePtr.as_mut_SQLPOINTER(), ValuePtr.len())
+        });
+
+        unsafe {
+            ffi::SQLGetConnectAttrA(
+                self.as_SQLHANDLE(),
+                A::IDENTIFIER,
+                ValuePtr.0,
+                ValuePtr.1,
+                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+            )
+        }
+    }
+
+    /// Returns the current setting of a connection attribute.
+    ///
+    /// For complete documentation on SQLGetConnectAttrW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetconnectattr-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLGetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<C, A, V>>(
+        // TODO: Not really sure whether attributes should be checked when getting them with SQLGetConnectAttr
+        &self,
+        Attribute: A,
+        ValuePtr: Option<&mut T>,
+        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
+    ) -> SQLRETURN
+    where
+        T: AttrGet<A> + Unicode + ?Sized,
+        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+    {
+        let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
+            if cfg!(feature = "odbc_debug") {
+                ValuePtr.assert_zeroed();
+            }
+
+            (ValuePtr.as_mut_SQLPOINTER(), ValuePtr.len())
+        });
+
+        unsafe {
+            ffi::SQLGetConnectAttrW(
+                self.as_SQLHANDLE(),
+                A::IDENTIFIER,
+                ValuePtr.0,
+                ValuePtr.1,
+                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+            )
+        }
+    }
+
+    /// Sets attributes that govern aspects of connections.
+    ///
+    /// For complete documentation on SQLSetConnectAttrA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetconnectattr-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLSetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<C, A, V>>(
+        &self,
+        Attribute: A,
+        ValuePtr: T,
+    ) -> SQLRETURN
+    where
+        T: AttrSet<A> + Ansi,
+    {
+        unsafe {
+            ffi::SQLSetConnectAttrA(
+                self.as_SQLHANDLE(),
+                A::IDENTIFIER,
+                ValuePtr.into_SQLPOINTER(),
+                ValuePtr.len(),
+            )
+        }
+    }
+
+    /// Sets attributes that govern aspects of connections.
+    ///
+    /// For complete documentation on SQLSetConnectAttrW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetconnectattr-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLSetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<C, A, V>>(
+        &self,
+        Attribute: A,
+        ValuePtr: T,
+    ) -> SQLRETURN
+    where
+        T: AttrSet<A> + Unicode,
+    {
+        unsafe {
+            ffi::SQLSetConnectAttrW(
+                self.as_SQLHANDLE(),
+                A::IDENTIFIER,
+                ValuePtr.into_SQLPOINTER(),
+                ValuePtr.len(),
+            )
+        }
+    }
+}
+
+impl<'env, V: OdbcVersion> SQLHDBC<'env, C2, V> {
+    /// Establishes connections to a driver and a data source. The connection handle references storage of all information about the connection to the data source, including status, transaction state, and error information.
+    ///
+    /// For complete documentation on SQLConnectA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlconnect-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLConnectA(
+        self,
+        ServerName: &OdbcStr<SQLCHAR>,
+        UserName: &OdbcStr<SQLCHAR>,
+        Authentication: &OdbcStr<SQLCHAR>,
+    ) -> (
+        Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+        SQLRETURN,
+    ) {
+        let ServerName = ServerName.as_raw_slice();
+        let UserName = UserName.as_raw_slice();
+        let Authentication = Authentication.as_raw_slice();
+
+        let sql_return = unsafe {
+            ffi::SQLConnectA(
+                self.as_SQLHANDLE(),
+                ServerName.0,
+                ServerName.1,
+                UserName.0,
+                UserName.1,
+                Authentication.0,
+                Authentication.1,
+            )
+        };
+
+        if SQL_SUCCEEDED(sql_return) {
+            (Ok(self.connect()), sql_return)
+        } else {
+            (Err(self), sql_return)
+        }
+    }
+
+    /// Establishes connections to a driver and a data source. The connection handle references storage of all information about the connection to the data source, including status, transaction state, and error information.
+    ///
+    /// For complete documentation on SQLConnectW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlconnect-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLConnectW(
+        self,
+        ServerName: &OdbcStr<SQLWCHAR>,
+        UserName: &OdbcStr<SQLWCHAR>,
+        Authentication: &OdbcStr<SQLWCHAR>,
+    ) -> (
+        Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+        SQLRETURN,
+    ) {
+        let ServerName = ServerName.as_raw_slice();
+        let UserName = UserName.as_raw_slice();
+        let Authentication = Authentication.as_raw_slice();
+
+        let sql_return = unsafe {
+            ffi::SQLConnectW(
+                self.as_SQLHANDLE(),
+                ServerName.0,
+                ServerName.1,
+                UserName.0,
+                UserName.1,
+                Authentication.0,
+                Authentication.1,
+            )
+        };
+
+        if SQL_SUCCEEDED(sql_return) {
+            (Ok(self.connect()), sql_return)
+        } else {
+            (Err(self), sql_return)
+        }
+    }
+
+    /// An alternative to **SQLConnect**. It supports data sources that require more connection information than the three arguments in **SQLConnect**, dialog boxes to prompt the user for all connection information, and data sources that are not defined in the system information. For more information, see Connecting with SQLDriverConnect.
+    ///
+    /// For complete documentation on SQLDriverConnectA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldriverconnect-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLDriverConnectA(
+        self,
+        WindowHandle: Option<SQLHWND>,
+        InConnectionString: &OdbcStr<SQLCHAR>,
+        OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
+        StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
+        DriverCompletion: DriverCompletion,
+    ) -> (
+        Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+        SQLRETURN,
+    ) {
+        let InConnectionString = InConnectionString.as_raw_slice();
+        let OutConnectionString =
+            OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
+
+        let sql_return = unsafe {
+            ffi::SQLDriverConnectA(
+                self.as_SQLHANDLE(),
+                // TODO: Fix this
+                ptr::null_mut(),
+                InConnectionString.0,
+                InConnectionString.1,
+                OutConnectionString.0,
+                OutConnectionString.1,
+                StringLength2Ptr.as_mut_ptr(),
+                DriverCompletion as SQLUSMALLINT,
+            )
+        };
+
+        if SQL_SUCCEEDED(sql_return) {
+            (Ok(self.connect()), sql_return)
+        } else {
+            (Err(self), sql_return)
+        }
+    }
+
+    /// An alternative to **SQLConnect**. It supports data sources that require more connection information than the three arguments in **SQLConnect**, dialog boxes to prompt the user for all connection information, and data sources that are not defined in the system information. For more information, see Connecting with SQLDriverConnect.
+    ///
+    /// For complete documentation on SQLDriverConnectW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqldriverconnect-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLDriverConnectW(
+        self,
+        WindowHandle: Option<SQLHWND>,
+        InConnectionString: &OdbcStr<SQLWCHAR>,
+        OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
+        StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
+        DriverCompletion: DriverCompletion,
+    ) -> (
+        Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
+        SQLRETURN,
+    ) {
+        let InConnectionString = InConnectionString.as_raw_slice();
+        let OutConnectionString =
+            OutConnectionString.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
+
+        let sql_return = unsafe {
+            ffi::SQLDriverConnectW(
+                self.as_SQLHANDLE(),
+                // TODO: Fix this
+                ptr::null_mut(),
+                InConnectionString.0,
+                InConnectionString.1,
+                OutConnectionString.0,
+                OutConnectionString.1,
+                StringLength2Ptr.as_mut_ptr(),
+                DriverCompletion as SQLUSMALLINT,
+            )
+        };
+
+        if SQL_SUCCEEDED(sql_return) {
+            (Ok(self.connect()), sql_return)
+        } else {
+            (Err(self), sql_return)
+        }
+    }
+}
+
+impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
+    /// Returns information about whether a driver supports a specific ODBC function. This function is implemented in the Driver Manager; it can also be implemented in drivers. If a driver implements **SQLGetFunctions**, the Driver Manager calls the function in the driver. Otherwise, it executes the function itself.
+    ///
+    /// For complete documentation on SQLGetFunctions, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetfunctions-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLGetFunctions(
+        &self,
+        FunctionId: FunctionId,
+        SupportedPtr: &mut MaybeUninit<SQLUSMALLINT>,
+    ) -> SQLRETURN {
+        unsafe {
+            ffi::SQLGetFunctions(
+                self.as_SQLHANDLE(),
+                FunctionId as SQLUSMALLINT,
+                SupportedPtr.as_mut_ptr(),
+            )
+        }
+    }
+
+    /// Returns general information about the driver and data source associated with a connection.
+    ///
+    /// For complete documentation on SQLGetInfoA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetinfo-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLGetInfoA<A: Ident<Type = SQLUSMALLINT>, T: InfoType<A, V>>(
+        // TODO: SQL_ODBC_VER can be called on connection that is not open
+        &self,
+        InfoType: A,
+        InfoValuePtr: Option<&mut T>,
+        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
+    ) -> SQLRETURN
+    where
+        T: AttrGet<A> + Ansi + ?Sized,
+        MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
+    {
+        let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
+            (InfoValuePtr.as_mut_SQLPOINTER(), InfoValuePtr.len())
+        });
+
+        unsafe {
+            ffi::SQLGetInfoA(
+                self.as_SQLHANDLE(),
+                A::IDENTIFIER,
+                InfoValuePtr.0,
+                InfoValuePtr.1,
+                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+            )
+        }
+    }
+
+    /// Returns general information about the driver and data source associated with a connection.
+    ///
+    /// For complete documentation on SQLGetInfoW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetinfo-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case, unused_variables)]
+    pub fn SQLGetInfoW<A: Ident<Type = SQLUSMALLINT>, T: InfoType<A, V>>(
+        // TODO: SQL_ODBC_VER can be called on connection that is not open
+        &self,
+        InfoType: A,
+        InfoValuePtr: Option<&mut T>,
+        StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
+    ) -> SQLRETURN
+    where
+        T: AttrGet<A> + Unicode + ?Sized,
+        MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
+    {
+        let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
+            (InfoValuePtr.as_mut_SQLPOINTER(), InfoValuePtr.len())
+        });
+
+        unsafe {
+            ffi::SQLGetInfoW(
+                self.as_SQLHANDLE(),
+                A::IDENTIFIER,
+                InfoValuePtr.0,
+                InfoValuePtr.1,
+                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+            )
+        }
+    }
+
+    /// Returns the SQL string as modified by the driver. **SQLNativeSql** does not execute the SQL statement.
+    ///
+    /// For complete documentation on SQLNativeSqlA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlnativesql-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLNativeSqlA(
+        &self,
+        InStatementText: &OdbcStr<SQLCHAR>,
+        OutStatementText: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
+        TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
+    ) -> SQLRETURN {
+        let InStatementText = InStatementText.as_raw_slice();
+        let OutStatementText = OutStatementText.as_mut_raw_slice();
+
+        unsafe {
+            ffi::SQLNativeSqlA(
+                self.as_SQLHANDLE(),
+                InStatementText.0,
+                InStatementText.1,
+                OutStatementText.0,
+                OutStatementText.1,
+                TextLength2Ptr.as_mut_ptr(),
+            )
+        }
+    }
+
+    /// Returns the SQL string as modified by the driver. **SQLNativeSql** does not execute the SQL statement.
+    ///
+    /// For complete documentation on SQLNativeSqlW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlnativesql-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLNativeSqlW(
+        &self,
+        InStatementText: &OdbcStr<SQLWCHAR>,
+        OutStatementText: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
+        TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
+    ) -> SQLRETURN {
+        let InStatementText = InStatementText.as_raw_slice();
+        let OutStatementText = OutStatementText.as_mut_raw_slice();
+
+        unsafe {
+            ffi::SQLNativeSqlW(
+                self.as_SQLHANDLE(),
+                InStatementText.0,
+                InStatementText.1,
+                OutStatementText.0,
+                OutStatementText.1,
+                TextLength2Ptr.as_mut_ptr(),
+            )
+        }
+    }
+
+    /// Requests a commit or rollback operation for all active operations on all statements associated with a connection. **SQLEndTran** can also request that a commit or rollback operation be performed for all connections associated with an environment.
+    ///
+    /// For complete documentation on SQLEndTran, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlendtran-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLEndTran(&self, CompletionType: CompletionType) -> SQLRETURN {
+        // Not implemented on SQLHENV so as to to avoid confusion, considering that the same
+        // functionality can be achieved by calling SQLEndTran repeatedly on SQLHDBC handle
+
+        unsafe {
+            ffi::SQLEndTran(
+                <Self as Handle>::Ident::IDENTIFIER,
+                self.as_SQLHANDLE(),
+                CompletionType as SQLSMALLINT,
+            )
+        }
+    }
+
+    /// Cancels the processing on a connection or statement. The Driver Manager maps a call to **SQLCancelHandle** to a call to **SQLCancel** when `HandleType` is SQL_HANDLE_STMT.
+    ///
+    /// For complete documentation on SQLCancelHandle, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcancelhandle-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    pub fn SQLCancelHandle(&self) -> SQLRETURN {
+        // Not implemented on SQLHSTMT because SQLHSTMT can also be cancelled via SQLCancel
+        unsafe { ffi::SQLCancelHandle(<Self as Handle>::Ident::IDENTIFIER, self.as_SQLHANDLE()) }
+    }
+}
+
+impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
+    /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
+    ///
+    /// For complete documentation on SQLExecDirectA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn SQLExecDirectA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
+        let StatementText = StatementText.as_raw_slice();
+
+        unsafe { ffi::SQLExecDirectA(self.as_SQLHANDLE(), StatementText.0, StatementText.1) }
+    }
+
+    /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
+    ///
+    /// For complete documentation on SQLExecDirectW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn SQLExecDirectW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
+        let StatementText = StatementText.as_raw_slice();
+
+        unsafe { ffi::SQLExecDirectW(self.as_SQLHANDLE(), StatementText.0, StatementText.1) }
+    }
+
+    /// Executes a prepared statement, using the current values of the parameter marker variables if any parameter markers exist in the statement.
+    ///
+    /// For complete documentation on SQLExecute, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecute-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn SQLExecute(&self) -> SQLRETURN {
+        unsafe { ffi::SQLExecute(self.as_SQLHANDLE()) }
+    }
+
+    /// Fetches the next rowset of data from the result set and returns data for all bound columns.
+    ///
+    /// For complete documentation on SQLFetch, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetch-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn SQLFetch(&self) -> SQLRETURN {
+        unsafe { ffi::SQLFetch(self.as_SQLHANDLE()) }
+    }
+
+    /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
+    /// When working with an ODBC 2.x driver, the Driver Manager maps this function to **SQLExtendedFetch**. For more information, see Mapping Replacement Functions for Backward Compatibility of Applications.
+    ///
+    /// For complete documentation on SQLFetchScroll, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetchscroll-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn SQLFetchScroll(&self, FetchOrientation: SQLSMALLINT, FetchOffset: SQLLEN) -> SQLRETURN {
+        unsafe { ffi::SQLFetchScroll(self.as_SQLHANDLE(), FetchOrientation, FetchOffset) }
+    }
+
+    /// Sets the cursor position in a rowset and allows an application to refresh data in the rowset or to update or delete data in the result set.
+    ///
+    /// For complete documentation on SQLSetPos, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetpos-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn SQLSetPos(
+        &self,
+        RowNumber: SQLSETPOSIROW,
+        Operation: Operation,
+        LockType: LockType,
+    ) -> SQLRETURN {
+        unsafe {
+            ffi::SQLSetPos(
+                self.as_SQLHANDLE(),
+                RowNumber,
+                Operation as SQLUSMALLINT,
+                LockType as SQLUSMALLINT,
+            )
+        }
+    }
+}
+
+impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
+    /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
+    ///
+    /// For complete documentation on SQLExecDirectA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub unsafe fn SQLExecDirectA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
+        let StatementText = StatementText.as_raw_slice();
+
+        ffi::SQLExecDirectA(self.as_SQLHANDLE(), StatementText.0, StatementText.1)
+    }
+
+    /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
+    ///
+    /// For complete documentation on SQLExecDirectW, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecdirect-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub unsafe fn SQLExecDirectW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
+        let StatementText = StatementText.as_raw_slice();
+
+        ffi::SQLExecDirectW(self.as_SQLHANDLE(), StatementText.0, StatementText.1)
+    }
+
+    /// Executes a prepared statement, using the current values of the parameter marker variables if any parameter markers exist in the statement.
+    ///
+    /// For complete documentation on SQLExecute, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlexecute-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub unsafe fn SQLExecute(&self) -> SQLRETURN {
+        ffi::SQLExecute(self.as_SQLHANDLE())
+    }
+
+    /// Fetches the next rowset of data from the result set and returns data for all bound columns.
+    ///
+    /// For complete documentation on SQLFetch, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetch-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub unsafe fn SQLFetch(&self) -> SQLRETURN {
+        ffi::SQLFetch(self.as_SQLHANDLE())
+    }
+
+    /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
+    /// When working with an ODBC 2.x driver, the Driver Manager maps this function to **SQLExtendedFetch**. For more information, see Mapping Replacement Functions for Backward Compatibility of Applications.
+    ///
+    /// For complete documentation on SQLFetchScroll, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetchscroll-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub unsafe fn SQLFetchScroll(
+        &self,
+        FetchOrientation: SQLSMALLINT,
+        FetchOffset: SQLLEN,
+    ) -> SQLRETURN {
+        ffi::SQLFetchScroll(self.as_SQLHANDLE(), FetchOrientation, FetchOffset)
+    }
+
+    /// Sets the cursor position in a rowset and allows an application to refresh data in the rowset or to update or delete data in the result set.
+    ///
+    /// For complete documentation on SQLSetPos, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetpos-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub unsafe fn SQLSetPos(
+        &self,
+        RowNumber: SQLSETPOSIROW,
+        Operation: Operation,
+        LockType: LockType,
+    ) -> SQLRETURN {
+        ffi::SQLSetPos(
+            self.as_SQLHANDLE(),
+            RowNumber,
+            Operation as SQLUSMALLINT,
+            LockType as SQLUSMALLINT,
+        )
+    }
+}
+
+impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V> for SQLHSTMT<'conn, 'desc, 'buf, V> {
+
+    // TODO: When GATs are implemented use 'stmt instead of 'conn
+    // because implicit descriptors are managed by the DM
+    type ARD = RefSQLHDESC<'conn, AppDesc<'buf>, V>;
+    type APD = RefSQLHDESC<'conn, AppDesc<'buf>, V>;
+    type IRD = RefSQLHDESC<'conn, IRD, V>;
+    type IPD = RefSQLHDESC<'conn, IPD, V>;
+
+    type ExplicitARD = SQLHDESC<'conn, AppDesc<'buf>, V>;
+    type ExplicitAPD = SQLHDESC<'conn, AppDesc<'buf>, V>;
+
+    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    where B: ?Sized {
+        //TODO:
+        //self.0.bind_col(TargetValuePtr)
+    }
+
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    where B: ?Sized {
+        // TODO:
+        //self.0.bind_param(TargetValuePtr)
+    }
+
+    fn bind_strlen_or_ind(&self, StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>) {
+        self.0.bind_strlen_or_ind(StrLen_or_IndPtr)
+    }
+}
+
+impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V> for UnsafeSQLHSTMT<'conn, 'desc, 'buf, V> {
+
+    // TODO: When GATs are implemented use 'stmt instead of 'conn
+    // because implicit descriptors are managed by the DM
+    type ARD = RefUnsafeSQLHDESC<'conn, AppDesc<'buf>, V>;
+    type APD = RefUnsafeSQLHDESC<'conn, AppDesc<'buf>, V>;
+    type IRD = RefUnsafeSQLHDESC<'conn, IRD, V>;
+    type IPD = RefUnsafeSQLHDESC<'conn, IPD, V>;
+
+    type ExplicitARD = UnsafeSQLHDESC<'conn, AppDesc<'buf>, V>;
+    type ExplicitAPD = UnsafeSQLHDESC<'conn, AppDesc<'buf>, V>;
+
+    // TODO: Don't bind (SQLPOINTER, SQLLEN) fat pointer when using raw_api
+    #[cfg(not(feature = "odbc_debug"))]
+    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    where
+        B: ?Sized,
+    {
+    }
+    #[cfg(not(feature = "odbc_debug"))]
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    where
+        B: ?Sized,
+    {
+    }
+    #[cfg(not(feature = "odbc_debug"))]
+    fn bind_strlen_or_ind(&self, StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>) {}
+
+    #[cfg(feature = "odbc_debug")]
+    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    where
+        B: ?Sized,
+    {
+        if let Some(explicit_ard) = self.explicit_ard.get() {
+            // TODO:
+            //explicit_ard.bind_col(TargetValuePtr);
+        } else {
+            // TODO:
+            //self.ard.bind_col(TargetValuePtr);
+        }
+    }
+    #[cfg(feature = "odbc_debug")]
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    where
+        B: ?Sized,
+    {
+        if let Some(explicit_apd) = self.explicit_apd.get() {
+            // TODO:
+            //explicit_apd.bind_param(TargetValuePtr);
+        } else {
+            // TODO:
+            //self.apd.bind_param(TargetValuePtr);
+        }
+    }
+    #[cfg(feature = "odbc_debug")]
+    fn bind_strlen_or_ind(&self, StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>) {
+        unimplemented!();
+    }
+}
+
+impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for SQLHDESC<'conn, DT, V> {
+}
+impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for UnsafeSQLHDESC<'conn, DT, V> {
+}
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefUnsafeSQLHDESC<'_, DT, V> {
+}
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefSQLHDESC<'_, DT, V> {
+}
+
 impl Async for SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3_80> {}
 impl Async for SQLHSTMT<'_, '_, '_, SQL_OV_ODBC4> {}
 impl Async for SQLHDBC<'_, C4, SQL_OV_ODBC3_80> {}
 impl Async for SQLHDBC<'_, C4, SQL_OV_ODBC4> {}
 
 #[allow(non_snake_case, unused_variables)]
-fn SQLGetStmtAttrA<'stmt, 'desc, 'buf, A: Ident<Type = SQLINTEGER>, T: BaseStmtAttr<'stmt, 'desc, 'buf, A, S, V>, S: Statement<'desc, 'buf, V>, V: OdbcVersion>(
+fn SQLGetStmtAttrA<
+    'stmt,
+    'desc,
+    'buf,
+    S: Statement<'desc, 'buf, V>,
+    A: Ident<Type = SQLINTEGER>,
+    T: BaseStmtAttr<'desc, 'buf, S, A, V>,
+    V: OdbcVersion,
+>(
     Handle: &'stmt S,
     Attribute: A,
     ValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrGet<A> + Ansi + ?Sized,
+    T: AttrGet<A> + Ansi + Ref<'stmt> + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     if let Some(ValuePtr) = ValuePtr {
@@ -3110,14 +3145,22 @@ where
 }
 
 #[allow(non_snake_case, unused_variables)]
-fn SQLGetStmtAttrW<'stmt, 'desc, 'buf, A: Ident<Type = SQLINTEGER>, T: BaseStmtAttr<'stmt, 'desc, 'buf, A, S, V>, S: Statement<'desc, 'buf, V>, V: OdbcVersion>(
+fn SQLGetStmtAttrW<
+    'stmt,
+    'desc,
+    'buf,
+    S: Statement<'desc, 'buf, V>,
+    A: Ident<Type = SQLINTEGER>,
+    T: BaseStmtAttr<'desc, 'buf, S, A, V>,
+    V: OdbcVersion,
+>(
     Handle: &'stmt S,
     Attribute: A,
     ValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrGet<A> + Unicode + ?Sized,
+    T: AttrGet<A> + Unicode + Ref<'stmt> + ?Sized,
     MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
 {
     if let Some(ValuePtr) = ValuePtr {
@@ -3140,10 +3183,21 @@ where
 }
 
 #[allow(non_snake_case, unused_variables)]
-fn SQLSetStmtAttrA<'desc, 'buf, A: Ident<Type = SQLINTEGER>, T: for<'stmt> BaseStmtAttr<'stmt, 'desc, 'buf, A, S, V>, S: Statement<'desc, 'buf, V>, V: OdbcVersion>(Handle: &S, Attribute: A, ValuePtr: T)
--> SQLRETURN
+fn SQLSetStmtAttrA<
+    'desc,
+    'buf,
+    S: Statement<'desc, 'buf, V>,
+    A: Ident<Type = SQLINTEGER>,
+    T: BaseStmtAttr<'desc, 'buf, S, A, V>,
+    V: OdbcVersion,
+>(
+    Handle: &S,
+    Attribute: A,
+    ValuePtr: T,
+) -> SQLRETURN
 where
-T: AttrSet<A> + Ansi {
+    T: AttrSet<A> + Ansi,
+{
     let sql_return = unsafe {
         ffi::SQLSetStmtAttrA(
             Handle.as_SQLHANDLE(),
@@ -3161,10 +3215,21 @@ T: AttrSet<A> + Ansi {
 }
 
 #[allow(non_snake_case, unused_variables)]
-fn SQLSetStmtAttrW<'desc, 'buf, A: Ident<Type = SQLINTEGER>, T: for<'stmt> BaseStmtAttr<'stmt, 'desc, 'buf, A, S, V>, S: Statement<'desc, 'buf, V>, V: OdbcVersion>(Handle: &S, Attribute: A, ValuePtr: T)
--> SQLRETURN
+fn SQLSetStmtAttrW<
+    'desc,
+    'buf,
+    S: Statement<'desc, 'buf, V>,
+    A: Ident<Type = SQLINTEGER>,
+    T: BaseStmtAttr<'desc, 'buf, S, A, V>,
+    V: OdbcVersion,
+>(
+    Handle: &S,
+    Attribute: A,
+    ValuePtr: T,
+) -> SQLRETURN
 where
-T: AttrSet<A> + Unicode {
+    T: AttrSet<A> + Unicode,
+{
     let sql_return = unsafe {
         ffi::SQLSetStmtAttrW(
             Handle.as_SQLHANDLE(),
@@ -3181,8 +3246,6 @@ T: AttrSet<A> + Unicode {
     sql_return
 }
 
-#[cfg(test)]
-use mockall::automock;
 #[cfg_attr(test, automock)]
 pub(crate) mod ffi {
     use crate::handle::SQLHWND;
