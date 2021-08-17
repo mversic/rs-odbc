@@ -522,6 +522,32 @@ mod test {
     use crate::env::SQL_OV_ODBC3_80;
 
     #[test]
+    fn env_SQL_OV_ODBC3_80_version_set() {
+        let env_raw_handle = 13 as SQLHANDLE;
+
+        let SQLSetEnvAttr_ctx = ffi::SQLSetEnvAttr_context();
+        let SQLFreeHandle_ctx = ffi::SQLFreeHandle_context();
+
+        SQLSetEnvAttr_ctx
+            .expect()
+            .once()
+            .withf_st(move |x, y, z, w| {
+                *x == env_raw_handle
+                    && *y == SQL_ATTR_ODBC_VERSION::IDENTIFIER
+                    && *z == SQL_OV_ODBC3_80::IDENTIFIER.into_SQLPOINTER()
+                    && *w == 0
+            })
+            .return_const(SQL_SUCCESS);
+        SQLFreeHandle_ctx
+            .expect()
+            .once()
+            .withf_st(move |x, y| *x == SQL_HANDLE_ENV::IDENTIFIER && *y == env_raw_handle)
+            .return_const(SQL_SUCCESS);
+
+        unsafe { SQLHENV::<SQL_OV_ODBC3_80>::from_raw(&SQL_NULL_HANDLE, env_raw_handle) };
+    }
+
+    #[test]
     fn disconnect_C2() {
         let conn_raw_handle = 13 as SQLHANDLE;
 
@@ -539,7 +565,7 @@ mod test {
             handle: conn_raw_handle,
             parent: PhantomData,
             connected: PhantomData,
-            version: PhantomData
+            version: PhantomData,
         };
     }
 
@@ -565,7 +591,7 @@ mod test {
             handle: conn_raw_handle,
             parent: PhantomData,
             connected: PhantomData,
-            version: PhantomData
+            version: PhantomData,
         };
     }
 
@@ -591,7 +617,7 @@ mod test {
             handle: conn_raw_handle,
             parent: PhantomData,
             connected: PhantomData,
-            version: PhantomData
+            version: PhantomData,
         };
     }
 
