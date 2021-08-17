@@ -4,7 +4,7 @@ error[E0505]: cannot move out of `conn` because it is borrowed
 30 |     let (stmt, _) = SQLHSTMT::SQLAllocHandle(&conn);
    |                                              ----- borrow of `conn` occurs here
 ...
-33 |     conn.SQLFreeHandle();
+33 |     conn.SQLDisconnect();
    |     ^^^^ move out of `conn` occurs here
 34 |     stmt.SQLFreeHandle();
    |     ---- borrow later used here

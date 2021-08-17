@@ -30,6 +30,6 @@ fn main() {
     let (stmt, _) = SQLHSTMT::SQLAllocHandle(&conn);
     let stmt = stmt.unwrap();
 
-    conn.SQLFreeHandle();
+    conn.SQLDisconnect();
     stmt.SQLFreeHandle();
 }

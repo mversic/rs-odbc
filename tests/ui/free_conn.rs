@@ -10,22 +10,10 @@ fn get_env_handle() -> SQLHENV<SQL_OV_ODBC3_80> {
     env.unwrap()
 }
 
-fn connect_to_test_db<'env>(
-    env: &'env SQLHENV<SQL_OV_ODBC3_80>,
-) -> SQLHDBC<'env, C4, SQL_OV_ODBC3_80> {
-    let (conn, _) = SQLHDBC::SQLAllocHandle(env);
-    let conn = conn.unwrap();
-    let mut outstrlen = MaybeUninit::uninit();
-
-    let (conn, _) =
-        conn.SQLDriverConnectA(None, "".as_ref(), None, &mut outstrlen, SQL_DRIVER_COMPLETE);
-
-    conn.unwrap()
-}
-
 fn main() {
     let env = get_env_handle();
-    let conn = connect_to_test_db(&env);
+    let (conn, _) = SQLHDBC::SQLAllocHandle(&env);
+    let conn = conn.unwrap();
 
     env.SQLFreeHandle();
     conn.SQLFreeHandle();

@@ -18,7 +18,7 @@ use crate::{
     desc::{DescField, DescType, AppDesc, IRD, IPD},
     diag::{DiagField, SQLSTATE},
     env::{EnvAttr, OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4},
-    handle::{UnsafeSQLHSTMT, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT},
+    handle::{UnsafeSQLHSTMT, SQLHDBC, RefSQLHDESC, SQLHDESC, SQLHENV, SQLHSTMT},
     info::InfoType,
     sql_types::SqlType,
     sqlreturn::{SQLRETURN, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_SUCCEEDED},
@@ -32,7 +32,61 @@ use crate::{
 
 pub trait Handle: AsSQLHANDLE + Sized {
     type Ident: Ident<Type = SQLSMALLINT>;
+}
 
+pub trait Allocate<'src>: Handle {
+    type SrcHandle: AsSQLHANDLE;
+
+    /// Creates handle from a raw pointer
+    ///
+    /// # Safety
+    ///
+    /// This is highly unsafe, due to the fact that raw pointer validity isn't checked
+    ///
+    // TODO: Consider using ptr::NonNull<RawHandle> here
+    unsafe fn from_raw(handle: SQLHANDLE) -> Self;
+
+    /// Allocates an environment, connection, statement, or descriptor handle.
+    ///
+    /// For complete documentation on SQLAllocHandle, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlallochandle-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_INVALID_HANDLE, or SQL_ERROR.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    fn SQLAllocHandle(InputHandle: &'src Self::SrcHandle) -> (Result<Self, ()>, SQLRETURN) {
+        // Initialized to ptr::null_mut for additional safety
+        let mut output_handle: SQLHANDLE = ptr::null_mut();
+
+        unsafe {
+            let sql_return = ffi::SQLAllocHandle(
+                Self::Ident::IDENTIFIER,
+                InputHandle.as_SQLHANDLE(),
+                &mut output_handle,
+            );
+
+            if SQL_SUCCEEDED(sql_return) {
+                (Ok(Self::from_raw(output_handle)), sql_return)
+            } else {
+                (Err(()), sql_return)
+            }
+        }
+    }
+
+    /// Frees resources associated with a specific environment, connection, statement, or descriptor handle.
+    ///
+    /// For complete documentation on SQLFreeHandle, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfreehandle-function).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the DM returns value other than SQL_SUCCESS
+    #[inline]
+    #[allow(non_snake_case)]
+    fn SQLFreeHandle(self) {}
+}
+
+pub trait Diagnostics: Handle {
     /// Returns the current value of a field of a record of the diagnostic data structure (associated with a specified handle) that contains error, warning, and status information.
     ///
     /// For complete documentation on SQLGetDiagFieldA, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdiagfield-function).
@@ -182,58 +236,6 @@ pub trait Handle: AsSQLHANDLE + Sized {
                 MessageText.1,
                 TextLengthPtr.as_mut_ptr(),
             )
-        }
-    }
-
-    /// Frees resources associated with a specific environment, connection, statement, or descriptor handle.
-    ///
-    /// For complete documentation on SQLFreeHandle, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfreehandle-function).
-    ///
-    /// # Panics
-    ///
-    /// Panics if the DM returns value other than SQL_SUCCESS
-    #[inline]
-    #[allow(non_snake_case)]
-    fn SQLFreeHandle(self) {}
-}
-
-pub trait Allocate<'src>: Handle {
-    type SrcHandle: AsSQLHANDLE;
-
-    /// Creates handle from a raw pointer
-    ///
-    /// # Safety
-    ///
-    /// This is highly unsafe, due to the fact that raw pointer validity isn't checked
-    ///
-    // TODO: Consider using ptr::NonNull<RawHandle> here
-    unsafe fn from_raw(handle: SQLHANDLE) -> Self;
-
-    /// Allocates an environment, connection, statement, or descriptor handle.
-    ///
-    /// For complete documentation on SQLAllocHandle, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlallochandle-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_INVALID_HANDLE, or SQL_ERROR.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    fn SQLAllocHandle(InputHandle: &'src Self::SrcHandle) -> (Result<Self, ()>, SQLRETURN) {
-        // Initialized to ptr::null_mut for additional safety
-        let mut output_handle: SQLHANDLE = ptr::null_mut();
-
-        unsafe {
-            let sql_return = ffi::SQLAllocHandle(
-                Self::Ident::IDENTIFIER,
-                InputHandle.as_SQLHANDLE(),
-                &mut output_handle,
-            );
-
-            if SQL_SUCCEEDED(sql_return) {
-                (Ok(Self::from_raw(output_handle)), sql_return)
-            } else {
-                (Err(()), sql_return)
-            }
         }
     }
 }
@@ -3092,14 +3094,10 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V> for UnsafeSQL
     }
 }
 
-impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for SQLHDESC<'conn, DT, V> {
-}
-impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for UnsafeSQLHDESC<'conn, DT, V> {
-}
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefUnsafeSQLHDESC<'_, DT, V> {
-}
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefSQLHDESC<'_, DT, V> {
-}
+impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for SQLHDESC<'conn, DT, V> { }
+impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for UnsafeSQLHDESC<'conn, DT, V> { }
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefUnsafeSQLHDESC<'_, DT, V> { }
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefSQLHDESC<'_, DT, V> { }
 
 impl Async for SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3_80> {}
 impl Async for SQLHSTMT<'_, '_, '_, SQL_OV_ODBC4> {}
