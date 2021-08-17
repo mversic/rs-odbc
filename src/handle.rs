@@ -1,6 +1,6 @@
 #[double]
 use crate::api::ffi;
-use crate::api::{Allocate, Handle, Diagnostics};
+use crate::api::{Allocate, Diagnostics, Handle};
 use crate::conn::{ConnState, C2, C3, C4};
 use crate::convert::{AsSQLHANDLE, IntoSQLPOINTER};
 use crate::desc::{AppDesc, IPD, IRD};
@@ -12,10 +12,10 @@ use crate::stmt::{
 use crate::{sqlreturn::SQL_SUCCESS, Ident, SQLPOINTER};
 use mockall_double::double;
 use std::any::type_name;
-use std::sync::{Arc, Weak};
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
+use std::sync::{Arc, Weak};
 use std::thread::panicking;
 
 #[derive(rs_odbc_derive::Ident)]
@@ -84,10 +84,8 @@ impl<V: OdbcVersion> Handle for SQLHENV<V> {
     type Ident = SQL_HANDLE_ENV;
 }
 
-impl<V: OdbcVersion> Allocate<'_> for SQLHENV<V> {
-    type SrcHandle = SQL_NULL_HANDLE;
-
-    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
+impl<V: OdbcVersion> Allocate<&SQL_NULL_HANDLE> for SQLHENV<V> {
+    unsafe fn from_raw(_: &SQL_NULL_HANDLE, handle: SQLHANDLE) -> Self {
         let val = Self {
             handle,
             version: PhantomData,
@@ -155,10 +153,8 @@ impl<C: ConnState, V: OdbcVersion> Handle for SQLHDBC<'_, C, V> {
     type Ident = SQL_HANDLE_DBC;
 }
 
-impl<'env, V: OdbcVersion> Allocate<'env> for SQLHDBC<'env, C2, V> {
-    type SrcHandle = SQLHENV<V>;
-
-    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
+impl<'env, V: OdbcVersion> Allocate<&'env SQLHENV<V>> for SQLHDBC<'env, C2, V> {
+    unsafe fn from_raw(_: &'env SQLHENV<V>, handle: SQLHANDLE) -> Self {
         Self {
             handle,
 
@@ -253,11 +249,11 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Handle for SQLHSTMT<'conn, 'desc, 'buf,
     type Ident = <UnsafeSQLHSTMT<'conn, 'desc, 'buf, V> as Handle>::Ident;
 }
 
-impl<'conn, 'desc, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHSTMT<'conn, 'desc, 'buf, V> {
-    type SrcHandle = <UnsafeSQLHSTMT<'conn, 'desc, 'buf, V> as Allocate<'conn>>::SrcHandle;
-
-    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
-        Self(UnsafeSQLHSTMT::from_raw(handle))
+impl<'env, 'conn, V: OdbcVersion> Allocate<&'conn SQLHDBC<'env, C4, V>>
+    for SQLHSTMT<'conn, '_, '_, V>
+{
+    unsafe fn from_raw(InputHandle: &'conn SQLHDBC<'env, C4, V>, handle: SQLHANDLE) -> Self {
+        Self(UnsafeSQLHSTMT::from_raw(InputHandle, handle))
     }
 }
 
@@ -308,12 +304,11 @@ impl<V: OdbcVersion> Handle for UnsafeSQLHSTMT<'_, '_, '_, V> {
     type Ident = SQL_HANDLE_STMT;
 }
 
-impl<'conn, V: OdbcVersion> Allocate<'conn> for UnsafeSQLHSTMT<'conn, '_, '_, V> {
-    // Valid because SQLHDBC is covariant
-    type SrcHandle = SQLHDBC<'conn, C4, V>;
-
+impl<'env, 'conn, V: OdbcVersion> Allocate<&'conn SQLHDBC<'env, C4, V>>
+    for UnsafeSQLHSTMT<'conn, '_, '_, V>
+{
     #[cfg(feature = "odbc_debug")]
-    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
+    unsafe fn from_raw(_: &'conn SQLHDBC<'conn, C4, V>, handle: SQLHANDLE) -> Self {
         unsafe {
             let ard = UnsafeSQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_ROW_DESC>(handle);
             let apd = UnsafeSQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_PARAM_DESC>(handle);
@@ -338,7 +333,7 @@ impl<'conn, V: OdbcVersion> Allocate<'conn> for UnsafeSQLHSTMT<'conn, '_, '_, V>
     }
 
     #[cfg(not(feature = "odbc_debug"))]
-    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
+    unsafe fn from_raw(_: &'conn SQLHDBC<'conn, C4, V>, handle: SQLHANDLE) -> Self {
         Self {
             handle,
 
@@ -420,12 +415,11 @@ impl<DT, V: OdbcVersion> Handle for SQLHDESC<'_, DT, V> {
     type Ident = SQL_HANDLE_DESC;
 }
 
-impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for SQLHDESC<'conn, AppDesc<'buf>, V> {
-    // Valid because SQLHDBC is covariant
-    type SrcHandle = <UnsafeSQLHDESC<'conn, AppDesc<'buf>, V> as Allocate<'conn>>::SrcHandle;
-
-    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
-        Self(UnsafeSQLHDESC::from_raw(handle))
+impl<'env, 'conn, 'buf, V: OdbcVersion> Allocate<&'conn SQLHDBC<'env, C4, V>>
+    for SQLHDESC<'conn, AppDesc<'buf>, V>
+{
+    unsafe fn from_raw(InputHandle: &'conn SQLHDBC<'env, C4, V>, handle: SQLHANDLE) -> Self {
+        Self(UnsafeSQLHDESC::from_raw(InputHandle, handle))
     }
 }
 
@@ -454,11 +448,11 @@ impl<V: OdbcVersion, T> Handle for UnsafeSQLHDESC<'_, T, V> {
     type Ident = SQL_HANDLE_DESC;
 }
 
-impl<'conn, 'buf, V: OdbcVersion> Allocate<'conn> for UnsafeSQLHDESC<'conn, AppDesc<'buf>, V> {
-    // Valid because SQLHDBC is covariant
-    type SrcHandle = SQLHDBC<'conn, C4, V>;
-
-    unsafe fn from_raw(handle: SQLHANDLE) -> Self {
+// Valid because SQLHDBC is covariant
+impl<'env, 'conn, 'buf, V: OdbcVersion> Allocate<&'conn SQLHDBC<'env, C4, V>>
+    for UnsafeSQLHDESC<'conn, AppDesc<'buf>, V>
+{
+    unsafe fn from_raw(_: &'conn SQLHDBC<'env, C4, V>, handle: SQLHANDLE) -> Self {
         Self {
             handle,
 
@@ -529,7 +523,7 @@ mod test {
 
     #[test]
     fn disconnect_C2() {
-        let raw_handle = 13 as SQLHANDLE;
+        let conn_raw_handle = 13 as SQLHANDLE;
 
         let SQLDisconnect_ctx = ffi::SQLDisconnect_context();
         let SQLFreeHandle_ctx = ffi::SQLFreeHandle_context();
@@ -538,15 +532,20 @@ mod test {
         SQLFreeHandle_ctx
             .expect()
             .once()
-            .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == raw_handle)
+            .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == conn_raw_handle)
             .return_const(SQL_SUCCESS);
 
-        unsafe { SQLHDBC::<C2, SQL_OV_ODBC3_80>::from_raw(raw_handle) };
+        SQLHDBC::<C2, SQL_OV_ODBC3_80> {
+            handle: conn_raw_handle,
+            parent: PhantomData,
+            connected: PhantomData,
+            version: PhantomData
+        };
     }
 
     #[test]
     fn disconnect_C3() {
-        let raw_handle = 13 as SQLHANDLE;
+        let conn_raw_handle = 13 as SQLHANDLE;
 
         let SQLDisconnect_ctx = ffi::SQLDisconnect_context();
         let SQLFreeHandle_ctx = ffi::SQLFreeHandle_context();
@@ -554,20 +553,25 @@ mod test {
         SQLDisconnect_ctx
             .expect()
             .once()
-            .withf_st(move |x| *x == raw_handle)
+            .withf_st(move |x| *x == conn_raw_handle)
             .return_const(SQL_SUCCESS);
         SQLFreeHandle_ctx
             .expect()
             .once()
-            .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == raw_handle)
+            .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == conn_raw_handle)
             .return_const(SQL_SUCCESS);
 
-        unsafe { SQLHDBC::<_, SQL_OV_ODBC3_80>::from_raw(raw_handle) }.need_data();
+        SQLHDBC::<C3, SQL_OV_ODBC3_80> {
+            handle: conn_raw_handle,
+            parent: PhantomData,
+            connected: PhantomData,
+            version: PhantomData
+        };
     }
 
     #[test]
     fn disconnect_C4() {
-        let raw_handle = 13 as SQLHANDLE;
+        let conn_raw_handle = 13 as SQLHANDLE;
 
         let SQLDisconnect_ctx = ffi::SQLDisconnect_context();
         let SQLFreeHandle_ctx = ffi::SQLFreeHandle_context();
@@ -575,22 +579,27 @@ mod test {
         SQLDisconnect_ctx
             .expect()
             .once()
-            .withf_st(move |x| *x == raw_handle)
+            .withf_st(move |x| *x == conn_raw_handle)
             .return_const(SQL_SUCCESS);
         SQLFreeHandle_ctx
             .expect()
             .once()
-            .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == raw_handle)
+            .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == conn_raw_handle)
             .return_const(SQL_SUCCESS);
 
-        unsafe { SQLHDBC::<_, SQL_OV_ODBC3_80>::from_raw(raw_handle) }.connect();
+        SQLHDBC::<C4, SQL_OV_ODBC3_80> {
+            handle: conn_raw_handle,
+            parent: PhantomData,
+            connected: PhantomData,
+            version: PhantomData
+        };
     }
 
     // TODO: Mockall is buggy and these tests fail more often
     //#[test]
     //#[should_panic]
     //fn disconnect_C3_panic() {
-    //    let raw_handle = 13 as SQLHANDLE;
+    //    let conn_raw_handle = 13 as SQLHANDLE;
 
     //    let SQLDisconnect_ctx = ffi::SQLDisconnect_context();
     //    let SQLFreeHandle_ctx = ffi::SQLFreeHandle_context();
@@ -598,21 +607,26 @@ mod test {
     //    SQLDisconnect_ctx
     //        .expect()
     //        .once()
-    //        .withf_st(move |x| *x == raw_handle)
+    //        .withf_st(move |x| *x == conn_raw_handle)
     //        .return_const(SQL_ERROR);
     //    SQLFreeHandle_ctx
     //        .expect()
     //        .once()
-    //        .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == raw_handle)
+    //        .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == conn_raw_handle)
     //        .return_const(SQL_SUCCESS);
 
-    //    SQLHDBC::<_, SQL_OV_ODBC3_80>::from_raw(raw_handle).need_data();
+    //    SQLHDBC::<C3, SQL_OV_ODBC3_80> {
+    //        handle: conn_raw_handle,
+    //        parent: PhantomData,
+    //        connected: PhantomData,
+    //        version: PhantomData
+    //    };
     //}
 
     //#[test]
     //#[should_panic]
     //fn disconnect_C4_panic() {
-    //    let raw_handle = 13 as SQLHANDLE;
+    //    let conn_raw_handle = 13 as SQLHANDLE;
 
     //    let SQLDisconnect_ctx = ffi::SQLDisconnect_context();
     //    let SQLFreeHandle_ctx = ffi::SQLFreeHandle_context();
@@ -620,14 +634,19 @@ mod test {
     //    SQLDisconnect_ctx
     //        .expect()
     //        .once()
-    //        .withf_st(move |x| *x == raw_handle)
+    //        .withf_st(move |x| *x == conn_raw_handle)
     //        .return_const(SQL_ERROR);
     //    SQLFreeHandle_ctx
     //        .expect()
     //        .once()
-    //        .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == raw_handle)
+    //        .withf_st(move |x, y| *x == SQL_HANDLE_DBC::IDENTIFIER && *y == conn_raw_handle)
     //        .return_const(SQL_SUCCESS);
 
-    //    SQLHDBC::<_, SQL_OV_ODBC3_80>::from_raw(raw_handle).connect();
+    //    SQLHDBC::<C3, SQL_OV_ODBC3_80> {
+    //        handle: conn_raw_handle,
+    //        parent: PhantomData,
+    //        connected: PhantomData,
+    //        version: PhantomData
+    //    };
     //}
 }

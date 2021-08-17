@@ -2,9 +2,9 @@ use crate::handle::*;
 #[cfg(test)]
 use mockall::automock;
 use std::cell::UnsafeCell;
+use std::ops::Deref;
 use std::mem::MaybeUninit;
 use std::ptr;
-
 use crate::{
     attr::{AttrGet, AttrSet},
     c_types::CData,
@@ -34,9 +34,7 @@ pub trait Handle: AsSQLHANDLE + Sized {
     type Ident: Ident<Type = SQLSMALLINT>;
 }
 
-pub trait Allocate<'src>: Handle {
-    type SrcHandle: AsSQLHANDLE;
-
+pub trait Allocate<SRC: Deref>: Handle where SRC::Target: AsSQLHANDLE {
     /// Creates handle from a raw pointer
     ///
     /// # Safety
@@ -44,7 +42,8 @@ pub trait Allocate<'src>: Handle {
     /// This is highly unsafe, due to the fact that raw pointer validity isn't checked
     ///
     // TODO: Consider using ptr::NonNull<RawHandle> here
-    unsafe fn from_raw(handle: SQLHANDLE) -> Self;
+    // TODO: make use of the first argument of this function with owning handles
+    unsafe fn from_raw(InputHandle: SRC, output_handle: SQLHANDLE) -> Self;
 
     /// Allocates an environment, connection, statement, or descriptor handle.
     ///
@@ -55,7 +54,7 @@ pub trait Allocate<'src>: Handle {
     #[inline]
     #[must_use]
     #[allow(non_snake_case)]
-    fn SQLAllocHandle(InputHandle: &'src Self::SrcHandle) -> (Result<Self, ()>, SQLRETURN) {
+    fn SQLAllocHandle(InputHandle: SRC) -> (Result<Self, ()>, SQLRETURN) {
         // Initialized to ptr::null_mut for additional safety
         let mut output_handle: SQLHANDLE = ptr::null_mut();
 
@@ -67,7 +66,7 @@ pub trait Allocate<'src>: Handle {
             );
 
             if SQL_SUCCEEDED(sql_return) {
-                (Ok(Self::from_raw(output_handle)), sql_return)
+                (Ok(Self::from_raw(InputHandle, output_handle)), sql_return)
             } else {
                 (Err(()), sql_return)
             }
