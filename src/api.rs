@@ -15,19 +15,19 @@ use crate::{
         AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLHANDLE, AsSQLPOINTER,
         IntoSQLPOINTER,
     },
-    desc::{DescField, DescType, AppDesc, IRD, IPD},
+    desc::{AppDesc, DescField, DescType, IPD, IRD},
     diag::{DiagField, SQLSTATE},
     env::{EnvAttr, OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4},
-    handle::{UnsafeSQLHSTMT, SQLHDBC, RefSQLHDESC, SQLHDESC, SQLHENV, SQLHSTMT},
+    handle::{RefSQLHDESC, UnsafeSQLHSTMT, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT, SQL_HANDLE_STMT},
     info::InfoType,
     sql_types::SqlType,
     sqlreturn::{SQLRETURN, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_SUCCEEDED},
     stmt::{private::BaseStmtAttr, StmtAttr},
     str::{Ansi, OdbcStr, Unicode},
     BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion, FreeStmtOption,
-    FunctionId, IOType, Ident, IdentifierType, LockType, NullAllowed, Operation, Reserved,
+    FunctionId, IOType, Ident, IdentifierType, LockType, NullAllowed, Operation, Ref, Reserved,
     Scope, StrLenOrInd, Unique, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW,
-    SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR, Ref,
+    SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
 
 pub trait Handle: AsSQLHANDLE + Sized {
@@ -241,7 +241,6 @@ pub trait Diagnostics: Handle {
 }
 
 pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
-
     type ARD: Descriptor<'buf, AppDesc<'buf>, V>;
     type APD: Descriptor<'buf, AppDesc<'buf>, V>;
     type IRD: Descriptor<'buf, IRD, V>;
@@ -250,11 +249,15 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     type ExplicitARD: Descriptor<'buf, AppDesc<'buf>, V>;
     type ExplicitAPD: Descriptor<'buf, AppDesc<'buf>, V>;
 
-    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
-    where
+    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(
+        &self,
+        TargetValuePtr: Option<&'buf B>,
+    ) where
         B: ?Sized;
-    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
-    where
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(
+        &self,
+        TargetValuePtr: Option<&'buf B>,
+    ) where
         B: ?Sized;
     fn bind_strlen_or_ind(&self, StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>);
 
@@ -370,20 +373,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     #[allow(non_snake_case)]
     fn SQLBulkOperations(&self, Operation: BulkOperation) -> SQLRETURN {
         unsafe { ffi::SQLBulkOperations(self.as_SQLHANDLE(), Operation as SQLUSMALLINT) }
-    }
-
-    /// Cancels the processing on a statement.
-    /// To cancel processing on a connection or statement, use SQLCancelHandle Function.
-    ///
-    /// For complete documentation on SQLCancel, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcancel-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    fn SQLCancel(&self) -> SQLRETURN {
-        unsafe { ffi::SQLCancel(self.as_SQLHANDLE()) }
     }
 
     /// Closes a cursor that has been opened on a statement and discards pending results.
@@ -986,7 +975,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
     #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(non_snake_case)]
     fn SQLGetTypeInfoA<ST: SqlType<V>>(&self, DataType: ST) -> SQLRETURN {
         unsafe { ffi::SQLGetTypeInfoA(self.as_SQLHANDLE(), DataType.identifier()) }
     }
@@ -999,7 +988,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
     #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(non_snake_case)]
     fn SQLGetTypeInfoW<ST: SqlType<V>>(&self, DataType: ST) -> SQLRETURN {
         unsafe { ffi::SQLGetTypeInfoW(self.as_SQLHANDLE(), DataType.identifier()) }
     }
@@ -1980,7 +1969,39 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     }
 }
 
-pub trait Async: Handle {
+pub trait Cancel<V: OdbcVersion>: Handle {
+    /// Cancels the processing on a statement.
+    /// To cancel processing on a connection or statement, use SQLCancelHandle Function.
+    ///
+    /// For complete documentation on SQLCancel, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcancel-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    fn SQLCancel(&self) -> SQLRETURN
+    where
+        Self: Handle<Ident = SQL_HANDLE_STMT>,
+    {
+        unsafe { ffi::SQLCancel(self.as_SQLHANDLE()) }
+    }
+
+    /// Cancels the processing on a connection or statement. The Driver Manager maps a call to **SQLCancelHandle** to a call to **SQLCancel** when `HandleType` is SQL_HANDLE_STMT.
+    ///
+    /// For complete documentation on SQLCancelHandle, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcancelhandle-function).
+    ///
+    /// # Returns
+    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
+    #[inline]
+    #[must_use]
+    #[allow(non_snake_case)]
+    fn SQLCancelHandle(&self) -> SQLRETURN {
+        unsafe { ffi::SQLCancelHandle(<Self as Handle>::Ident::IDENTIFIER, self.as_SQLHANDLE()) }
+    }
+}
+
+pub trait Async<V: OdbcVersion>: Handle {
     /// Can be used to determine when an asynchronous function is complete using either notification- or polling-based processing. For more information about asynchronous operations, see Asynchronous Execution.
     /// **SQLCompleteAsync** is only implemented in the ODBC Driver Manager.
     /// In notification based asynchronous processing mode, **SQLCompleteAsync** must be called after the Driver Manager raises the event object used for notification. **SQLCompleteAsync** completes the asynchronous processing and the asynchronous function will generate a return code.
@@ -2805,20 +2826,6 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
             )
         }
     }
-
-    /// Cancels the processing on a connection or statement. The Driver Manager maps a call to **SQLCancelHandle** to a call to **SQLCancel** when `HandleType` is SQL_HANDLE_STMT.
-    ///
-    /// For complete documentation on SQLCancelHandle, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlcancelhandle-function).
-    ///
-    /// # Returns
-    /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
-    #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    pub fn SQLCancelHandle(&self) -> SQLRETURN {
-        // Not implemented on SQLHSTMT because SQLHSTMT can also be cancelled via SQLCancel
-        unsafe { ffi::SQLCancelHandle(<Self as Handle>::Ident::IDENTIFIER, self.as_SQLHANDLE()) }
-    }
 }
 
 impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
@@ -3005,8 +3012,9 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     }
 }
 
-impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V> for SQLHSTMT<'conn, 'desc, 'buf, V> {
-
+impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
+    for SQLHSTMT<'conn, 'desc, 'buf, V>
+{
     // TODO: When GATs are implemented use 'stmt instead of 'conn
     // because implicit descriptors are managed by the DM
     type ARD = RefSQLHDESC<'conn, AppDesc<'buf>, V>;
@@ -3018,13 +3026,19 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V> for SQLHSTMT<
     type ExplicitAPD = SQLHDESC<'conn, AppDesc<'buf>, V>;
 
     fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
-    where B: ?Sized {
+    where
+        B: ?Sized,
+    {
         //TODO:
         //self.0.bind_col(TargetValuePtr)
     }
 
-    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
-    where B: ?Sized {
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(
+        &self,
+        TargetValuePtr: Option<&'buf B>,
+    ) where
+        B: ?Sized,
+    {
         // TODO:
         //self.0.bind_param(TargetValuePtr)
     }
@@ -3034,8 +3048,9 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V> for SQLHSTMT<
     }
 }
 
-impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V> for UnsafeSQLHSTMT<'conn, 'desc, 'buf, V> {
-
+impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
+    for UnsafeSQLHSTMT<'conn, 'desc, 'buf, V>
+{
     // TODO: When GATs are implemented use 'stmt instead of 'conn
     // because implicit descriptors are managed by the DM
     type ARD = RefUnsafeSQLHDESC<'conn, AppDesc<'buf>, V>;
@@ -3054,8 +3069,10 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V> for UnsafeSQL
     {
     }
     #[cfg(not(feature = "odbc_debug"))]
-    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
-    where
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(
+        &self,
+        TargetValuePtr: Option<&'buf B>,
+    ) where
         B: ?Sized,
     {
     }
@@ -3076,8 +3093,10 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V> for UnsafeSQL
         }
     }
     #[cfg(feature = "odbc_debug")]
-    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
-    where
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(
+        &self,
+        TargetValuePtr: Option<&'buf B>,
+    ) where
         B: ?Sized,
     {
         if let Some(explicit_apd) = self.explicit_apd.get() {
@@ -3094,15 +3113,23 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V> for UnsafeSQL
     }
 }
 
-impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for SQLHDESC<'conn, DT, V> { }
-impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for UnsafeSQLHDESC<'conn, DT, V> { }
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefUnsafeSQLHDESC<'_, DT, V> { }
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefSQLHDESC<'_, DT, V> { }
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for SQLHDESC<'_, DT, V> {}
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefSQLHDESC<'_, DT, V> {}
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for UnsafeSQLHDESC<'_, DT, V> {}
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefUnsafeSQLHDESC<'_, DT, V> {}
 
-impl Async for SQLHSTMT<'_, '_, '_, SQL_OV_ODBC3_80> {}
-impl Async for SQLHSTMT<'_, '_, '_, SQL_OV_ODBC4> {}
-impl Async for SQLHDBC<'_, C4, SQL_OV_ODBC3_80> {}
-impl Async for SQLHDBC<'_, C4, SQL_OV_ODBC4> {}
+// TODO: If Connection trait is introduced implement for all connections
+impl Cancel<SQL_OV_ODBC3_80> for SQLHDBC<'_, C4, SQL_OV_ODBC3_80> {}
+impl Cancel<SQL_OV_ODBC4> for SQLHDBC<'_, C4, SQL_OV_ODBC4> {}
+
+impl Async<SQL_OV_ODBC3_80> for SQLHDBC<'_, C4, SQL_OV_ODBC3_80> {}
+impl Async<SQL_OV_ODBC4> for SQLHDBC<'_, C4, SQL_OV_ODBC4> {}
+
+impl<'desc, 'buf, S: Statement<'desc, 'buf, SQL_OV_ODBC3_80>> Cancel<SQL_OV_ODBC3_80> for S {}
+impl<'desc, 'buf, S: Statement<'desc, 'buf, SQL_OV_ODBC4>> Cancel<SQL_OV_ODBC4> for S {}
+
+impl<'desc, 'buf, S: Statement<'desc, 'buf, SQL_OV_ODBC3_80>> Async<SQL_OV_ODBC3_80> for S {}
+impl<'desc, 'buf, S: Statement<'desc, 'buf, SQL_OV_ODBC4>> Async<SQL_OV_ODBC4> for S {}
 
 #[allow(non_snake_case, unused_variables)]
 fn SQLGetStmtAttrA<
