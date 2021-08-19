@@ -1,4 +1,4 @@
-use rs_odbc::api::{Allocate, Handle, Descriptor, Statement};
+use rs_odbc::api::{Allocate, Descriptor, Statement};
 use rs_odbc::conn::C4;
 use rs_odbc::desc::SQL_DESC_ARRAY_SIZE;
 use rs_odbc::env::{

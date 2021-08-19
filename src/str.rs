@@ -1,4 +1,3 @@
-use crate::desc::AppDesc;
 use crate::env::OdbcVersion;
 use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, SQLHDESC};
 use crate::{Ident, SQLCHAR, SQLWCHAR};
