@@ -7,32 +7,29 @@ Rust implementation of the ODBC API that looks and feels like ODBC but is safe
 
 ## Description
 
-Main design goal driving the development of this crate is that the exposed API should look as close
-as possible to the original API while providing type safety wherever possible. This crate prevents most
-of the safety issues inherent to C code and moves most of the application errors to compile time.
-ODBC state transitions are modeled as a Rust type system FSM which turns many of the invalid handle
-errors into compile errors.
+Main design goal of this crate is that the **exposed API should look as close as possible to the original ODBC API**
+while providing type safety wherever possible. This crate prevents most of the safety issues inherent to C code
+and moves most of the application errors to compile time. ODBC state transitions FSM is implemented inside Rust's
+type system so that many of the invalid handle errors are prevented as compile errors.
 
 ## Why this crate
 
 ### 1. Known API
-If you have already worked with the ODBC API you will feel at home using this crate, **you
-don't have to learn another API**. With this crate you are getting a well known, highly used and standardized API.
-The level of abstraction over the original ODBC API is minimal and **you can basically use the original
-ODBC documentation**. Translating existing ODBC examples from C to Rust is very straight forward
-with minimal differences
+If you have already worked with the ODBC API you will feel at home using this crate, i.e. **you don't have
+to learn yet another API**. With this crate you are getting a well known, highly used and standardized API.
+The level of abstraction over the original ODBC API is minimal so that **you can use the original ODBC
+documentation**. Translating existing ODBC applications or examples from C to Rust is very straightforward.
 
 ### 2. Safe API
-For most applications **you will never have to resort to using raw pointers**. Other crates
-that expose custom APIs will usually force you to fall back to the raw API when you are required
+For most applications **you will never have to resort to using raw pointers**. Crates which expose custom high-level
+API wrappers around ODBC will most likely force you to fall back to using the raw API when you are required
 to use ODBC features that are not expressible through the API they provide. This will introduce
 unnecessary safety risks for your application unless those crates are built on top of this crate.
 
 ### 3. Complete API
-**This crate is designed to be fully ODBC compliant** which means there should be no low level
-ODBC feature that can't be expressed through this crate. However, it is possible that a particular
-feature may not have been implemented yet. If you notice that a feature is missing, you are encouraged
-to open an issue requiring the feature.
+**This crate is designed to be fully ODBC compliant** so there should be no low-level ODBC feature that cannot be
+expressed through this crate. However, it is possible that a particular feature may not have been implemented
+yet. If you notice that a feature is missing, you are encouraged to open an issue requiring the feature.
 
 # Installation
 
@@ -42,9 +39,87 @@ to open an issue requiring the feature.
 
 # API differences
 
-```rust
-// TODO:
+1. ODBC functions are implemented as methods or associated functions on handles. Therefore,
+providing handle identifier(e.g. `SQL_HANDLE_STMT`) as an argument becomes unnecessary
+
+<table>
+<tr>
+<th>C ODBC eample</th>
+<th>Rust ODBC example</th>
+</tr>
+<tr>
+<td>
+
+```c
+SQLHSTMT hstmt = SQL_NULL_HSTMT;
+int ret1 = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+int ret2 = SQLCancelHandle(SQL_HANDLE_STMT, hstmt);
 ```
+</td>
+<td>
+
+```rust
+let (hstmt, ret1) SQLHSTMT::SQLAllocHandle(&hdbc);
+let ret2 = hstmt.SQLCancelHandle();
+```
+
+</td>
+</tr>
+</table>
+
+2. ODBC functions which take pointer and it's length take reference to a slice instead. Slice references
+prevent the possibility of the application writer to write/read pass the end of the allocation unit.
+
+<table>
+<tr>
+<th>C ODBC eample</th>
+<th>Rust ODBC example</th>
+</tr>
+<tr>
+<td>
+
+```c
+int ret = SQLSetEnvAttr(henv, SQL_ATTR_CP_MATCH, (SQLPOINTER) SQL_CP_RELAXED_MATCH, 0);
+```
+</td>
+<td>
+
+```rust
+let ret = henv.SQLSetEnvAttr(SQL_ATTR_CP_MATCH, SQL_CP_RELAXED_MATCH);
+```
+
+</td>
+</tr>
+</table>
+
+3. ODBC version is defined at the point when environment handle is allocated. Usually, this
+should be the first step in your ODBC application but in Rust it is handled by the type system
+
+<table>
+<tr>
+<th>C ODBC eample</th>
+<th>Rust ODBC example</th>
+</tr>
+<tr>
+<td>
+
+```c
+SQLHENV henv = SQL_NULL_HENV;
+int ret1 = SQLAllocHandle(SQL_HANDLE_ENV, &SQL_NULL_HANDLE, &henv);
+int ret2 = SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER) SQL_OV_ODBC3_80, 0);
+```
+</td>
+<td>
+
+```rust
+let (env, ret1) = SQLHENV::<SQL_OV_ODBC3_80>::SQLAllocHandle(&SQL_NULL_HANDLE);
+```
+
+</td>
+</tr>
+</table>
+
+4. Disconnecting and freeing handles is done automatically at the end of scope
 
 # Uninitialized variables
 
@@ -63,9 +138,16 @@ fn main() {
   let (env, _) = SQLHENV::SQLAllocHandle(&SQL_NULL_HANDLE);
   let env: SQLHENV<SQL_OV_ODBC3_80> = env.unwrap();
 
-  let mut value = MaybeUninit::uninit();
+  let mut value = env::SQL_CP_ONE_PER_HENV;     // Initialized to default value
   let _ = env.SQLGetEnvAttr(SQL_ATTR_CONNECTION_POOLING, Some(&mut value), None);
 
+  // Confirm value was modified by the driver
+  assert_ne!(env::SQL_CP_ONE_PER_HENV, value);
+
+  let mut value = MaybeUninit::uninit();        // Variable is uninitialized
+  let _ = env.SQLGetEnvAttr(SQL_ATTR_CONNECTION_POOLING, Some(&mut value), None);
+
+  // Value initialized by the driver
   match unsafe { value.assume_init() } {
       env::SQL_CP_ONE_PER_DRIVER => println!("SQL_CP_ONE_PER_DRIVER"),
       env::SQL_CP_ONE_PER_HENV => println!("SQL_CP_ONE_PER_HENV"),
