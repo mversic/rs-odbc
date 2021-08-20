@@ -2,24 +2,23 @@
 name = "rs-odbc"
 version = "0.1.0"
 authors = ["Marin Veršić <marin.versic101@gmail.com>"]
-build = "build.rs"
+description = "Minimal safe Rust implementation of ODBC"
+repository="https://github.com/mversic/rs-odbc"
 license = "Apache-2.0"
 edition = "2018"
-
-[build-dependencies]
-rustc_version = "*"
+build = "build.rs"
 
 [dev-dependencies]
-trybuild = "^1"
+trybuild = "*"
 mockall = "*"
 # TODO: use miri eventually
 
 [dependencies]
-rs_odbc_derive = {path = "./rs_odbc_derive", version = "*"}
+rs-odbc_derive = {path = "./rs-odbc_derive", version = "0.1.0"}
 mockall_double = "*"
 
 [features]
+default = [] # TODO: Add static as default feature
 # TODO: Rename odbc_debug to something more appropriate like runtime_checks
-default = [] # TODO: Add static as default?
-odbc_debug = []
+# odbc_debug = []
 static = []

@@ -31,12 +31,6 @@ unnecessary safety risks for your application unless those crates are built on t
 expressed through this crate. However, it is possible that a particular feature may not have been implemented
 yet. If you notice that a feature is missing, you are encouraged to open an issue requiring the feature.
 
-# Installation
-
-```rust
-// TODO:
-```
-
 # API differences
 
 1. ODBC functions are implemented as methods or associated functions on handles. Therefore,
@@ -52,15 +46,27 @@ providing handle identifier(e.g. `SQL_HANDLE_STMT`) as an argument becomes unnec
 
 ```c
 SQLHSTMT hstmt = SQL_NULL_HSTMT;
-int ret1 = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
-int ret2 = SQLCancelHandle(SQL_HANDLE_STMT, hstmt);
+int ret1 = SQLAllocHandle(
+    SQL_HANDLE_STMT,
+    hdbc,
+    &hstmt
+);
+if (SQL_SUCCEEDED(ret1)) {
+    int ret2 = SQLCancelHandle(
+        SQL_HANDLE_STMT,
+        hstmt
+    );
+}
 ```
 </td>
 <td>
 
 ```rust
-let (hstmt, ret1) SQLHSTMT::SQLAllocHandle(&hdbc);
-let ret2 = hstmt.SQLCancelHandle();
+let (hstmt, ret1) = SQLHSTMT::SQLAllocHandle(&hdbc);
+if SQL_SUCCEEDED(ret1) {
+    let hstmt = hstmt.unwrap();
+    let ret2 = hstmt.SQLCancelHandle();
+}
 ```
 
 </td>
@@ -79,13 +85,21 @@ prevent the possibility of the application writer to write/read pass the end of 
 <td>
 
 ```c
-int ret = SQLSetEnvAttr(henv, SQL_ATTR_CP_MATCH, (SQLPOINTER) SQL_CP_RELAXED_MATCH, 0);
+int ret = SQLSetEnvAttr(
+    henv,
+    SQL_ATTR_CP_MATCH,
+    SQL_CP_RELAXED_MATCH,
+    0
+);
 ```
 </td>
 <td>
 
 ```rust
-let ret = henv.SQLSetEnvAttr(SQL_ATTR_CP_MATCH, SQL_CP_RELAXED_MATCH);
+let ret = henv.SQLSetEnvAttr(
+    SQL_ATTR_CP_MATCH,
+    SQL_CP_RELAXED_MATCH
+);
 ```
 
 </td>
@@ -105,14 +119,28 @@ should be the first step in your ODBC application but in Rust it is handled by t
 
 ```c
 SQLHENV henv = SQL_NULL_HENV;
-int ret1 = SQLAllocHandle(SQL_HANDLE_ENV, &SQL_NULL_HANDLE, &henv);
-int ret2 = SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER) SQL_OV_ODBC3_80, 0);
+int ret1 = SQLAllocHandle(
+    SQL_HANDLE_ENV,
+    &SQL_NULL_HANDLE,
+    &henv
+);
+if (SQL_SUCCEEDED(ret1)) {
+    int ret2 = SQLSetEnvAttr(
+        henv,
+        SQL_ATTR_ODBC_VERSION,
+        SQL_OV_ODBC3_80,
+        0
+    );
+}
 ```
 </td>
 <td>
 
 ```rust
-let (env, ret1) = SQLHENV::<SQL_OV_ODBC3_80>::SQLAllocHandle(&SQL_NULL_HANDLE);
+let (env, ret1) = SQLHENV::SQLAllocHandle(&SQL_NULL_HANDLE);
+if (SQL_SUCCEEDED(ret1)) {
+    let env: SQLHENV<SQL_OV_ODBC3_80> = env.unwrap();
+}
 ```
 
 </td>

@@ -14,6 +14,8 @@ pub mod sqlreturn;
 pub mod stmt;
 pub mod str;
 
+// TODO: Export Ident, odbc_type, odbc_bitmask publicly
+// so users can import from this lib directly
 use rs_odbc_derive::odbc_type;
 use std::convert::TryFrom;
 use std::ffi::c_void;
