@@ -99,20 +99,22 @@ prevent the possibility of the application writer to write/read pass the end of 
 <td>
 
 ```c
-int ret = SQLSetEnvAttr(
-    henv,
-    SQL_ATTR_CP_MATCH,
-    SQL_CP_RELAXED_MATCH,
-    0
+SQLCHAR catalog_name[] = "rs_odbc";
+int ret = SQLSetConnAttr(
+    hdbc,
+    SQL_ATTR_CURRENT_CATALOG,
+    catalog_name,
+    SQL_NTS,
 );
 ```
 </td>
 <td>
 
 ```rust
-let ret = henv.SQLSetEnvAttr(
-    SQL_ATTR_CP_MATCH,
-    SQL_CP_RELAXED_MATCH
+let catalog_name = "rs_odbc";
+let ret = hdbc.SQLSetConnAttr(
+    SQL_ATTR_CURRENT_CATALOG,
+    catalog_name.as_ref()
 );
 ```
 
