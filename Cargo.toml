@@ -8,13 +8,13 @@ license = "Apache-2.0"
 edition = "2018"
 
 [dev-dependencies]
-trybuild = "*"
-mockall = "*"
+trybuild = "^1"
+mockall = "^0"
 # TODO: use miri eventually
 
 [dependencies]
 rs-odbc_derive = {path = "./rs-odbc_derive", version = "0.1.0"}
-mockall_double = "*"
+mockall_double = "^0"
 
 [features]
 default = []
