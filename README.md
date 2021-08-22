@@ -2,6 +2,7 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/mversic/rs-odbc/blob/master/LICENSE)
 ![Build](https://github.com/mversic/rs-odbc/actions/workflows/odbc-ci.yml/badge.svg)
+[![Crates.io](https://img.shields.io/crates/v/rs-odbc.svg)](https://crates.io/crates/rs-odbc)
 
 Rust implementation of the ODBC API that looks and feels like ODBC but is safe
 
