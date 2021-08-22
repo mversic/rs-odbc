@@ -6,7 +6,6 @@ description = "Minimal safe Rust implementation of ODBC"
 repository="https://github.com/mversic/rs-odbc"
 license = "Apache-2.0"
 edition = "2018"
-build = "build.rs"
 
 [dev-dependencies]
 trybuild = "*"
@@ -18,7 +17,10 @@ rs-odbc_derive = {path = "./rs-odbc_derive", version = "0.1.0"}
 mockall_double = "*"
 
 [features]
-default = [] # TODO: Add static as default feature
+default = []
+
 # TODO: Rename odbc_debug to something more appropriate like runtime_checks
 # odbc_debug = []
+
+# Enables static linking
 static = []

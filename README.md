@@ -31,6 +31,20 @@ unnecessary safety risks for your application unless those crates are built on t
 expressed through this crate. However, it is possible that a particular feature may not have been implemented
 yet. If you notice that a feature is missing, you are encouraged to open an issue requiring the feature.
 
+# Installation
+
+To be able to use this library you have to have ODBC Driver Manager installed and configured on your host OS.
+This library dynamically links against the `odbc32.dll` on Windows or against `libodbc.so`(unixODBC) on Linux
+and OS-X. To enable static linking of native libraries use the cargo `static` feature.
+
+# Cargo features
+
+## static
+
+Enables static linking of native libraries. If static linking is enabled user must define `RS_ODBC_LINK_SEARCH`
+environment variable which contains path to static libraries this crate will link against. For unixODBC, user
+should provide both `libodbc.a` and `libltdl.a` under this path. **Static linking is not supported for Windows**.
+
 # API differences
 
 1. ODBC functions are implemented as methods or associated functions on handles. Therefore,
