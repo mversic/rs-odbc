@@ -88,7 +88,11 @@ if SQL_SUCCEEDED(ret1) {
 </tr>
 </table>
 
-2. ODBC functions which take pointer and it's length take reference to a slice instead. Slice references
+2. Most of the ODBC handle methods return `SQLRETURN` as per standard, but some will return a tuple
+`(Result<<succ_handle_type>, <err_handle_type>>, SQLRETURN)`(e.g. SQLDriverConnect). Returning
+handles makes it possible to implement the ODBC state transition FSM inside the Rust's type system
+
+3. ODBC functions which take pointer and it's length take reference to a slice instead. Slice references
 prevent the possibility of the application writer to write/read pass the end of the allocation unit.
 
 <table>
@@ -123,7 +127,7 @@ let ret = hdbc.SQLSetConnAttr(
 </tr>
 </table>
 
-3. ODBC version is defined at the point when environment handle is allocated. Usually, this
+4. ODBC version is defined at the point when environment handle is allocated. Usually, this
 should be the first step in your ODBC application but in Rust it is handled by the type system
 
 <table>
@@ -164,7 +168,7 @@ if (SQL_SUCCEEDED(ret1)) {
 </tr>
 </table>
 
-4. Disconnecting and freeing handles is done automatically at the end of scope
+5. Disconnecting and freeing handles is done automatically at the end of scope
 
 # Uninitialized variables
 
