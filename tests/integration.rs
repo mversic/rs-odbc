@@ -1,20 +1,17 @@
+use core::mem::MaybeUninit;
 use rs_odbc::api::{Allocate, Descriptor, Statement};
 use rs_odbc::conn::C4;
 use rs_odbc::desc::SQL_DESC_ARRAY_SIZE;
 use rs_odbc::env::{
     CpMatch, SQL_ATTR_CP_MATCH, SQL_CP_RELAXED_MATCH, SQL_OV_ODBC3, SQL_OV_ODBC3_80,
 };
-use rs_odbc::handle::{
-    RefSQLHDESC, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT,
-    SQL_NULL_HANDLE,
-};
+use rs_odbc::handle::{RefSQLHDESC, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE};
 use rs_odbc::info::{
     TxnIsolation, SQL_TXN_ISOLATION_OPTION, SQL_TXN_READ_COMMITTED, SQL_TXN_READ_UNCOMMITTED,
     SQL_TXN_REPEATABLE_READ, SQL_TXN_SERIALIZABLE,
 };
 use rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC;
 use rs_odbc::{sqlreturn::SQL_SUCCESS, SQLCHAR, SQL_DRIVER_COMPLETE};
-use std::mem::MaybeUninit;
 
 fn get_env_handle() -> SQLHENV<SQL_OV_ODBC3_80> {
     let (env, res) = SQLHENV::SQLAllocHandle(&SQL_NULL_HANDLE);
@@ -102,7 +99,7 @@ fn db_connect() {
         outstr[i] = MaybeUninit::zeroed();
     }
 
-    let outstr: [SQLCHAR; 1024] = unsafe { std::mem::transmute(outstr) };
+    let outstr: [SQLCHAR; 1024] = unsafe { core::mem::transmute(outstr) };
     assert_eq!(
         "DSN=MariaDB;Database=rs_odbc_test;".as_bytes(),
         &outstr[..outstrlen]

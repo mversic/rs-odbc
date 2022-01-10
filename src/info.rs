@@ -5,7 +5,7 @@ use crate::{
     Ident, OdbcDefined, Scalar, SQLCHAR, SQLSMALLINT, SQLUINTEGER, SQLUSMALLINT, SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_bitmask, odbc_type, Ident};
-use std::mem::MaybeUninit;
+use core::mem::MaybeUninit;
 
 pub trait InfoType<I: Ident, V: OdbcVersion>:
     Attr<I> + AttrLen<Self::DefinedBy, SQLSMALLINT>

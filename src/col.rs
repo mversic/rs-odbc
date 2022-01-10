@@ -2,8 +2,8 @@ use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{Ident, OdbcDefined, Scalar, SQLCHAR, SQLLEN, SQLSMALLINT, SQLWCHAR};
+use core::mem::MaybeUninit;
 use rs_odbc_derive::Ident;
-use std::mem::MaybeUninit;
 
 pub trait ColAttr<A: Ident, V: OdbcVersion>:
     Attr<A> + AttrLen<Self::DefinedBy, SQLSMALLINT>

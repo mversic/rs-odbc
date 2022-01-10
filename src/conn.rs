@@ -7,7 +7,7 @@ use crate::{
     SQLWCHAR,
 };
 use rs_odbc_derive::{odbc_type, Ident};
-use std::mem::MaybeUninit;
+use core::mem::MaybeUninit;
 
 pub trait ConnState: private::ConnState {}
 
@@ -127,7 +127,7 @@ mod private {
     use crate::handle::SQLHDBC;
     use crate::{env, sqlreturn};
     use mockall_double::double;
-    use std::{any, thread};
+    use core::any;
 
     pub trait ConnState {
         // TODO: If drop impl specialization is allowed this fn will not be required
@@ -138,7 +138,12 @@ mod private {
         {
             let sql_return = unsafe { ffi::SQLDisconnect(handle.as_SQLHANDLE()) };
 
-            if sql_return != sqlreturn::SQL_SUCCESS && !thread::panicking() {
+            #[cfg(feature = "std")]
+            if std::thread::panicking() {
+                return;
+            }
+
+            if sql_return != sqlreturn::SQL_SUCCESS {
                 panic!(
                     "{}: SQLDisconnect returned {:?}",
                     any::type_name::<Self>(),

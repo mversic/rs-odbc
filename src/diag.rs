@@ -8,8 +8,8 @@ use crate::{
     sqlreturn::SQLRETURN, Def, Ident, OdbcDefined, Scalar, Void, SQLCHAR, SQLINTEGER, SQLLEN,
     SQLPOINTER, SQLSMALLINT, SQLWCHAR,
 };
+use core::mem::MaybeUninit;
 use rs_odbc_derive::{odbc_type, Ident};
-use std::mem::MaybeUninit;
 
 pub trait DiagField<H: Handle, D: Ident>: Attr<D> + AttrLen<Self::DefinedBy, SQLSMALLINT> {
     // TODO: These could be checked by the type system
@@ -103,7 +103,7 @@ where
 
     fn len(&self) -> SQLSMALLINT {
         // This is ok because MaybeUninit<T> has the same memory layout as T
-        <MaybeUninit<SQLSTATE<C>>>::len(unsafe { std::mem::transmute(self) })
+        <MaybeUninit<SQLSTATE<C>>>::len(unsafe { core::mem::transmute(self) })
     }
 }
 unsafe impl<AD: Def> AttrLen<AD, SQLSMALLINT> for MaybeUninit<SQLSTATE<SQLCHAR>> {
@@ -117,7 +117,7 @@ unsafe impl<AD: Def> AttrLen<AD, SQLSMALLINT> for MaybeUninit<SQLSTATE<SQLWCHAR>
     type StrLen = Void;
 
     fn len(&self) -> SQLSMALLINT {
-        (std::mem::size_of::<SQLWCHAR>() * (SQLSTATE_SIZE + 1)) as SQLSMALLINT
+        (core::mem::size_of::<SQLWCHAR>() * (SQLSTATE_SIZE + 1)) as SQLSMALLINT
     }
 }
 

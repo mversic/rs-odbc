@@ -95,7 +95,7 @@ fn odbc_derive(ast: &mut syn::DeriveInput, inner_type: &Ident) -> TokenStream2 {
                         (self as *mut Self).cast()
                     }
                 }
-                unsafe impl crate::convert::AsMutSQLPOINTER for std::mem::MaybeUninit<#type_name> {
+                unsafe impl crate::convert::AsMutSQLPOINTER for core::mem::MaybeUninit<#type_name> {
                     fn as_mut_SQLPOINTER(&mut self) -> crate::SQLPOINTER {
                         self.as_mut_ptr().cast()
                     }
@@ -113,7 +113,7 @@ fn odbc_derive(ast: &mut syn::DeriveInput, inner_type: &Ident) -> TokenStream2 {
             let variants = data.variants.iter().map(|v| &v.ident);
 
             quote! {
-                impl std::convert::TryFrom<crate::#inner_type> for #type_name {
+                impl TryFrom<crate::#inner_type> for #type_name {
                     type Error = crate::#inner_type;
 
                     fn try_from(source: crate::#inner_type) -> Result<Self, Self::Error> {
@@ -171,21 +171,21 @@ pub fn odbc_bitmask(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let type_name = &ast.ident;
     odbc_bitmask.extend(quote! {
-        impl std::ops::BitAnd<#type_name> for #type_name {
+        impl core::ops::BitAnd<#type_name> for #type_name {
             type Output = crate::#inner_type;
 
             fn bitand(self, other: #type_name) -> Self::Output {
                 Self::identifier(&self) &Self::identifier(&other)
             }
         }
-        impl std::ops::BitAnd<crate::#inner_type> for #type_name {
+        impl core::ops::BitAnd<crate::#inner_type> for #type_name {
             type Output = crate::#inner_type;
 
             fn bitand(self, other: crate::#inner_type) -> Self::Output {
                 Self::identifier(&self) & other
             }
         }
-        impl std::ops::BitAnd<#type_name> for crate::#inner_type {
+        impl core::ops::BitAnd<#type_name> for crate::#inner_type {
             type Output = crate::#inner_type;
 
             fn bitand(self, other: #type_name) -> Self::Output {

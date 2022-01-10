@@ -11,10 +11,7 @@ use crate::{
     slice_len, Scalar, Void, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLUINTEGER,
     SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
-use std::cell::UnsafeCell;
-use std::convert::TryFrom;
-use std::fmt::Debug;
-use std::mem::MaybeUninit;
+use core::{cell::UnsafeCell, fmt::Debug, mem::MaybeUninit};
 
 /// Used to do a cheap mutable reference-to-raw pointer conversion.
 /// Implementing types must support all possible values for T because
@@ -74,7 +71,7 @@ unsafe impl<T: Scalar> AsMutPtr<T> for MaybeUninit<Void> {
         // Acording to the ODBC specification returning `self.as_mut_ptr().cast()` here
         // should be fine. However non-compliant implementations might try to write
         // to non-null pointers obtained through this method which would cause UB
-        std::ptr::null_mut()
+        core::ptr::null_mut()
     }
 }
 unsafe impl<T: Scalar> IntoSQLPOINTER for &T {
@@ -237,7 +234,7 @@ unsafe impl<'buf, V: OdbcVersion, T: DescType<'buf>> IntoSQLPOINTER
     for Option<&SQLHDESC<'_, T, V>>
 {
     fn into_SQLPOINTER(self) -> SQLPOINTER {
-        self.map_or_else(std::ptr::null_mut, |handle| {
+        self.map_or_else(core::ptr::null_mut, |handle| {
             Some(&handle.0).into_SQLPOINTER()
         })
     }
@@ -246,7 +243,7 @@ unsafe impl<'buf, V: OdbcVersion, T: DescType<'buf>> IntoSQLPOINTER
     for Option<&UnsafeSQLHDESC<'_, T, V>>
 {
     fn into_SQLPOINTER(self) -> SQLPOINTER {
-        self.map_or_else(std::ptr::null_mut, |handle| handle.as_SQLHANDLE().cast())
+        self.map_or_else(core::ptr::null_mut, |handle| handle.as_SQLHANDLE().cast())
     }
 }
 
@@ -277,17 +274,21 @@ unsafe impl<DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<RefUnsafeSQLHDES
         self.as_mut_ptr().cast()
     }
 }
-unsafe impl<'conn, 'desc, DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<RefSQLHDESC<'conn, DT, V>> {
+unsafe impl<'conn, 'desc, DT, V: OdbcVersion> AsMutSQLPOINTER
+    for MaybeUninit<RefSQLHDESC<'conn, DT, V>>
+{
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
         // Valid because RefSQLHDESC is a transparent newtype wrapper over RefUnsafeSQLHDESC
-        unsafe { std::mem::transmute::<_, &mut MaybeUninit<RefUnsafeSQLHDESC<'conn, DT, V>>>(self) }
-            .as_mut_SQLPOINTER()
+        unsafe {
+            core::mem::transmute::<_, &mut MaybeUninit<RefUnsafeSQLHDESC<'conn, DT, V>>>(self)
+        }
+        .as_mut_SQLPOINTER()
     }
 }
 
 unsafe impl AsSQLHANDLE for SQL_NULL_HANDLE {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
-        std::ptr::null_mut()
+        core::ptr::null_mut()
     }
 }
 unsafe impl<V: OdbcVersion> AsSQLHANDLE for SQLHENV<V> {

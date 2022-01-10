@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+
 pub mod api;
 pub mod attr;
 pub mod c_types;
@@ -16,10 +18,8 @@ pub mod str;
 
 // TODO: Export Ident, odbc_type, odbc_bitmask publicly
 // so users can import from this lib directly
+use core::{ffi::c_void, fmt::Debug};
 use rs_odbc_derive::odbc_type;
-use std::convert::TryFrom;
-use std::ffi::c_void;
-use std::fmt::Debug;
 pub use {api::*, c_types::*, sql_types::*};
 pub use {
     BulkOperation::*, CompletionType::*, DriverCompletion::*, FreeStmtOption::*, FunctionId::*,

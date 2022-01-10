@@ -1,8 +1,8 @@
 use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
 use crate::str::{OdbcChar, OdbcStr};
-use crate::{Ident, OdbcDefined, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR, Scalar};
+use crate::{Ident, OdbcDefined, Scalar, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR};
+use core::mem::MaybeUninit;
 use rs_odbc_derive::{odbc_type, Ident};
-use std::mem::MaybeUninit;
 
 pub trait EnvAttr<A: Ident, V: OdbcVersion>:
     Attr<A, DefinedBy = OdbcDefined> + AttrLen<OdbcDefined, SQLINTEGER>

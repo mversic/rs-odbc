@@ -1,8 +1,10 @@
 use crate::env::OdbcVersion;
 use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, SQLHDESC};
 use crate::{Ident, SQLCHAR, SQLWCHAR};
-use std::mem::MaybeUninit;
-use std::ops::{Deref, DerefMut};
+use core::{
+    mem::MaybeUninit,
+    ops::{Deref, DerefMut},
+};
 
 pub trait OdbcChar {}
 

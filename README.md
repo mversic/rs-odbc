@@ -178,10 +178,10 @@ ODBC function in question. To circumvent the unnecessary initialization, many of
 for the usage of both initialized and uninitialized variables (via `MaybeUninit`).
 
 ```rust
+use core::mem::MaybeUninit;
 use rs_odbc::api::Allocate;
 use rs_odbc::env::{self, SQL_ATTR_CONNECTION_POOLING, SQL_OV_ODBC3_80};
 use rs_odbc::handle::{SQLHENV, SQL_NULL_HANDLE};
-use std::mem::MaybeUninit;
 
 fn main() {
   let (env, _) = SQLHENV::SQLAllocHandle(&SQL_NULL_HANDLE);

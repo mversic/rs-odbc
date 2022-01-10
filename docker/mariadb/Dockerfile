@@ -1,9 +1,11 @@
 FROM mariadb:latest
 
 # Install required tools and libraries
-RUN apt-get update && apt-get install -y unixodbc-dev odbc-mariadb curl
-RUN curl --proto '=https' --tlsv1.2 --silent -sSf https://sh.rustup.rs \
-    | sh -s -- --profile minimal -y
+RUN apt-get update -yq && apt-get install -y --no-install-recommends libc6-dev gcc curl unixodbc-dev odbc-mariadb
+RUN curl --proto '=https' --tlsv1.2 --silent -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y
+
+# Remove `apt-get update` metadata
+RUN rm -rf /var/lib/apt/lists/*
 
 # Install initialization scripts
 COPY ./init/ /docker-entrypoint-initdb.d/

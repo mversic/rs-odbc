@@ -14,7 +14,7 @@ use crate::{
 };
 use mockall_double::double;
 use rs_odbc_derive::{odbc_type, Ident};
-use std::mem::MaybeUninit;
+use core::mem::MaybeUninit;
 
 pub(crate) mod private {
     use super::*;
@@ -47,7 +47,7 @@ pub(crate) mod private {
                     A::IDENTIFIER,
                     self.as_mut_SQLPOINTER(),
                     ValuePtrLen,
-                    StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+                    StringLengthPtr.map_or_else(core::ptr::null_mut, AsMutPtr::as_mut_ptr),
                 )
             }
         }
@@ -71,7 +71,7 @@ pub(crate) mod private {
                     A::IDENTIFIER,
                     self.as_mut_SQLPOINTER(),
                     ValuePtrLen,
-                    StringLengthPtr.map_or_else(std::ptr::null_mut, AsMutPtr::as_mut_ptr),
+                    StringLengthPtr.map_or_else(core::ptr::null_mut, AsMutPtr::as_mut_ptr),
                 )
             }
         }

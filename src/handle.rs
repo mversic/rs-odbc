@@ -11,12 +11,10 @@ use crate::stmt::{
 };
 use crate::{sqlreturn::SQL_SUCCESS, Ident, SQLPOINTER};
 use mockall_double::double;
-use std::any::type_name;
-use std::cell::Cell;
-use std::marker::PhantomData;
-use std::mem::ManuallyDrop;
-use std::sync::{Arc, Weak};
-use std::thread::panicking;
+use core::any::type_name;
+use core::cell::Cell;
+use core::marker::PhantomData;
+use core::mem::ManuallyDrop;
 
 #[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 1)]
@@ -505,7 +503,12 @@ impl<DT, V: OdbcVersion> Diagnostics for RefSQLHDESC<'_, DT, V> {}
 fn drop_handle<H: Handle>(handle: &mut H) {
     let sql_return = unsafe { ffi::SQLFreeHandle(H::Ident::IDENTIFIER, handle.as_SQLHANDLE()) };
 
-    if sql_return != SQL_SUCCESS && !panicking() {
+    #[cfg(feature = "std")]
+    if std::thread::panicking() {
+        return;
+    }
+
+    if sql_return != SQL_SUCCESS {
         panic!(
             "{}: SQLFreeHandle returned: {:?}",
             type_name::<H>(),

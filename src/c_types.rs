@@ -9,9 +9,7 @@ use crate::{
     SQLBIGINT, SQLCHAR, SQLDOUBLE, SQLINTEGER, SQLLEN, SQLREAL, SQLSCHAR, SQLSMALLINT, SQLUBIGINT,
     SQLUINTEGER, SQLUSMALLINT, SQLWCHAR, SQL_PARAM_INPUT, SQL_PARAM_INPUT_OUTPUT, SQL_PARAM_OUTPUT,
 };
-use std::cell::UnsafeCell;
-use std::convert::TryInto;
-use std::mem::MaybeUninit;
+use core::{cell::UnsafeCell, mem::MaybeUninit};
 
 pub trait CData<TT: Ident, V: OdbcVersion>: CDataLen {}
 
@@ -476,8 +474,8 @@ impl PartialEq<SQL_INTERVAL_STRUCT> for SQL_INTERVAL_STRUCT {
         unimplemented!()
     }
 }
-impl std::fmt::Debug for SQL_INTERVAL_STRUCT {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+impl core::fmt::Debug for SQL_INTERVAL_STRUCT {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
         unimplemented!()
     }
 }

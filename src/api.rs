@@ -1,10 +1,7 @@
 use crate::handle::*;
 #[cfg(test)]
 use mockall::automock;
-use std::cell::UnsafeCell;
-use std::ops::Deref;
-use std::mem::MaybeUninit;
-use std::ptr;
+use core::{cell::UnsafeCell, ops::Deref, mem::MaybeUninit, ptr};
 use crate::{
     attr::{AttrGet, AttrSet},
     c_types::CData,
@@ -98,7 +95,7 @@ pub trait Diagnostics: Handle {
     fn SQLGetDiagFieldA<A: Ident<Type = SQLSMALLINT>, T: DiagField<Self, A>>(
         &self,
         // TODO: Use NoneZeroI16?
-        RecNumber: std::num::NonZeroI16,
+        RecNumber: core::num::NonZeroI16,
         DiagIdentifier: A,
         DiagInfoPtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
@@ -140,7 +137,7 @@ pub trait Diagnostics: Handle {
     fn SQLGetDiagFieldW<A: Ident<Type = SQLSMALLINT>, T: DiagField<Self, A>>(
         &self,
         // TODO: Use NoneZeroI16?
-        RecNumber: std::num::NonZeroI16,
+        RecNumber: core::num::NonZeroI16,
         DiagIdentifier: A,
         DiagInfoPtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
@@ -182,7 +179,7 @@ pub trait Diagnostics: Handle {
     fn SQLGetDiagRecA(
         &self,
         // TODO: Use NoneZeroI16?
-        RecNumber: std::num::NonZeroI16,
+        RecNumber: core::num::NonZeroI16,
         SQLState: &mut MaybeUninit<SQLSTATE<SQLCHAR>>,
         NativeErrorPtr: &mut MaybeUninit<SQLINTEGER>,
         MessageText: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
@@ -216,7 +213,7 @@ pub trait Diagnostics: Handle {
     fn SQLGetDiagRecW(
         &self,
         // TODO: Use NoneZeroI16?
-        RecNumber: std::num::NonZeroI16,
+        RecNumber: core::num::NonZeroI16,
         SQLState: &mut MaybeUninit<SQLSTATE<SQLWCHAR>>,
         NativeErrorPtr: &mut MaybeUninit<SQLINTEGER>,
         MessageText: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
@@ -3283,8 +3280,8 @@ pub(crate) mod ffi {
     type HSTMT = SQLHANDLE;
     type HDESC = SQLHANDLE;
 
-    type ConstSQLPOINTER = *const std::ffi::c_void;
-    type MutSQLPOINTER = *mut std::ffi::c_void;
+    type ConstSQLPOINTER = *const core::ffi::c_void;
+    type MutSQLPOINTER = *mut core::ffi::c_void;
 
     // TODO: static linking is not supported for windows
     #[cfg_attr(windows, link(name = "odbc32", kind = "dylib"))]

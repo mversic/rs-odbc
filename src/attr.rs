@@ -8,10 +8,7 @@ use crate::{
     slice_len, Def, DriverDefined, Ident, OdbcDefined, Scalar, Void, SQLCHAR, SQLINTEGER, SQLLEN,
     SQLSMALLINT, SQLUINTEGER, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
-use std::cell::UnsafeCell;
-use std::convert::TryFrom;
-use std::fmt::Debug;
-use std::mem::MaybeUninit;
+use core::{cell::UnsafeCell, fmt::Debug, mem::MaybeUninit};
 
 pub unsafe trait Attr<A: Ident> {
     type DefinedBy: Def;
@@ -120,7 +117,7 @@ where
 
     fn len(&self) -> LEN {
         // Transmute is safe because MaybeUninit<T> has the same size and alignment as T
-        <MaybeUninit<_> as AttrLen<AD, LEN>>::len(unsafe { std::mem::transmute(self) })
+        <MaybeUninit<_> as AttrLen<AD, LEN>>::len(unsafe { core::mem::transmute(self) })
     }
 }
 unsafe impl<T: Ident, LEN: Copy> AttrLen<OdbcDefined, LEN> for MaybeUninit<T>
@@ -153,19 +150,19 @@ where
 
     fn len(&self) -> LEN {
         // Transmute is safe because MaybeUninit<T> has the same size and alignment as T
-        <OdbcStr<MaybeUninit<CH>> as AttrLen<AD, LEN>>::len(unsafe { std::mem::transmute(self) })
+        <OdbcStr<MaybeUninit<CH>> as AttrLen<AD, LEN>>::len(unsafe { core::mem::transmute(self) })
     }
 }
 unsafe impl<AD: Def, CH: OdbcChar, LEN: Copy> AttrLen<AD, LEN> for OdbcStr<MaybeUninit<CH>>
 where
-    LEN: TryFrom<usize> + std::ops::Mul<Output = LEN>,
+    LEN: TryFrom<usize> + core::ops::Mul<Output = LEN>,
     LEN::Error: Debug,
 {
     type StrLen = LEN;
 
     fn len(&self) -> LEN {
         // TODO: Check for multiplication overflow with checked_mul
-        slice_len::<_, LEN>(self) * LEN::try_from(std::mem::size_of::<CH>()).unwrap()
+        slice_len::<_, LEN>(self) * LEN::try_from(core::mem::size_of::<CH>()).unwrap()
     }
 }
 // TODO: If this is a deferred buffer, then I believe len should be 0
@@ -201,7 +198,7 @@ where
 
     fn len(&self) -> LEN {
         // Transmute is safe because MaybeUninit<T> has the same size and alignment as T
-        <[MaybeUninit<SQLCHAR>] as AttrLen<AD, LEN>>::len(unsafe { std::mem::transmute(self) })
+        <[MaybeUninit<SQLCHAR>] as AttrLen<AD, LEN>>::len(unsafe { core::mem::transmute(self) })
     }
 }
 unsafe impl<AD: Def, T: Ident, LEN: Copy> AttrLen<AD, LEN> for [T]
@@ -282,7 +279,7 @@ where
 
     fn len(&self) -> LEN {
         // Transmute is safe because RefSQLHDESC is a transparent wrapper over RefUnsafeSQLHDESC
-        unsafe { std::mem::transmute::<_, &MaybeUninit<RefUnsafeSQLHDESC<'conn, DT, V>>>(self) }
+        unsafe { core::mem::transmute::<_, &MaybeUninit<RefUnsafeSQLHDESC<'conn, DT, V>>>(self) }
             .len()
     }
 }
@@ -318,7 +315,7 @@ where
 
     fn len(&self) -> LEN {
         // Transmute is safe because SQLHDESC is a transparent wrapper over UnsafeSQLHDESC
-        unsafe { std::mem::transmute::<_, Option<&UnsafeSQLHDESC<'conn, AppDesc<'buf>, V>>>(self) }
+        unsafe { core::mem::transmute::<_, Option<&UnsafeSQLHDESC<'conn, AppDesc<'buf>, V>>>(self) }
             .len()
     }
 }

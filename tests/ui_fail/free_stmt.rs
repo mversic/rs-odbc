@@ -1,10 +1,9 @@
-use rs_odbc::api::{Allocate, Handle, Statement};
+use core::mem::MaybeUninit;
+use rs_odbc::api::{Allocate, Handle};
 use rs_odbc::conn::C4;
 use rs_odbc::env::SQL_OV_ODBC3_80;
-use rs_odbc::handle::{SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE};
-use rs_odbc::stmt::SQL_ATTR_APP_ROW_DESC;
+use rs_odbc::handle::{SQLHDBC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE};
 use rs_odbc::SQL_DRIVER_COMPLETE;
-use std::mem::MaybeUninit;
 
 fn get_env_handle() -> SQLHENV<SQL_OV_ODBC3_80> {
     let (env, _) = SQLHENV::SQLAllocHandle(&SQL_NULL_HANDLE);
@@ -16,8 +15,8 @@ fn connect_to_test_db<'env>(
 ) -> SQLHDBC<'env, C4, SQL_OV_ODBC3_80> {
     let (conn, _) = SQLHDBC::SQLAllocHandle(env);
     let conn = conn.unwrap();
-
     let mut outstrlen = MaybeUninit::uninit();
+
     let (conn, _) =
         conn.SQLDriverConnectA(None, "".as_ref(), None, &mut outstrlen, SQL_DRIVER_COMPLETE);
 
@@ -29,13 +28,8 @@ fn main() {
     let conn = connect_to_test_db(&env);
 
     let (stmt, _) = SQLHSTMT::SQLAllocHandle(&conn);
-    let (desc, _) = SQLHDESC::SQLAllocHandle(&conn);
-
     let stmt = stmt.unwrap();
-    let desc = desc.unwrap();
 
-    stmt.SQLSetStmtAttrA(SQL_ATTR_APP_ROW_DESC, Some(&desc));
-
-    desc.SQLFreeHandle();
+    conn.SQLDisconnect();
     stmt.SQLFreeHandle();
 }
