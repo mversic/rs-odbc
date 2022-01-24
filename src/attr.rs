@@ -1,11 +1,11 @@
-use crate::c_types::CScalar;
-use crate::convert::{AsMutSQLPOINTER, IntoSQLPOINTER};
+use crate::c_types::{CScalar, StrLenOrInd};
+use crate::convert::{AsMutPtr, AsMutSQLPOINTER, IntoSQLPOINTER};
 use crate::desc::AppDesc;
 use crate::env::OdbcVersion;
 use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, SQLHDESC};
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{
-    slice_len, Def, DriverDefined, Ident, OdbcDefined, Scalar, Void, SQLCHAR, SQLINTEGER, SQLLEN,
+    slice_len, Def, DriverDefined, Ident, OdbcDefined, Scalar, SQLCHAR, SQLINTEGER, SQLLEN,
     SQLSMALLINT, SQLUINTEGER, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
 use core::{cell::UnsafeCell, fmt::Debug, mem::MaybeUninit};
@@ -16,20 +16,27 @@ pub unsafe trait Attr<A: Ident> {
 pub unsafe trait AttrGet<A>: AsMutSQLPOINTER + AttrZeroAssert {}
 pub unsafe trait AttrSet<A>: IntoSQLPOINTER {}
 
+// TODO: https://github.com/rust-lang/rust/issues/35121
+// Use never type ! when it is available on stable
+#[derive(Debug, Clone, Copy)]
+pub enum Void {}
+
+/// Same as [`AsMutPtr`] except that it's intended to be used to designate [`AttrLen::StrLen`] types.
+pub unsafe trait StrLen<T: Scalar> {
+    fn as_mut_ptr(&mut self) -> *mut T;
+}
+
 // TODO: https://github.com/rust-lang/rust/issues/20400
 // Once this problem is resolved, it would be possible to modify AttrLen<AD, LEN>
 // into AttrLen<A, LEN> and do more precise blanket implementations like
 // impl<T: Attr<A>, LEN> AttrLen<A, LEN> for T {}
-pub unsafe trait AttrLen<AD: Def, LEN: Copy> {
+pub unsafe trait AttrLen<AD: Def, LEN: Scalar> {
     /// Invariant: StrLen can only be LEN(for slices) or uninhabited type(for scalar types)
     /// It is assumed that ODBC driver will never write to StrLen pointer for scalar types
-    type StrLen: Copy;
+    type StrLen: StrLen<LEN>;
 
     fn len(&self) -> LEN;
 }
-
-pub trait SafeApi {}
-pub trait UnsafeApi {}
 
 pub trait AttrZeroAssert {
     fn assert_zeroed(&self) {}
@@ -108,7 +115,7 @@ where
 {
 }
 
-unsafe impl<AD: Def, T: Ident, LEN: Copy> AttrLen<AD, LEN> for T
+unsafe impl<AD: Def, T: Ident, LEN: Scalar> AttrLen<AD, LEN> for T
 where
     MaybeUninit<T>: AttrLen<AD, LEN>,
     LEN: From<SQLSMALLINT>,
@@ -120,7 +127,7 @@ where
         <MaybeUninit<_> as AttrLen<AD, LEN>>::len(unsafe { core::mem::transmute(self) })
     }
 }
-unsafe impl<T: Ident, LEN: Copy> AttrLen<OdbcDefined, LEN> for MaybeUninit<T>
+unsafe impl<T: Ident, LEN: Scalar> AttrLen<OdbcDefined, LEN> for MaybeUninit<T>
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -130,7 +137,7 @@ where
         LEN::from(0)
     }
 }
-unsafe impl<T: Ident, LEN: Copy> AttrLen<DriverDefined, LEN> for MaybeUninit<T>
+unsafe impl<T: Ident, LEN: Scalar> AttrLen<DriverDefined, LEN> for MaybeUninit<T>
 where
     LEN: From<T::Type>,
 {
@@ -140,7 +147,7 @@ where
         LEN::from(T::IDENTIFIER)
     }
 }
-unsafe impl<AD: Def, CH: OdbcChar, LEN: Copy> AttrLen<AD, LEN> for OdbcStr<CH>
+unsafe impl<AD: Def, CH: OdbcChar, LEN: Scalar> AttrLen<AD, LEN> for OdbcStr<CH>
 where
     LEN: TryFrom<usize>,
     LEN::Error: Debug,
@@ -153,7 +160,7 @@ where
         <OdbcStr<MaybeUninit<CH>> as AttrLen<AD, LEN>>::len(unsafe { core::mem::transmute(self) })
     }
 }
-unsafe impl<AD: Def, CH: OdbcChar, LEN: Copy> AttrLen<AD, LEN> for OdbcStr<MaybeUninit<CH>>
+unsafe impl<AD: Def, CH: OdbcChar, LEN: Scalar> AttrLen<AD, LEN> for OdbcStr<MaybeUninit<CH>>
 where
     LEN: TryFrom<usize> + core::ops::Mul<Output = LEN>,
     LEN::Error: Debug,
@@ -168,7 +175,7 @@ where
 // TODO: If this is a deferred buffer, then I believe len should be 0
 // This can be resolved with specialization by having special implementation for SQL_DESC_DATA_PTR
 // and alike if there are other attributes that correspond to deferred buffers
-unsafe impl<LEN: Copy> AttrLen<OdbcDefined, LEN> for [MaybeUninit<SQLCHAR>]
+unsafe impl<LEN: Scalar> AttrLen<OdbcDefined, LEN> for [MaybeUninit<SQLCHAR>]
 where
     LEN: TryFrom<usize>,
     LEN::Error: Debug,
@@ -182,7 +189,7 @@ where
 // TODO: What if this is a deferred buffer, then I believe len should be 0
 // This can be resolved with specialization by having special implementation for SQL_DESC_DATA_PTR
 // and alike if there are other attributes that correspond to deferred buffers
-unsafe impl<LEN: Copy> AttrLen<DriverDefined, LEN> for [MaybeUninit<SQLCHAR>] {
+unsafe impl<LEN: Scalar> AttrLen<DriverDefined, LEN> for [MaybeUninit<SQLCHAR>] {
     type StrLen = LEN;
 
     fn len(&self) -> LEN {
@@ -190,7 +197,7 @@ unsafe impl<LEN: Copy> AttrLen<DriverDefined, LEN> for [MaybeUninit<SQLCHAR>] {
         unimplemented!();
     }
 }
-unsafe impl<AD: Def, LEN: Copy> AttrLen<AD, LEN> for [SQLCHAR]
+unsafe impl<AD: Def, LEN: Scalar> AttrLen<AD, LEN> for [SQLCHAR]
 where
     [MaybeUninit<SQLCHAR>]: AttrLen<AD, LEN>,
 {
@@ -201,7 +208,7 @@ where
         <[MaybeUninit<SQLCHAR>] as AttrLen<AD, LEN>>::len(unsafe { core::mem::transmute(self) })
     }
 }
-unsafe impl<AD: Def, T: Ident, LEN: Copy> AttrLen<AD, LEN> for [T]
+unsafe impl<AD: Def, T: Ident, LEN: Scalar> AttrLen<AD, LEN> for [T]
 where
     LEN: From<SQLSMALLINT>,
 {
@@ -211,7 +218,7 @@ where
         LEN::from(0)
     }
 }
-unsafe impl<AD: Def, LEN: Copy, CH: OdbcChar> AttrLen<AD, LEN> for &OdbcStr<CH>
+unsafe impl<AD: Def, LEN: Scalar, CH: OdbcChar> AttrLen<AD, LEN> for &OdbcStr<CH>
 where
     OdbcStr<CH>: AttrLen<AD, LEN>,
 {
@@ -221,7 +228,7 @@ where
         AttrLen::len(*self)
     }
 }
-unsafe impl<AD: Def, LEN: Copy, T> AttrLen<AD, LEN> for &[T]
+unsafe impl<AD: Def, LEN: Scalar, T> AttrLen<AD, LEN> for &[T]
 where
     [T]: AttrLen<AD, LEN>,
 {
@@ -247,7 +254,7 @@ unsafe impl<AD: Def, T> AttrLen<AD, SQLINTEGER> for [UnsafeCell<T>] {
         0 // Length is not used for deferred buffers
     }
 }
-unsafe impl<DT, LEN: Copy, V: OdbcVersion> AttrLen<OdbcDefined, LEN>
+unsafe impl<DT, LEN: Scalar, V: OdbcVersion> AttrLen<OdbcDefined, LEN>
     for MaybeUninit<RefUnsafeSQLHDESC<'_, DT, V>>
 where
     LEN: From<SQLSMALLINT>,
@@ -258,7 +265,7 @@ where
         LEN::from(0)
     }
 }
-unsafe impl<DT, LEN: Copy, V: OdbcVersion> AttrLen<DriverDefined, LEN>
+unsafe impl<DT, LEN: Scalar, V: OdbcVersion> AttrLen<DriverDefined, LEN>
     for MaybeUninit<RefUnsafeSQLHDESC<'_, DT, V>>
 where
     LEN: From<SQLSMALLINT>,
@@ -269,7 +276,7 @@ where
         LEN::from(crate::SQL_IS_POINTER)
     }
 }
-unsafe impl<'conn, AD: Def, DT, LEN: Copy, V: OdbcVersion> AttrLen<AD, LEN>
+unsafe impl<'conn, AD: Def, DT, LEN: Scalar, V: OdbcVersion> AttrLen<AD, LEN>
     for MaybeUninit<RefSQLHDESC<'conn, DT, V>>
 where
     MaybeUninit<RefUnsafeSQLHDESC<'conn, DT, V>>: AttrLen<AD, LEN>,
@@ -283,7 +290,7 @@ where
             .len()
     }
 }
-unsafe impl<LEN: Copy, V: OdbcVersion> AttrLen<OdbcDefined, LEN>
+unsafe impl<LEN: Scalar, V: OdbcVersion> AttrLen<OdbcDefined, LEN>
     for Option<&UnsafeSQLHDESC<'_, AppDesc<'_>, V>>
 where
     LEN: From<SQLSMALLINT>,
@@ -294,7 +301,7 @@ where
         LEN::from(0)
     }
 }
-unsafe impl<LEN: Copy, V: OdbcVersion> AttrLen<DriverDefined, LEN>
+unsafe impl<LEN: Scalar, V: OdbcVersion> AttrLen<DriverDefined, LEN>
     for Option<&UnsafeSQLHDESC<'_, AppDesc<'_>, V>>
 where
     LEN: From<SQLSMALLINT>,
@@ -305,7 +312,7 @@ where
         LEN::from(crate::SQL_IS_POINTER)
     }
 }
-unsafe impl<'a, 'conn, 'buf, AD: Def, LEN: Copy, V: OdbcVersion> AttrLen<AD, LEN>
+unsafe impl<'a, 'conn, 'buf, AD: Def, LEN: Scalar, V: OdbcVersion> AttrLen<AD, LEN>
     for Option<&'a SQLHDESC<'conn, AppDesc<'buf>, V>>
 where
     Option<&'a UnsafeSQLHDESC<'conn, AppDesc<'buf>, V>>: AttrLen<AD, LEN>,
@@ -317,6 +324,24 @@ where
         // Transmute is safe because SQLHDESC is a transparent wrapper over UnsafeSQLHDESC
         unsafe { core::mem::transmute::<_, Option<&UnsafeSQLHDESC<'conn, AppDesc<'buf>, V>>>(self) }
             .len()
+    }
+}
+
+unsafe impl<T: Scalar> StrLen<T> for T
+where
+    T: AsMutPtr<T>,
+{
+    fn as_mut_ptr(&mut self) -> *mut T {
+        <Self as AsMutPtr<T>>::as_mut_ptr(self)
+    }
+}
+unsafe impl<T: Scalar> StrLen<T> for MaybeUninit<T>
+where
+    Self: AsMutPtr<T>,
+    T: StrLen<T>,
+{
+    fn as_mut_ptr(&mut self) -> *mut T {
+        <Self as AsMutPtr<T>>::as_mut_ptr(self)
     }
 }
 
@@ -332,6 +357,30 @@ impl<T: CScalar> AttrZeroAssert for UnsafeCell<T> {
 ////////////////////////////////////////////////////////////////////////////////
 // CONCRETE IMPLS
 ////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Why are these needed?
+unsafe impl StrLen<SQLLEN> for MaybeUninit<StrLenOrInd> {
+    fn as_mut_ptr(&mut self) -> *mut SQLLEN {
+        self.as_mut_ptr().cast()
+    }
+}
+unsafe impl StrLen<SQLLEN> for UnsafeCell<StrLenOrInd> {
+    fn as_mut_ptr(&mut self) -> *mut SQLLEN {
+        self.get().cast()
+    }
+}
+unsafe impl<T: Scalar> StrLen<T> for Void {
+    fn as_mut_ptr(&mut self) -> *mut T {
+        // Uninhabited type has no memory location
+        core::ptr::null_mut()
+    }
+}
+unsafe impl<T: Scalar> StrLen<T> for MaybeUninit<Void> {
+    fn as_mut_ptr(&mut self) -> *mut T {
+        // Uninhabited type has no memory location
+        core::ptr::null_mut()
+    }
+}
 
 impl AttrZeroAssert for SQLSMALLINT {
     fn assert_zeroed(&self) {

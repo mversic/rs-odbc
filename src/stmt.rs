@@ -1,8 +1,7 @@
 #[double]
 use crate::api::ffi;
 use crate::api::Statement;
-use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
-use crate::convert::AsMutPtr;
+use crate::attr::{Attr, AttrGet, AttrLen, AttrSet, StrLen};
 use crate::desc::{AppDesc, IRD, IPD};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::handle::{UnsafeSQLHDESC, SQLHDESC};
@@ -37,7 +36,7 @@ pub(crate) mod private {
         where
             A: Ident<Type = SQLINTEGER>,
             Self: AttrGet<A> + Ansi + Ref<'stmt>,
-            MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
+            MaybeUninit<Self::StrLen>: StrLen<SQLINTEGER>,
         {
             let ValuePtrLen = self.len();
 
@@ -47,7 +46,7 @@ pub(crate) mod private {
                     A::IDENTIFIER,
                     self.as_mut_SQLPOINTER(),
                     ValuePtrLen,
-                    StringLengthPtr.map_or_else(core::ptr::null_mut, AsMutPtr::as_mut_ptr),
+                    StringLengthPtr.map_or_else(core::ptr::null_mut, StrLen::as_mut_ptr),
                 )
             }
         }
@@ -61,7 +60,7 @@ pub(crate) mod private {
         where
             A: Ident<Type = SQLINTEGER>,
             Self: AttrGet<A> + Unicode + Ref<'stmt>,
-            MaybeUninit<Self::StrLen>: AsMutPtr<SQLINTEGER>,
+            MaybeUninit<Self::StrLen>: StrLen<SQLINTEGER>,
         {
             let ValuePtrLen = self.len();
 
@@ -71,7 +70,7 @@ pub(crate) mod private {
                     A::IDENTIFIER,
                     self.as_mut_SQLPOINTER(),
                     ValuePtrLen,
-                    StringLengthPtr.map_or_else(core::ptr::null_mut, AsMutPtr::as_mut_ptr),
+                    StringLengthPtr.map_or_else(core::ptr::null_mut, StrLen::as_mut_ptr),
                 )
             }
         }

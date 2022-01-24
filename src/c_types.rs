@@ -38,6 +38,7 @@ unsafe impl<'conn, DT, TT: Ident, CH: OdbcChar, V: OdbcVersion> DeferredBuf<RefU
 unsafe impl<DT, TT: Ident, V: OdbcVersion> DeferredBuf<RefUnsafeSQLHDESC<'_, DT, V>, TT, V> for (SQLPOINTER, SQLLEN) {}
 
 #[repr(transparent)]
+#[derive(Clone, Copy)]
 pub struct StrLenOrInd(pub(crate) SQLLEN);
 impl StrLenOrInd {
     pub unsafe fn set_len(&mut self, len: SQLLEN) {

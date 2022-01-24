@@ -1,12 +1,12 @@
 use crate::api::Handle;
-use crate::attr::{Attr, AttrGet, AttrLen, AttrZeroAssert};
+use crate::attr::{Attr, AttrGet, AttrLen, AttrZeroAssert, Void};
 use crate::convert::AsMutSQLPOINTER;
 use crate::env::OdbcVersion;
 use crate::handle::SQLHSTMT;
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{
-    sqlreturn::SQLRETURN, Def, Ident, OdbcDefined, Scalar, Void, SQLCHAR, SQLINTEGER, SQLLEN,
-    SQLPOINTER, SQLSMALLINT, SQLWCHAR,
+    sqlreturn::SQLRETURN, Def, Ident, OdbcDefined, Scalar, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER,
+    SQLSMALLINT, SQLWCHAR,
 };
 use core::mem::MaybeUninit;
 use rs_odbc_derive::{odbc_type, Ident};

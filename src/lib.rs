@@ -61,11 +61,6 @@ pub type SQLSETPOSIROW = u64;
 type UWORD = u16;
 pub type SQLPOINTER = *mut c_void;
 
-#[derive(Debug, Clone, Copy)]
-// TODO: https://github.com/rust-lang/rust/issues/35121
-// Use uninhabited type ! when it is available in stable
-pub enum Void {}
-
 // TODO: Won't be required once GATs are implemented because
 // implicit handles will be able to use type constructors
 // https://github.com/rust-lang/rust/issues/44265
@@ -142,7 +137,7 @@ impl<T> Ident for &mut T {
 }
 
 // TODO: Make private?
-pub trait Scalar {}
+pub trait Scalar: Copy {}
 impl Scalar for SQLSCHAR {}
 impl Scalar for SQLCHAR {}
 impl Scalar for SQLSMALLINT {}

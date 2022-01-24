@@ -1,6 +1,8 @@
-use crate::env::OdbcVersion;
-use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, SQLHDESC};
-use crate::{Ident, SQLCHAR, SQLWCHAR};
+use crate::{
+    env::OdbcVersion,
+    handle::{RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, SQLHDESC},
+    Ident, SQLCHAR, SQLWCHAR,
+};
 use core::{
     mem::MaybeUninit,
     ops::{Deref, DerefMut},

@@ -1,15 +1,16 @@
-use crate::c_types::{CScalar, StrLenOrInd};
-use crate::conn::ConnState;
-use crate::desc::DescType;
-use crate::env::OdbcVersion;
-use crate::handle::{
-    RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, UnsafeSQLHSTMT, SQLHANDLE, SQLHDBC, SQLHDESC,
-    SQLHENV, SQLHSTMT, SQL_NULL_HANDLE,
-};
-use crate::str::{Ansi, OdbcChar, OdbcStr, Unicode};
 use crate::{
-    slice_len, Scalar, Void, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLUINTEGER,
-    SQLULEN, SQLUSMALLINT, SQLWCHAR,
+    c_types::CScalar,
+    conn::ConnState,
+    desc::DescType,
+    env::OdbcVersion,
+    handle::{
+        RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, UnsafeSQLHSTMT, SQLHANDLE, SQLHDBC,
+        SQLHDESC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE,
+    },
+    slice_len,
+    str::{Ansi, OdbcChar, OdbcStr, Unicode},
+    Scalar, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLUINTEGER, SQLULEN,
+    SQLUSMALLINT, SQLWCHAR,
 };
 use core::{cell::UnsafeCell, fmt::Debug, mem::MaybeUninit};
 
@@ -60,18 +61,14 @@ pub unsafe trait AsSQLHANDLE {
 // GENERIC IMPLS
 ////////////////////////////////////////////////////////////////////////////////
 
-unsafe impl<T> AsMutPtr<T> for MaybeUninit<T> {
+unsafe impl<T: Scalar> AsMutPtr<T> for T {
     fn as_mut_ptr(&mut self) -> *mut T {
-        self.as_mut_ptr()
+        self
     }
 }
-unsafe impl<T: Scalar> AsMutPtr<T> for MaybeUninit<Void> {
+unsafe impl<T: AsMutPtr<T>> AsMutPtr<T> for MaybeUninit<T> {
     fn as_mut_ptr(&mut self) -> *mut T {
-        // SAFETY:
-        // Acording to the ODBC specification returning `self.as_mut_ptr().cast()` here
-        // should be fine. However non-compliant implementations might try to write
-        // to non-null pointers obtained through this method which would cause UB
-        core::ptr::null_mut()
+        self.as_mut_ptr()
     }
 }
 unsafe impl<T: Scalar> IntoSQLPOINTER for &T {
@@ -167,7 +164,7 @@ unsafe impl<CH, LEN: TryFrom<usize>> AsMutRawSlice<SQLCHAR, LEN> for OdbcStr<CH>
 where
     LEN: Copy,
     LEN::Error: Debug,
-    OdbcStr<CH>: Ansi,
+    Self: Ansi,
 {
     fn as_mut_raw_slice(&mut self) -> (*mut SQLCHAR, LEN) {
         (self.as_mut_ptr().cast(), slice_len(self))
@@ -177,7 +174,7 @@ unsafe impl<CH, LEN: TryFrom<usize>> AsMutRawSlice<SQLWCHAR, LEN> for OdbcStr<CH
 where
     LEN: Copy,
     LEN::Error: Debug,
-    OdbcStr<CH>: Unicode,
+    Self: Unicode,
 {
     fn as_mut_raw_slice(&mut self) -> (*mut SQLWCHAR, LEN) {
         (self.as_mut_ptr().cast(), slice_len(self))
@@ -187,18 +184,6 @@ where
 ////////////////////////////////////////////////////////////////////////////////
 // CONCRETE IMPLS
 ////////////////////////////////////////////////////////////////////////////////
-
-// TODO: Why is this needed?
-unsafe impl AsMutPtr<SQLLEN> for MaybeUninit<StrLenOrInd> {
-    fn as_mut_ptr(&mut self) -> *mut SQLLEN {
-        self.as_mut_ptr().cast()
-    }
-}
-unsafe impl AsMutPtr<SQLLEN> for UnsafeCell<StrLenOrInd> {
-    fn as_mut_ptr(&mut self) -> *mut SQLLEN {
-        self.get().cast()
-    }
-}
 
 unsafe impl IntoSQLPOINTER for SQLSMALLINT {
     fn into_SQLPOINTER(self) -> SQLPOINTER {

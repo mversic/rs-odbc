@@ -1,9 +1,6 @@
 use crate::handle::*;
-#[cfg(test)]
-use mockall::automock;
-use core::{cell::UnsafeCell, ops::Deref, mem::MaybeUninit, ptr};
 use crate::{
-    attr::{AttrGet, AttrSet},
+    attr::{AttrGet, AttrSet, StrLen},
     c_types::CData,
     c_types::DeferredBuf,
     col::ColAttr,
@@ -26,12 +23,18 @@ use crate::{
     Scope, StrLenOrInd, Unique, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW,
     SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
+use core::{cell::UnsafeCell, mem::MaybeUninit, ops::Deref, ptr};
+#[cfg(test)]
+use mockall::automock;
 
 pub trait Handle: AsSQLHANDLE + Sized {
     type Ident: Ident<Type = SQLSMALLINT>;
 }
 
-pub trait Allocate<SRC: Deref>: Handle where SRC::Target: AsSQLHANDLE {
+pub trait Allocate<SRC: Deref>: Handle
+where
+    SRC::Target: AsSQLHANDLE,
+{
     /// Creates handle from a raw pointer
     ///
     /// # Safety
@@ -102,7 +105,7 @@ pub trait Diagnostics: Handle {
     ) -> SQLRETURN
     where
         T: AttrGet<A> + Ansi + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
+        MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
         let DiagInfoPtr = DiagInfoPtr.map_or((ptr::null_mut(), 0), |DiagInfoPtr| {
             if cfg!(feature = "odbc_debug") {
@@ -120,7 +123,7 @@ pub trait Diagnostics: Handle {
                 A::IDENTIFIER,
                 DiagInfoPtr.0,
                 DiagInfoPtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
             )
         }
     }
@@ -144,7 +147,7 @@ pub trait Diagnostics: Handle {
     ) -> SQLRETURN
     where
         T: AttrGet<A> + Unicode + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
+        MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
         let DiagInfoPtr = DiagInfoPtr.map_or((ptr::null_mut(), 0), |DiagInfoPtr| {
             if cfg!(feature = "odbc_debug") {
@@ -162,7 +165,7 @@ pub trait Diagnostics: Handle {
                 A::IDENTIFIER,
                 DiagInfoPtr.0,
                 DiagInfoPtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
             )
         }
     }
@@ -181,9 +184,9 @@ pub trait Diagnostics: Handle {
         // TODO: Use NoneZeroI16?
         RecNumber: core::num::NonZeroI16,
         SQLState: &mut MaybeUninit<SQLSTATE<SQLCHAR>>,
-        NativeErrorPtr: &mut MaybeUninit<SQLINTEGER>,
+        NativeErrorPtr: &mut impl AsMutPtr<SQLINTEGER>,
         MessageText: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
-        TextLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        TextLengthPtr: &mut impl AsMutPtr<SQLSMALLINT>,
     ) -> SQLRETURN {
         let MessageText = MessageText.as_mut_raw_slice();
 
@@ -215,9 +218,9 @@ pub trait Diagnostics: Handle {
         // TODO: Use NoneZeroI16?
         RecNumber: core::num::NonZeroI16,
         SQLState: &mut MaybeUninit<SQLSTATE<SQLWCHAR>>,
-        NativeErrorPtr: &mut MaybeUninit<SQLINTEGER>,
+        NativeErrorPtr: &mut impl AsMutPtr<SQLINTEGER>,
         MessageText: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
-        TextLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        TextLengthPtr: &mut impl AsMutPtr<SQLSMALLINT>,
     ) -> SQLRETURN {
         let MessageText = MessageText.as_mut_raw_slice();
 
@@ -399,11 +402,11 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
         FieldIdentifier: A,
         CharacterAttributePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
-        NumericAttributePtr: &mut MaybeUninit<SQLLEN>,
+        NumericAttributePtr: &mut impl AsMutPtr<SQLLEN>,
     ) -> SQLRETURN
     where
         T: AttrGet<A> + Ansi + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
+        MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
         // TODO: With MaybeUnint it's not possible to check that value is zeroed
         //if cfg!(feature = "odbc_debug") {
@@ -425,7 +428,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
                 A::IDENTIFIER,
                 CharacterAttributePtr.0,
                 CharacterAttributePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
                 NumericAttributePtr.as_mut_ptr(),
             )
         }
@@ -446,11 +449,11 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
         FieldIdentifier: A,
         CharacterAttributePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
-        NumericAttributePtr: &mut MaybeUninit<SQLLEN>,
+        NumericAttributePtr: &mut impl AsMutPtr<SQLLEN>,
     ) -> SQLRETURN
     where
         T: AttrGet<A> + Unicode + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
+        MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
         // TODO: With MaybeUnint it's not possible to check that value is zeroed
         //if cfg!(feature = "odbc_debug") {
@@ -472,7 +475,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
                 A::IDENTIFIER,
                 CharacterAttributePtr.0,
                 CharacterAttributePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
                 NumericAttributePtr.as_mut_ptr(),
             )
         }
@@ -635,11 +638,11 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
         &self,
         ColumnNumber: SQLUSMALLINT,
         ColumnName: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
-        NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-        DataTypePtr: &mut MaybeUninit<SQLSMALLINT>,
-        ColumnSizePtr: &mut MaybeUninit<SQLULEN>,
-        DecimalDigitsPtr: &mut MaybeUninit<SQLSMALLINT>,
-        NullablePtr: &mut MaybeUninit<NullAllowed>,
+        NameLengthPtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        DataTypePtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        ColumnSizePtr: &mut impl AsMutPtr<SQLULEN>,
+        DecimalDigitsPtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        NullablePtr: &mut impl AsMutPtr<NullAllowed>,
     ) -> SQLRETURN {
         let ColumnName = ColumnName.as_mut_raw_slice();
 
@@ -671,11 +674,11 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
         &self,
         ColumnNumber: SQLUSMALLINT,
         ColumnName: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
-        NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-        DataTypePtr: &mut MaybeUninit<SQLSMALLINT>,
-        ColumnSizePtr: &mut MaybeUninit<SQLULEN>,
-        DecimalDigitsPtr: &mut MaybeUninit<SQLSMALLINT>,
-        NullablePtr: &mut MaybeUninit<NullAllowed>,
+        NameLengthPtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        DataTypePtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        ColumnSizePtr: &mut impl AsMutPtr<SQLULEN>,
+        DecimalDigitsPtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        NullablePtr: &mut impl AsMutPtr<NullAllowed>,
     ) -> SQLRETURN {
         let ColumnName = ColumnName.as_mut_raw_slice();
 
@@ -706,10 +709,10 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     fn SQLDescribeParam(
         &self,
         ParameterNumber: SQLUSMALLINT,
-        DataTypePtr: &mut MaybeUninit<SQLSMALLINT>,
-        ParameterSizePtr: &mut MaybeUninit<SQLULEN>,
-        DecimalDigitsPtr: &mut MaybeUninit<SQLSMALLINT>,
-        NullablePtr: &mut MaybeUninit<NullAllowed>,
+        DataTypePtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        ParameterSizePtr: &mut impl AsMutPtr<SQLULEN>,
+        DecimalDigitsPtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        NullablePtr: &mut impl AsMutPtr<NullAllowed>,
     ) -> SQLRETURN {
         unsafe {
             ffi::SQLDescribeParam(
@@ -846,7 +849,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     fn SQLGetCursorNameA(
         &self,
         CursorName: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
-        NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        NameLengthPtr: &mut impl AsMutPtr<SQLSMALLINT>,
     ) -> SQLRETURN {
         let CursorName = CursorName.as_mut_raw_slice();
 
@@ -872,7 +875,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     fn SQLGetCursorNameW(
         &self,
         CursorName: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
-        NameLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        NameLengthPtr: &mut impl AsMutPtr<SQLSMALLINT>,
     ) -> SQLRETURN {
         let CursorName = CursorName.as_mut_raw_slice();
 
@@ -893,8 +896,8 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(non_snake_case, unused_variables)]
     #[must_use]
+    #[allow(non_snake_case, unused_variables)]
     // TODO: This function must be unsafe if SQL_ARD_TYPE and SQL_APD_TYPE are allowed to be used
     fn SQLGetData<TT: Ident<Type = SQLSMALLINT>, B: CData<TT, V>>(
         &self,
@@ -905,7 +908,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     ) -> SQLRETURN
     where
         B: AsMutSQLPOINTER + ?Sized,
-        MaybeUninit<StrLenOrInd>: AsMutPtr<SQLLEN>,
+        MaybeUninit<StrLenOrInd>: StrLen<SQLLEN>,
     {
         unsafe {
             ffi::SQLGetData(
@@ -914,7 +917,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
                 TT::IDENTIFIER,
                 TargetValuePtr.as_mut_SQLPOINTER(),
                 TargetValuePtr.len(),
-                StrLen_or_IndPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StrLen_or_IndPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
             )
         }
     }
@@ -936,7 +939,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     ) -> SQLRETURN
     where
         T: AttrGet<A> + Ansi + Ref<'stmt> + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+        MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
         SQLGetStmtAttrA(self, Attribute, ValuePtr, StringLengthPtr)
     }
@@ -958,7 +961,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     ) -> SQLRETURN
     where
         T: AttrGet<A> + Unicode + Ref<'stmt> + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+        MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
         SQLGetStmtAttrW(self, Attribute, ValuePtr, StringLengthPtr)
     }
@@ -1012,7 +1015,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     #[inline]
     #[must_use]
     #[allow(non_snake_case)]
-    fn SQLNumParams(&self, ParameterCountPtr: &mut MaybeUninit<SQLSMALLINT>) -> SQLRETURN {
+    fn SQLNumParams(&self, ParameterCountPtr: &mut impl AsMutPtr<SQLSMALLINT>) -> SQLRETURN {
         unsafe { ffi::SQLNumParams(self.as_SQLHANDLE(), ParameterCountPtr.as_mut_ptr()) }
     }
 
@@ -1025,7 +1028,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     #[inline]
     #[must_use]
     #[allow(non_snake_case)]
-    fn SQLNumResultCols(&self, ColumnCountPtr: &mut MaybeUninit<SQLSMALLINT>) -> SQLRETURN {
+    fn SQLNumResultCols(&self, ColumnCountPtr: &mut impl AsMutPtr<SQLSMALLINT>) -> SQLRETURN {
         unsafe { ffi::SQLNumResultCols(self.as_SQLHANDLE(), ColumnCountPtr.as_mut_ptr()) }
     }
 
@@ -1301,7 +1304,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     #[inline]
     #[must_use]
     #[allow(non_snake_case)]
-    fn SQLRowCount(&self, RowCountPtr: &mut MaybeUninit<SQLLEN>) -> SQLRETURN {
+    fn SQLRowCount(&self, RowCountPtr: &mut impl AsMutPtr<SQLLEN>) -> SQLRETURN {
         unsafe { ffi::SQLRowCount(self.as_SQLHANDLE(), RowCountPtr.as_mut_ptr()) }
     }
 
@@ -1701,7 +1704,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     ) -> SQLRETURN
     where
         T: AttrGet<A> + Ansi + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+        MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
             if cfg!(feature = "odbc_debug") {
@@ -1718,7 +1721,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
                 A::IDENTIFIER,
                 ValuePtr.0,
                 ValuePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
             )
         }
     }
@@ -1741,7 +1744,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     ) -> SQLRETURN
     where
         T: AttrGet<A> + Unicode + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+        MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
             if cfg!(feature = "odbc_debug") {
@@ -1758,7 +1761,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
                 A::IDENTIFIER,
                 ValuePtr.0,
                 ValuePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
             )
         }
     }
@@ -1776,13 +1779,13 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
         &self,
         RecNumber: SQLSMALLINT,
         Name: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
-        StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-        TypePtr: &mut MaybeUninit<ST>,
-        SubTypePtr: &mut MaybeUninit<DatetimeIntervalCode>,
-        LengthPtr: &mut MaybeUninit<SQLLEN>,
-        PrecisionPtr: &mut MaybeUninit<SQLSMALLINT>,
-        ScalePtr: &mut MaybeUninit<SQLSMALLINT>,
-        NullablePtr: &mut MaybeUninit<NullAllowed>,
+        StringLengthPtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        TypePtr: &mut impl AsMutPtr<ST>,
+        SubTypePtr: &mut impl AsMutPtr<DatetimeIntervalCode>,
+        LengthPtr: &mut impl AsMutPtr<SQLLEN>,
+        PrecisionPtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        ScalePtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        NullablePtr: &mut impl AsMutPtr<NullAllowed>,
     ) -> SQLRETURN {
         let Name = Name.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
@@ -1816,13 +1819,13 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
         &self,
         RecNumber: SQLSMALLINT,
         Name: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
-        StringLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
-        TypePtr: &mut MaybeUninit<ST>,
-        SubTypePtr: &mut MaybeUninit<DatetimeIntervalCode>,
-        LengthPtr: &mut MaybeUninit<SQLLEN>,
-        PrecisionPtr: &mut MaybeUninit<SQLSMALLINT>,
-        ScalePtr: &mut MaybeUninit<SQLSMALLINT>,
-        NullablePtr: &mut MaybeUninit<NullAllowed>,
+        StringLengthPtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        TypePtr: &mut impl AsMutPtr<ST>,
+        SubTypePtr: &mut impl AsMutPtr<DatetimeIntervalCode>,
+        LengthPtr: &mut impl AsMutPtr<SQLLEN>,
+        PrecisionPtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        ScalePtr: &mut impl AsMutPtr<SQLSMALLINT>,
+        NullablePtr: &mut impl AsMutPtr<NullAllowed>,
     ) -> SQLRETURN {
         let Name = Name.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
@@ -1942,8 +1945,8 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
         // TODO: Input or Output for both? I guess it depends on which descriptor was given
         DataPtr: Option<&'buf PTR>,
         // TODO: Shouldn't following two be UnsafeCell
-        StringLengthPtr: &'buf mut MaybeUninit<SQLLEN>,
-        IndicatorPtr: &'buf mut MaybeUninit<SQLLEN>,
+        StringLengthPtr: &'buf mut impl AsMutPtr<SQLLEN>,
+        IndicatorPtr: &'buf mut impl AsMutPtr<SQLLEN>,
     ) -> SQLRETURN
     where
         &'buf PTR: IntoSQLPOINTER,
@@ -2011,7 +2014,7 @@ pub trait Async<V: OdbcVersion>: Handle {
     #[must_use]
     #[allow(non_snake_case)]
     // TODO: Should this handle be mutable or not?
-    fn SQLCompleteAsync(&mut self, AsyncRetCodePtr: &mut MaybeUninit<RETCODE>) -> SQLRETURN {
+    fn SQLCompleteAsync(&mut self, AsyncRetCodePtr: &mut impl AsMutPtr<RETCODE>) -> SQLRETURN {
         unsafe {
             ffi::SQLCompleteAsync(
                 Self::Ident::IDENTIFIER,
@@ -2036,9 +2039,9 @@ impl<V: OdbcVersion> SQLHENV<V> {
         &self,
         Direction: SQLUSMALLINT,
         ServerName: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
-        NameLength1Ptr: &mut MaybeUninit<SQLSMALLINT>,
+        NameLength1Ptr: &mut impl AsMutPtr<SQLSMALLINT>,
         Description: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
-        NameLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
+        NameLength2Ptr: &mut impl AsMutPtr<SQLSMALLINT>,
     ) -> SQLRETURN {
         let ServerName = ServerName.as_mut_raw_slice();
         let Description = Description.as_mut_raw_slice();
@@ -2070,9 +2073,9 @@ impl<V: OdbcVersion> SQLHENV<V> {
         &self,
         Direction: SQLUSMALLINT,
         ServerName: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
-        NameLength1Ptr: &mut MaybeUninit<SQLSMALLINT>,
+        NameLength1Ptr: &mut impl AsMutPtr<SQLSMALLINT>,
         Description: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
-        NameLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
+        NameLength2Ptr: &mut impl AsMutPtr<SQLSMALLINT>,
     ) -> SQLRETURN {
         let ServerName = ServerName.as_mut_raw_slice();
         let Description = Description.as_mut_raw_slice();
@@ -2104,9 +2107,9 @@ impl<V: OdbcVersion> SQLHENV<V> {
         &self,
         Direction: SQLUSMALLINT,
         DriverDescription: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
-        DescriptionLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        DescriptionLengthPtr: &mut impl AsMutPtr<SQLSMALLINT>,
         DriverAttributes: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
-        AttributesLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        AttributesLengthPtr: &mut impl AsMutPtr<SQLSMALLINT>,
     ) -> SQLRETURN {
         let DriverDescription = DriverDescription.as_mut_raw_slice();
         let DriverAttributes = DriverAttributes.as_mut_raw_slice();
@@ -2138,9 +2141,9 @@ impl<V: OdbcVersion> SQLHENV<V> {
         &self,
         Direction: SQLUSMALLINT,
         DriverDescription: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
-        DescriptionLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        DescriptionLengthPtr: &mut impl AsMutPtr<SQLSMALLINT>,
         DriverAttributes: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
-        AttributesLengthPtr: &mut MaybeUninit<SQLSMALLINT>,
+        AttributesLengthPtr: &mut impl AsMutPtr<SQLSMALLINT>,
     ) -> SQLRETURN {
         let DriverDescription = DriverDescription.as_mut_raw_slice();
         let DriverAttributes = DriverAttributes.as_mut_raw_slice();
@@ -2176,7 +2179,7 @@ impl<V: OdbcVersion> SQLHENV<V> {
     ) -> SQLRETURN
     where
         T: AttrGet<A> + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+        MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
             (ValuePtr.as_mut_SQLPOINTER(), ValuePtr.len())
@@ -2188,7 +2191,7 @@ impl<V: OdbcVersion> SQLHENV<V> {
                 A::IDENTIFIER,
                 ValuePtr.0,
                 ValuePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
             )
         }
     }
@@ -2237,7 +2240,7 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
         self,
         InConnectionString: &OdbcStr<SQLCHAR>,
         OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
-        StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
+        StringLength2Ptr: &mut impl AsMutPtr<SQLSMALLINT>,
     ) -> (
         Result<SQLHDBC<'env, C4, V>, Result<SQLHDBC<'env, C3, V>, SQLHDBC<'env, C2, V>>>,
         SQLRETURN,
@@ -2284,7 +2287,7 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
         self,
         InConnectionString: &OdbcStr<SQLWCHAR>,
         OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
-        StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
+        StringLength2Ptr: &mut impl AsMutPtr<SQLSMALLINT>,
     ) -> (
         Result<SQLHDBC<'env, C4, V>, Result<SQLHDBC<'env, C3, V>, SQLHDBC<'env, C2, V>>>,
         SQLRETURN,
@@ -2358,7 +2361,7 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     ) -> SQLRETURN
     where
         T: AttrGet<A> + Ansi + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+        MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
             if cfg!(feature = "odbc_debug") {
@@ -2374,7 +2377,7 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
                 A::IDENTIFIER,
                 ValuePtr.0,
                 ValuePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
             )
         }
     }
@@ -2397,7 +2400,7 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     ) -> SQLRETURN
     where
         T: AttrGet<A> + Unicode + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+        MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
             if cfg!(feature = "odbc_debug") {
@@ -2413,7 +2416,7 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
                 A::IDENTIFIER,
                 ValuePtr.0,
                 ValuePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
             )
         }
     }
@@ -2570,7 +2573,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C2, V> {
         WindowHandle: Option<SQLHWND>,
         InConnectionString: &OdbcStr<SQLCHAR>,
         OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
-        StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
+        StringLength2Ptr: &mut impl AsMutPtr<SQLSMALLINT>,
         DriverCompletion: DriverCompletion,
     ) -> (
         Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
@@ -2615,7 +2618,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C2, V> {
         WindowHandle: Option<SQLHWND>,
         InConnectionString: &OdbcStr<SQLWCHAR>,
         OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
-        StringLength2Ptr: &mut MaybeUninit<SQLSMALLINT>,
+        StringLength2Ptr: &mut impl AsMutPtr<SQLSMALLINT>,
         DriverCompletion: DriverCompletion,
     ) -> (
         Result<SQLHDBC<'env, C4, V>, SQLHDBC<'env, C2, V>>,
@@ -2660,7 +2663,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     pub fn SQLGetFunctions(
         &self,
         FunctionId: FunctionId,
-        SupportedPtr: &mut MaybeUninit<SQLUSMALLINT>,
+        SupportedPtr: &mut impl AsMutPtr<SQLUSMALLINT>,
     ) -> SQLRETURN {
         unsafe {
             ffi::SQLGetFunctions(
@@ -2689,7 +2692,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     ) -> SQLRETURN
     where
         T: AttrGet<A> + Ansi + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
+        MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
         let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
             (InfoValuePtr.as_mut_SQLPOINTER(), InfoValuePtr.len())
@@ -2701,7 +2704,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
                 A::IDENTIFIER,
                 InfoValuePtr.0,
                 InfoValuePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
             )
         }
     }
@@ -2724,7 +2727,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     ) -> SQLRETURN
     where
         T: AttrGet<A> + Unicode + ?Sized,
-        MaybeUninit<T::StrLen>: AsMutPtr<SQLSMALLINT>,
+        MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
         let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
             (InfoValuePtr.as_mut_SQLPOINTER(), InfoValuePtr.len())
@@ -2736,7 +2739,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
                 A::IDENTIFIER,
                 InfoValuePtr.0,
                 InfoValuePtr.1,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
             )
         }
     }
@@ -2754,7 +2757,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
         &self,
         InStatementText: &OdbcStr<SQLCHAR>,
         OutStatementText: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
-        TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
+        TextLength2Ptr: &mut impl AsMutPtr<SQLINTEGER>,
     ) -> SQLRETURN {
         let InStatementText = InStatementText.as_raw_slice();
         let OutStatementText = OutStatementText.as_mut_raw_slice();
@@ -2784,7 +2787,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
         &self,
         InStatementText: &OdbcStr<SQLWCHAR>,
         OutStatementText: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
-        TextLength2Ptr: &mut MaybeUninit<SQLINTEGER>,
+        TextLength2Ptr: &mut impl AsMutPtr<SQLINTEGER>,
     ) -> SQLRETURN {
         let InStatementText = InStatementText.as_raw_slice();
         let OutStatementText = OutStatementText.as_mut_raw_slice();
@@ -3111,8 +3114,14 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
 
 impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for SQLHDESC<'_, DT, V> {}
 impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefSQLHDESC<'_, DT, V> {}
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for UnsafeSQLHDESC<'_, DT, V> {}
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefUnsafeSQLHDESC<'_, DT, V> {}
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V>
+    for UnsafeSQLHDESC<'_, DT, V>
+{
+}
+impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V>
+    for RefUnsafeSQLHDESC<'_, DT, V>
+{
+}
 
 // TODO: If Connection trait is introduced implement for all connections
 impl Cancel<SQL_OV_ODBC3_80> for SQLHDBC<'_, C4, SQL_OV_ODBC3_80> {}
@@ -3144,7 +3153,7 @@ fn SQLGetStmtAttrA<
 ) -> SQLRETURN
 where
     T: AttrGet<A> + Ansi + Ref<'stmt> + ?Sized,
-    MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+    MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
 {
     if let Some(ValuePtr) = ValuePtr {
         if cfg!(feature = "odbc_debug") {
@@ -3159,7 +3168,7 @@ where
                 A::IDENTIFIER,
                 ptr::null_mut(),
                 0,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
             )
         }
     }
@@ -3182,7 +3191,7 @@ fn SQLGetStmtAttrW<
 ) -> SQLRETURN
 where
     T: AttrGet<A> + Unicode + Ref<'stmt> + ?Sized,
-    MaybeUninit<T::StrLen>: AsMutPtr<SQLINTEGER>,
+    MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
 {
     if let Some(ValuePtr) = ValuePtr {
         if cfg!(feature = "odbc_debug") {
@@ -3197,7 +3206,7 @@ where
                 A::IDENTIFIER,
                 ptr::null_mut(),
                 0,
-                StringLengthPtr.map_or_else(ptr::null_mut, AsMutPtr::as_mut_ptr),
+                StringLengthPtr.map_or_else(ptr::null_mut, StrLen::as_mut_ptr),
             )
         }
     }
