@@ -1,6 +1,6 @@
 [package]
 name = "rs-odbc"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Marin Veršić <marin.versic101@gmail.com>"]
 description = "Minimal safe Rust implementation of ODBC"
 repository="https://github.com/mversic/rs-odbc"
@@ -8,13 +8,13 @@ license = "Apache-2.0"
 edition = "2021"
 
 [dev-dependencies]
-trybuild = "^1"
-mockall = "0.3"
+trybuild = "1.0.65"
+mockall = "0.11.2"
 # TODO: use miri eventually
 
 [dependencies]
-rs-odbc_derive = {path = "./rs-odbc_derive", version = "0.1.0"}
-mockall_double = "^0"
+rs-odbc_derive = {path = "rs-odbc_derive", version = "0.2.0"}
+mockall_double = "0.3.0"
 
 [features]
 default = ["std"]

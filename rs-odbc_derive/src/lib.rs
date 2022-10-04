@@ -1,14 +1,14 @@
 use proc_macro::{token_stream, TokenStream};
 use proc_macro2::{Ident, TokenStream as TokenStream2};
 use quote::quote;
-use syn::{self, parse::Parse, parse::Parser};
+use syn::{self, parse::Parser};
 
 // TODO: Better message
 const ZST_MSG: &str = "`odbc_type` must be implemented on a zero-sized struct or an enum";
 
 #[proc_macro_derive(Ident, attributes(identifier))]
 pub fn into_identifier(input: TokenStream) -> TokenStream {
-    let ast: syn::DeriveInput = syn::parse(input).unwrap();
+    let ast: syn::DeriveInput = syn::parse_macro_input!(input);
 
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
     let type_name = &ast.ident;
@@ -73,18 +73,10 @@ fn odbc_derive(ast: &mut syn::DeriveInput, inner_type: &Ident) -> TokenStream2 {
     let type_name = &ast.ident;
     let mut ret = match ast.data {
         syn::Data::Struct(ref mut struct_data) => {
-            ast.attrs.extend(
-                syn::Attribute::parse_outer
-                    .parse2(quote! { #[repr(transparent)] })
-                    .unwrap(),
-            );
+            ast.attrs.push(syn::parse_quote!(#[repr(transparent)]));
 
             if struct_data.fields.is_empty() {
-                struct_data.fields = syn::Fields::Unnamed(
-                    syn::FieldsUnnamed::parse
-                        .parse2(quote! { (crate::#inner_type) })
-                        .expect(&format!("{}: unknown ODBC type", inner_type)),
-                );
+                struct_data.fields = syn::Fields::Unnamed(syn::parse_quote!((crate::#inner_type)));
             } else {
                 panic!("{}", ZST_MSG);
             }
@@ -164,7 +156,7 @@ fn odbc_derive(ast: &mut syn::DeriveInput, inner_type: &Ident) -> TokenStream2 {
 
 #[proc_macro_attribute]
 pub fn odbc_bitmask(args: TokenStream, input: TokenStream) -> TokenStream {
-    let mut ast: syn::DeriveInput = syn::parse(input).unwrap();
+    let mut ast: syn::DeriveInput = syn::parse_macro_input!(input);
 
     let inner_type = parse_inner_type(args.into_iter());
     let mut odbc_bitmask = odbc_derive(&mut ast, &inner_type);
@@ -199,7 +191,8 @@ pub fn odbc_bitmask(args: TokenStream, input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn odbc_type(args: TokenStream, input: TokenStream) -> TokenStream {
-    let mut ast: syn::DeriveInput = syn::parse(input).unwrap();
+    // `DeriveInput` is not appropriate here
+    let mut ast: syn::DeriveInput = syn::parse_macro_input!(input);
 
     ast.attrs.extend(
         syn::Attribute::parse_outer

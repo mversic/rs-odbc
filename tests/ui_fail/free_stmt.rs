@@ -1,5 +1,5 @@
 use core::mem::MaybeUninit;
-use rs_odbc::api::{Allocate, Handle};
+use rs_odbc::api::Allocate;
 use rs_odbc::conn::C4;
 use rs_odbc::env::SQL_OV_ODBC3_80;
 use rs_odbc::handle::{SQLHDBC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE};

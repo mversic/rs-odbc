@@ -1,6 +1,6 @@
 use core::cell::UnsafeCell;
 use core::mem::MaybeUninit;
-use rs_odbc::api::{Allocate, Handle, Statement};
+use rs_odbc::api::{Allocate, Statement};
 use rs_odbc::c_types::SQL_C_SLONG;
 use rs_odbc::conn::C4;
 use rs_odbc::env::SQL_OV_ODBC3_80;

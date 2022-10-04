@@ -136,6 +136,9 @@ impl<T> Ident for &mut T {
     const IDENTIFIER: Self::Type = SQL_IS_POINTER;
 }
 
+// This invariant is here because of the blanket implementation of `AsMutPtr`
+/// Implementing types must support all possible values for T because
+/// any valid T value can be written to the obtained raw mut pointer
 // TODO: Make private?
 pub trait Scalar: Copy {}
 impl Scalar for SQLSCHAR {}

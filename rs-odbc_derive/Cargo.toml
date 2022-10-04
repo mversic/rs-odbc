@@ -1,11 +1,11 @@
 [package]
 name = "rs-odbc_derive"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Marin Veršić <marin.versic101@gmail.com>"]
 description = "Proc macros for rs-odbc crate"
 repository="https://github.com/mversic/rs-odbc/rs-odbc_derive"
 license = "Apache-2.0"
-edition = "2018"
+edition = "2021"
 
 [lib]
 proc-macro = true

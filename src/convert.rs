@@ -15,6 +15,9 @@ use crate::{
 use core::{cell::UnsafeCell, fmt::Debug, mem::MaybeUninit};
 
 /// Used to do a cheap mutable reference-to-raw pointer conversion.
+///
+/// # Invariant
+///
 /// Implementing types must support all possible values for T because
 /// any valid T value can be written to the obtained raw mut pointer
 pub unsafe trait AsMutPtr<T> {
