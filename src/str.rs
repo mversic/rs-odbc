@@ -1,11 +1,13 @@
+use core::{
+    cell::UnsafeCell,
+    mem::MaybeUninit,
+    ops::{Deref, DerefMut},
+};
+
 use crate::{
     env::OdbcVersion,
     handle::{RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, SQLHDESC},
     Ident, SQLCHAR, SQLWCHAR,
-};
-use core::{
-    mem::MaybeUninit,
-    ops::{Deref, DerefMut},
 };
 
 pub trait OdbcChar {}
@@ -32,6 +34,16 @@ impl<T> DerefMut for OdbcStr<T> {
         &mut self.0
     }
 }
+//impl AsRef<OdbcStr<UnsafeCell<SQLCHAR>>> for UnsafeCell<str> {
+//    fn as_ref(&self) -> &OdbcStr<UnsafeCell<SQLCHAR>> {
+//        self.get() as *const SQLCHAR
+//    }
+//}
+//impl AsMut<OdbcStr<UnsafeCell<SQLCHAR>>> for UnsafeCell<str> {
+//    fn as_mut(&mut self) -> &mut OdbcStr<UnsafeCell<SQLCHAR>> {
+//        unsafe { self.get }
+//    }
+//}
 impl AsRef<OdbcStr<SQLCHAR>> for str {
     fn as_ref(&self) -> &OdbcStr<SQLCHAR> {
         self.as_bytes().as_ref()

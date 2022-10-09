@@ -94,13 +94,7 @@ impl<C: ConnState, A: Ident, V: OdbcVersion> ConnAttr<C, A, V> for OdbcStr<Maybe
 {
 }
 
-// Implement ConnAttr for references to connection attributes (used by AttrSet)
-impl<C: ConnState, A: Ident, T: Scalar> ConnAttr<C, A, SQL_OV_ODBC3> for &T
-where
-    T: ConnAttr<C, A, SQL_OV_ODBC3>,
-    Self: AttrSet<A> + AttrLen<Self::DefinedBy, SQLINTEGER>,
-{
-}
+// Implement ConnAttr for references to unsized types (used by AttrSet)
 impl<C: ConnState, A: Ident, T: Scalar, V: OdbcVersion> ConnAttr<C, A, V> for &[T]
 where
     [T]: ConnAttr<C, A, V>,

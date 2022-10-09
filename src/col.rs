@@ -58,13 +58,7 @@ impl<A: Ident, V: OdbcVersion> ColAttr<A, V> for OdbcStr<MaybeUninit<SQLWCHAR>> 
 {
 }
 
-// Implement ColAttr for references to column attributes (used by AttrSet)
-impl<A: Ident, T: Scalar> ColAttr<A, SQL_OV_ODBC3> for &T
-where
-    T: ColAttr<A, SQL_OV_ODBC3>,
-    Self: AttrSet<A> + AttrLen<Self::DefinedBy, SQLSMALLINT>,
-{
-}
+// Implement ColAttr for references to unsized (used by AttrSet)
 impl<A: Ident, T: Scalar, V: OdbcVersion> ColAttr<A, V> for &[T]
 where
     [T]: ColAttr<A, V>,

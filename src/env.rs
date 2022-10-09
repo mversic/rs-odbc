@@ -57,14 +57,7 @@ impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for OdbcStr<MaybeUninit<SQLWCHAR>> 
 {
 }
 
-// Implement EnvAttr for references to environment attributes (used by AttrSet)
-// TODO: Is it possible to implement for all reference types? Check other attributes as well
-impl<A: Ident, T: Scalar> EnvAttr<A, SQL_OV_ODBC3> for &T
-where
-    T: EnvAttr<A, SQL_OV_ODBC3>,
-    Self: AttrSet<A>,
-{
-}
+// Implement EnvAttr for references to unsized (used by AttrSet)
 impl<A: Ident, T: Scalar, V: OdbcVersion> EnvAttr<A, V> for &[T]
 where
     [T]: EnvAttr<A, V>,

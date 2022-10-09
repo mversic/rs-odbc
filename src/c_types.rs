@@ -1,25 +1,23 @@
 use crate::convert::AsSQLPOINTER;
-use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
+use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC};
 use crate::sql_types::*;
 use crate::str::{OdbcChar, OdbcStr};
 use crate::Ident;
 use crate::SQLPOINTER;
 use crate::{
     SQLBIGINT, SQLCHAR, SQLDOUBLE, SQLINTEGER, SQLLEN, SQLREAL, SQLSCHAR, SQLSMALLINT, SQLUBIGINT,
-    SQLUINTEGER, SQLUSMALLINT, SQLWCHAR, SQL_PARAM_INPUT, SQL_PARAM_INPUT_OUTPUT, SQL_PARAM_OUTPUT,
+    SQLUINTEGER, SQLUSMALLINT, SQLWCHAR,
 };
 use core::{cell::UnsafeCell, mem::MaybeUninit};
 
 pub trait CData<TT: Ident, V: OdbcVersion>: CDataLen {}
 
-/// Care must be taken because references to DeferredBuf might be written to. This usually
-/// means that DeferredBuf should only be implemented on &UnsafeCell<T> or &[UnsafeCell<T>].
+/// Care must be taken because references to DeferredBuf might be written to
 // TODO: Do I need to disambiguate between BindCol and BindParameters deferred buffers
 pub unsafe trait DeferredBuf<S, TT: Ident, V: OdbcVersion>: CDataLen + AsSQLPOINTER {}
 
-impl<TT: Ident, T: CScalar, V: OdbcVersion> CData<TT, V> for MaybeUninit<T> where T: CData<TT, V>
-{}
+impl<TT: Ident, T: CScalar, V: OdbcVersion> CData<TT, V> for MaybeUninit<T> where T: CData<TT, V> {}
 
 impl<TT: Ident, T, V: OdbcVersion> CData<TT, V> for [MaybeUninit<T>] where [T]: CData<TT, V> {}
 
@@ -28,14 +26,41 @@ impl<TT: Ident, T: OdbcChar, V: OdbcVersion> CData<TT, V> for OdbcStr<MaybeUnini
 {
 }
 
-unsafe impl<DT, TT: Ident, T: CScalar, V: OdbcVersion> DeferredBuf<RefSQLHDESC<'_, DT, V>, TT, V> for UnsafeCell<T> where T: CData<TT, V> {}
-unsafe impl<DT, TT: Ident, T: CScalar, V: OdbcVersion> DeferredBuf<RefSQLHDESC<'_, DT, V>, TT, V> for [UnsafeCell<T>] where [T]: CData<TT, V> {}
-unsafe impl<DT, TT: Ident, CH: OdbcChar, V: OdbcVersion> DeferredBuf<RefSQLHDESC<'_, DT, V>, TT, V> for OdbcStr<UnsafeCell<CH>> where OdbcStr<CH>: CData<TT, V> {}
+unsafe impl<DT, TT: Ident, T: CScalar, V: OdbcVersion> DeferredBuf<RefSQLHDESC<'_, DT, V>, TT, V>
+    for UnsafeCell<T>
+where
+    T: CData<TT, V>,
+{
+}
+unsafe impl<DT, TT: Ident, CH: OdbcChar, V: OdbcVersion> DeferredBuf<RefSQLHDESC<'_, DT, V>, TT, V>
+    for OdbcStr<UnsafeCell<CH>>
+where
+    OdbcStr<CH>: CData<TT, V>,
+{
+}
 
-unsafe impl<'conn, DT, TT: Ident, T: CScalar, V: OdbcVersion> DeferredBuf<RefUnsafeSQLHDESC<'conn, DT, V>, TT, V> for UnsafeCell<T> where T: DeferredBuf<RefSQLHDESC<'conn, DT, V>, TT, V> {}
-unsafe impl<'conn, DT, TT: Ident, T: CScalar, V: OdbcVersion> DeferredBuf<RefUnsafeSQLHDESC<'conn, DT, V>, TT, V> for [UnsafeCell<T>] where [T]: DeferredBuf<RefSQLHDESC<'conn, DT, V>, TT, V> {}
-unsafe impl<'conn, DT, TT: Ident, CH: OdbcChar, V: OdbcVersion> DeferredBuf<RefUnsafeSQLHDESC<'conn, DT, V>, TT, V> for OdbcStr<UnsafeCell<CH>> where OdbcStr<CH>: DeferredBuf<RefSQLHDESC<'conn, DT, V>, TT, V> {}
-unsafe impl<DT, TT: Ident, V: OdbcVersion> DeferredBuf<RefUnsafeSQLHDESC<'_, DT, V>, TT, V> for (SQLPOINTER, SQLLEN) {}
+unsafe impl<'conn, DT, TT: Ident, T: CScalar, V: OdbcVersion>
+    DeferredBuf<RefUnsafeSQLHDESC<'conn, DT, V>, TT, V> for UnsafeCell<T>
+where
+    T: DeferredBuf<RefSQLHDESC<'conn, DT, V>, TT, V>,
+{
+}
+unsafe impl<'conn, DT, TT: Ident, T: CScalar, V: OdbcVersion>
+    DeferredBuf<RefUnsafeSQLHDESC<'conn, DT, V>, TT, V> for [UnsafeCell<T>]
+where
+    [T]: DeferredBuf<RefSQLHDESC<'conn, DT, V>, TT, V>,
+{
+}
+unsafe impl<'conn, DT, TT: Ident, CH: OdbcChar, V: OdbcVersion>
+    DeferredBuf<RefUnsafeSQLHDESC<'conn, DT, V>, TT, V> for OdbcStr<UnsafeCell<CH>>
+where
+    OdbcStr<CH>: DeferredBuf<RefSQLHDESC<'conn, DT, V>, TT, V>,
+{
+}
+unsafe impl<DT, TT: Ident, V: OdbcVersion> DeferredBuf<RefUnsafeSQLHDESC<'_, DT, V>, TT, V>
+    for (SQLPOINTER, SQLLEN)
+{
+}
 
 #[repr(transparent)]
 #[derive(Clone, Copy)]
@@ -471,12 +496,12 @@ pub struct SQL_INTERVAL_STRUCT {
 }
 impl Eq for SQL_INTERVAL_STRUCT {}
 impl PartialEq<SQL_INTERVAL_STRUCT> for SQL_INTERVAL_STRUCT {
-    fn eq(&self, other: &SQL_INTERVAL_STRUCT) -> bool {
+    fn eq(&self, _: &SQL_INTERVAL_STRUCT) -> bool {
         unimplemented!()
     }
 }
 impl core::fmt::Debug for SQL_INTERVAL_STRUCT {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+    fn fmt(&self, _: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
         unimplemented!()
     }
 }

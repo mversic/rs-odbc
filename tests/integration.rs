@@ -1,9 +1,10 @@
 use core::mem::MaybeUninit;
 use rs_odbc::api::{Allocate, Descriptor, Statement};
-use rs_odbc::conn::C4;
+use rs_odbc::conn::{C4, SQL_ATTR_CURRENT_CATALOG};
 use rs_odbc::desc::SQL_DESC_ARRAY_SIZE;
 use rs_odbc::env::{
-    CpMatch, SQL_ATTR_CP_MATCH, SQL_CP_RELAXED_MATCH, SQL_OV_ODBC3, SQL_OV_ODBC3_80,
+    CpMatch, SQL_ATTR_CP_MATCH, SQL_CP_RELAXED_MATCH, SQL_CP_STRICT_MATCH, SQL_OV_ODBC3,
+    SQL_OV_ODBC3_80,
 };
 use rs_odbc::handle::{RefSQLHDESC, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE};
 use rs_odbc::info::{
@@ -28,7 +29,7 @@ fn connect_to_test_db<'env>(
     assert_eq!(SQL_SUCCESS, res);
     let conn = conn.unwrap();
 
-    let conn_string = "DSN=MariaDB;Database=rs_odbc_test;";
+    let conn_string = "DSN=MariaDB;";
     let mut outstrlen = MaybeUninit::zeroed();
     let (conn, res) = conn.SQLDriverConnectA(
         None,
@@ -38,8 +39,13 @@ fn connect_to_test_db<'env>(
         SQL_DRIVER_COMPLETE,
     );
     assert_eq!(SQL_SUCCESS, res);
+    let conn = conn.unwrap();
 
-    conn.unwrap()
+    let db_name = "rs_odbc_test";
+    let res = conn.SQLSetConnectAttrA(SQL_ATTR_CURRENT_CATALOG, db_name.as_ref());
+    assert_eq!(SQL_SUCCESS, res);
+
+    conn
 }
 
 #[test]
@@ -58,7 +64,7 @@ fn set_get_env_attr() {
     let res = env.SQLSetEnvAttr(SQL_ATTR_CP_MATCH, SQL_CP_RELAXED_MATCH);
     assert_eq!(SQL_SUCCESS, res);
 
-    let mut val = MaybeUninit::zeroed();
+    let mut val = MaybeUninit::new(SQL_CP_STRICT_MATCH);
     let res = env.SQLGetEnvAttr(SQL_ATTR_CP_MATCH, Some(&mut val), None);
     assert_eq!(SQL_SUCCESS, res);
 
@@ -80,7 +86,7 @@ fn db_connect() {
 
     let conn_string = "DSN=MariaDB;Database=rs_odbc_test;";
     let mut outstr: [MaybeUninit<_>; 1024] = unsafe { MaybeUninit::zeroed().assume_init() };
-    let mut outstrlen = MaybeUninit::zeroed();
+    let mut outstrlen = MaybeUninit::new(0);
     let (conn, res) = conn.SQLDriverConnectA(
         None,
         conn_string.as_ref(),
@@ -96,7 +102,7 @@ fn db_connect() {
 
     for i in outstrlen..1024 {
         // Make sure type is properly initialized
-        outstr[i] = MaybeUninit::zeroed();
+        outstr[i] = MaybeUninit::new(0);
     }
 
     let outstr: [SQLCHAR; 1024] = unsafe { core::mem::transmute(outstr) };

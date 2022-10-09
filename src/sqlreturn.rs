@@ -7,6 +7,7 @@ use rs_odbc_derive::odbc_type;
 /// # Documentation
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/return-codes-odbc
 /// https://github.com/microsoft/ODBC-Specification/blob/ODBC%204.0.md
+#[must_use]
 #[odbc_type(SQLSMALLINT)]
 pub struct SQLRETURN;
 

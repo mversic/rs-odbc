@@ -23,50 +23,46 @@ use crate::{
     Scope, StrLenOrInd, Unique, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW,
     SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
-use core::{cell::UnsafeCell, mem::MaybeUninit, ops::Deref, ptr};
+use core::{cell::UnsafeCell, mem::MaybeUninit, ptr};
 #[cfg(test)]
 use mockall::automock;
 
+/// ODBC handle such as environment, connection, statement or descriptor.
+///
+/// For complete documentation, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/handles).
 pub trait Handle: AsSQLHANDLE + Sized {
     type Ident: Ident<Type = SQLSMALLINT>;
 }
 
-pub trait Allocate<SRC: Deref>: Handle
-where
-    SRC::Target: AsSQLHANDLE,
-{
+#[allow(non_snake_case)]
+pub trait Allocate<'src, SRC: AsSQLHANDLE>: Handle {
     /// Creates handle from a raw pointer
     ///
     /// # Safety
     ///
-    /// This is highly unsafe, due to the fact that raw pointer validity isn't checked
-    ///
-    // TODO: Consider using ptr::NonNull<RawHandle> here
-    // TODO: make use of the first argument of this function with owning handles
-    unsafe fn from_raw(InputHandle: SRC, output_handle: SQLHANDLE) -> Self;
+    /// The given raw pointer must point to a valid handle of the required type
+    unsafe fn from_raw(output_handle: ptr::NonNull<RawHandle>) -> Self;
 
     /// Allocates an environment, connection, statement, or descriptor handle.
     ///
-    /// For complete documentation on SQLAllocHandle, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlallochandle-function).
+    /// For complete documentation on `SQLAllocHandle`, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlallochandle-function).
     ///
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_INVALID_HANDLE, or SQL_ERROR.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
-    fn SQLAllocHandle(InputHandle: SRC) -> (Result<Self, ()>, SQLRETURN) {
-        // Initialized to ptr::null_mut for additional safety
-        let mut output_handle: SQLHANDLE = ptr::null_mut();
+    fn SQLAllocHandle(InputHandle: &'src SRC) -> (Result<Self, ()>, SQLRETURN) {
+        let mut output_handle = MaybeUninit::uninit();
 
         unsafe {
             let sql_return = ffi::SQLAllocHandle(
                 Self::Ident::IDENTIFIER,
                 InputHandle.as_SQLHANDLE(),
-                &mut output_handle,
+                output_handle.as_mut_ptr(),
             );
 
             if SQL_SUCCEEDED(sql_return) {
-                (Ok(Self::from_raw(InputHandle, output_handle)), sql_return)
+                let output_handle = ptr::NonNull::new_unchecked(output_handle.assume_init());
+                (Ok(Self::from_raw(output_handle)), sql_return)
             } else {
                 (Err(()), sql_return)
             }
@@ -81,10 +77,10 @@ where
     ///
     /// Panics if the DM returns value other than SQL_SUCCESS
     #[inline]
-    #[allow(non_snake_case)]
     fn SQLFreeHandle(self) {}
 }
 
+#[allow(non_snake_case, unused_variables)]
 pub trait Diagnostics: Handle {
     /// Returns the current value of a field of a record of the diagnostic data structure (associated with a specified handle) that contains error, warning, and status information.
     ///
@@ -93,8 +89,6 @@ pub trait Diagnostics: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_NO_DATA.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
     fn SQLGetDiagFieldA<A: Ident<Type = SQLSMALLINT>, T: DiagField<Self, A>>(
         &self,
         // TODO: Use NoneZeroI16?
@@ -135,8 +129,6 @@ pub trait Diagnostics: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_NO_DATA.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
     fn SQLGetDiagFieldW<A: Ident<Type = SQLSMALLINT>, T: DiagField<Self, A>>(
         &self,
         // TODO: Use NoneZeroI16?
@@ -177,8 +169,6 @@ pub trait Diagnostics: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLGetDiagRecA(
         &self,
         // TODO: Use NoneZeroI16?
@@ -211,8 +201,6 @@ pub trait Diagnostics: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLGetDiagRecW(
         &self,
         // TODO: Use NoneZeroI16?
@@ -239,6 +227,7 @@ pub trait Diagnostics: Handle {
     }
 }
 
+#[allow(non_snake_case)]
 pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     type ARD: Descriptor<'buf, AppDesc<'buf>, V>;
     type APD: Descriptor<'buf, AppDesc<'buf>, V>;
@@ -267,8 +256,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     fn SQLBindCol<TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<Self::ARD, TT, V>>(
         &self,
         ColumnNumber: SQLUSMALLINT,
@@ -311,8 +299,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     fn SQLBindParameter<
         TT: Ident<Type = SQLSMALLINT>,
         // TODO: Check which type is used for ParameterType
@@ -368,8 +355,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLBulkOperations(&self, Operation: BulkOperation) -> SQLRETURN {
         unsafe { ffi::SQLBulkOperations(self.as_SQLHANDLE(), Operation as SQLUSMALLINT) }
     }
@@ -381,8 +366,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLCloseCursor(&self) -> SQLRETURN {
         unsafe { ffi::SQLCloseCursor(self.as_SQLHANDLE()) }
     }
@@ -394,8 +377,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     fn SQLColAttributeA<A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
         &self,
         ColumnNumber: SQLUSMALLINT,
@@ -408,7 +390,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
         T: AttrGet<A> + Ansi + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
-        // TODO: With MaybeUnint it's not possible to check that value is zeroed
+        // TODO: With MaybeUninit it's not possible to check that value is zeroed
         //if cfg!(feature = "odbc_debug") {
         //    NumericAttributePtr.assert_zeroed();
         //}
@@ -441,8 +423,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     fn SQLColAttributeW<A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
         &self,
         ColumnNumber: SQLUSMALLINT,
@@ -455,7 +436,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
         T: AttrGet<A> + Unicode + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
-        // TODO: With MaybeUnint it's not possible to check that value is zeroed
+        // TODO: With MaybeUninit it's not possible to check that value is zeroed
         //if cfg!(feature = "odbc_debug") {
         //    NumericAttributePtr.assert_zeroed();
         //}
@@ -488,8 +469,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLColumnPrivilegesA(
         &self,
         CatalogName: &OdbcStr<SQLCHAR>,
@@ -524,8 +503,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLColumnPrivilegesW(
         &self,
         CatalogName: &OdbcStr<SQLWCHAR>,
@@ -560,8 +537,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLColumnsA(
         &self,
         CatalogName: &OdbcStr<SQLCHAR>,
@@ -596,8 +571,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLColumnsW(
         &self,
         CatalogName: &OdbcStr<SQLWCHAR>,
@@ -632,8 +605,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLDescribeColA(
         &self,
         ColumnNumber: SQLUSMALLINT,
@@ -668,8 +639,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLDescribeColW(
         &self,
         ColumnNumber: SQLUSMALLINT,
@@ -704,8 +673,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLDescribeParam(
         &self,
         ParameterNumber: SQLUSMALLINT,
@@ -738,8 +705,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLForeignKeysA(
         &self,
         PKCatalogName: &OdbcStr<SQLCHAR>,
@@ -787,8 +752,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLForeignKeysW(
         &self,
         PKCatalogName: &OdbcStr<SQLWCHAR>,
@@ -831,8 +794,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLFreeStmt(&self, Option: FreeStmtOption) -> SQLRETURN {
         unsafe { ffi::SQLFreeStmt(self.as_SQLHANDLE(), Option as SQLUSMALLINT) }
     }
@@ -844,8 +805,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLGetCursorNameA(
         &self,
         CursorName: &mut OdbcStr<MaybeUninit<SQLCHAR>>,
@@ -870,8 +829,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLGetCursorNameW(
         &self,
         CursorName: &mut OdbcStr<MaybeUninit<SQLWCHAR>>,
@@ -896,8 +853,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     // TODO: This function must be unsafe if SQL_ARD_TYPE and SQL_APD_TYPE are allowed to be used
     fn SQLGetData<TT: Ident<Type = SQLSMALLINT>, B: CData<TT, V>>(
         &self,
@@ -929,8 +885,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
     fn SQLGetStmtAttrA<'stmt, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, Self, A, V>>(
         &'stmt self,
         Attribute: A,
@@ -951,8 +905,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
     fn SQLGetStmtAttrW<'stmt, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, Self, A, V>>(
         &'stmt self,
         Attribute: A,
@@ -973,8 +925,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLGetTypeInfoA<ST: SqlType<V>>(&self, DataType: ST) -> SQLRETURN {
         unsafe { ffi::SQLGetTypeInfoA(self.as_SQLHANDLE(), DataType.identifier()) }
     }
@@ -986,8 +936,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLGetTypeInfoW<ST: SqlType<V>>(&self, DataType: ST) -> SQLRETURN {
         unsafe { ffi::SQLGetTypeInfoW(self.as_SQLHANDLE(), DataType.identifier()) }
     }
@@ -999,8 +947,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, OR SQL_PARAM_DATA_AVAILABLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     // TODO: Maybe this fn should be unsafe
     fn SQLMoreResults(&self) -> SQLRETURN {
         unsafe { ffi::SQLMoreResults(self.as_SQLHANDLE()) }
@@ -1013,8 +959,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLNumParams(&self, ParameterCountPtr: &mut impl AsMutPtr<SQLSMALLINT>) -> SQLRETURN {
         unsafe { ffi::SQLNumParams(self.as_SQLHANDLE(), ParameterCountPtr.as_mut_ptr()) }
     }
@@ -1026,8 +970,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLNumResultCols(&self, ColumnCountPtr: &mut impl AsMutPtr<SQLSMALLINT>) -> SQLRETURN {
         unsafe { ffi::SQLNumResultCols(self.as_SQLHANDLE(), ColumnCountPtr.as_mut_ptr()) }
     }
@@ -1039,8 +981,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLParamData(&self, ValuePtrPtr: &mut MaybeUninit<SQLPOINTER>) -> SQLRETURN {
         unsafe { ffi::SQLParamData(self.as_SQLHANDLE(), ValuePtrPtr.as_mut_ptr()) }
     }
@@ -1052,8 +992,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLPrepareA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
         let StatementText = StatementText.as_raw_slice();
 
@@ -1067,8 +1005,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLPrepareW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
         let StatementText = StatementText.as_raw_slice();
 
@@ -1082,8 +1018,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLPrimaryKeysA(
         &self,
         CatalogName: &OdbcStr<SQLCHAR>,
@@ -1114,8 +1048,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLPrimaryKeysW(
         &self,
         CatalogName: &OdbcStr<SQLWCHAR>,
@@ -1146,8 +1078,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLProcedureColumnsA(
         &self,
         CatalogName: &OdbcStr<SQLCHAR>,
@@ -1182,8 +1112,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLProcedureColumnsW(
         &self,
         CatalogName: &OdbcStr<SQLWCHAR>,
@@ -1218,8 +1146,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLProceduresA(
         &self,
         CatalogName: &OdbcStr<SQLCHAR>,
@@ -1250,8 +1176,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLProceduresW(
         &self,
         CatalogName: &OdbcStr<SQLWCHAR>,
@@ -1282,7 +1206,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(non_snake_case)]
     // TODO: Is it unsafe if odbc_debug is used?
     unsafe fn SQLPutData<TT: Ident, B: CData<TT, V>>(&self, DataPtr: Option<&B>) -> SQLRETURN
     where
@@ -1302,8 +1225,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLRowCount(&self, RowCountPtr: &mut impl AsMutPtr<SQLLEN>) -> SQLRETURN {
         unsafe { ffi::SQLRowCount(self.as_SQLHANDLE(), RowCountPtr.as_mut_ptr()) }
     }
@@ -1315,8 +1236,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLSetCursorNameA(&self, CursorName: &OdbcStr<SQLCHAR>) -> SQLRETURN {
         let CursorName = CursorName.as_raw_slice();
 
@@ -1330,8 +1249,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLSetCursorNameW(&self, CursorName: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
         let CursorName = CursorName.as_raw_slice();
 
@@ -1345,8 +1262,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
     fn SQLSetStmtAttrA<A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, Self, A, V>>(
         &self,
         Attribute: A,
@@ -1365,8 +1280,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
     fn SQLSetStmtAttrW<A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, Self, A, V>>(
         &self,
         Attribute: A,
@@ -1388,8 +1301,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLSpecialColumnsA(
         &self,
         IdentifierType: IdentifierType,
@@ -1429,8 +1340,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLSpecialColumnsW(
         &self,
         IdentifierType: IdentifierType,
@@ -1467,8 +1376,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLStatisticsA(
         &self,
         CatalogName: &OdbcStr<SQLCHAR>,
@@ -1503,8 +1410,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLStatisticsW(
         &self,
         CatalogName: &OdbcStr<SQLWCHAR>,
@@ -1539,8 +1444,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLTablePrivilegesA(
         &self,
         CatalogName: &OdbcStr<SQLCHAR>,
@@ -1571,8 +1474,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLTablePrivilegesW(
         &self,
         CatalogName: &OdbcStr<SQLWCHAR>,
@@ -1603,8 +1504,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLTablesA(
         &self,
         CatalogName: &OdbcStr<SQLCHAR>,
@@ -1639,8 +1538,6 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLTablesW(
         &self,
         CatalogName: &OdbcStr<SQLWCHAR>,
@@ -1669,6 +1566,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     }
 }
 
+#[allow(non_snake_case)]
 pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// Copies descriptor information from one descriptor handle to another.
     ///
@@ -1677,9 +1575,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(non_snake_case)]
     // TODO: Not sure if application and implementation descriptors can be interchangeably copied
-    #[must_use]
     // TODO: Do they have to have the same version?
     // TODO: Is lifetime the same?
     fn SQLCopyDesc<DT2: DescType<'buf>>(&self, TargetDescHandle: &SQLHDESC<DT2, V>) -> SQLRETURN {
@@ -1693,8 +1589,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     fn SQLGetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, Self, DT, A, V>>(
         &self,
         RecNumber: SQLSMALLINT,
@@ -1733,8 +1628,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     fn SQLGetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, Self, DT, A, V>>(
         &self,
         RecNumber: SQLSMALLINT,
@@ -1773,8 +1667,6 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLGetDescRecA<ST: SqlType<V>>(
         &self,
         RecNumber: SQLSMALLINT,
@@ -1813,8 +1705,6 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLGetDescRecW<ST: SqlType<V>>(
         &self,
         RecNumber: SQLSMALLINT,
@@ -1853,8 +1743,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     fn SQLSetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, Self, DT, A, V>>(
         &self,
         RecNumber: SQLSMALLINT,
@@ -1892,8 +1781,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     fn SQLSetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, Self, DT, A, V>>(
         &self,
         RecNumber: SQLSMALLINT,
@@ -1931,8 +1819,6 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(non_snake_case)]
-    #[must_use]
     // TODO: Must not be allowed for IRD. Handle here or with DescField
     fn SQLSetDescRec<ST: SqlType<V>, PTR>(
         &self,
@@ -1968,6 +1854,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     }
 }
 
+#[allow(non_snake_case)]
 pub trait Cancel<V: OdbcVersion>: Handle {
     /// Cancels the processing on a statement.
     /// To cancel processing on a connection or statement, use SQLCancelHandle Function.
@@ -1977,8 +1864,6 @@ pub trait Cancel<V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLCancel(&self) -> SQLRETURN
     where
         Self: Handle<Ident = SQL_HANDLE_STMT>,
@@ -1993,13 +1878,12 @@ pub trait Cancel<V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     fn SQLCancelHandle(&self) -> SQLRETURN {
         unsafe { ffi::SQLCancelHandle(<Self as Handle>::Ident::IDENTIFIER, self.as_SQLHANDLE()) }
     }
 }
 
+#[allow(non_snake_case)]
 pub trait Async<V: OdbcVersion>: Handle {
     /// Can be used to determine when an asynchronous function is complete using either notification- or polling-based processing. For more information about asynchronous operations, see Asynchronous Execution.
     /// **SQLCompleteAsync** is only implemented in the ODBC Driver Manager.
@@ -2011,8 +1895,6 @@ pub trait Async<V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     // TODO: Should this handle be mutable or not?
     fn SQLCompleteAsync(&mut self, AsyncRetCodePtr: &mut impl AsMutPtr<RETCODE>) -> SQLRETURN {
         unsafe {
@@ -2025,6 +1907,7 @@ pub trait Async<V: OdbcVersion>: Handle {
     }
 }
 
+#[allow(non_snake_case)]
 impl<V: OdbcVersion> SQLHENV<V> {
     /// Returns information about a data source. This function is implemented only by the Driver Manager.
     ///
@@ -2033,8 +1916,6 @@ impl<V: OdbcVersion> SQLHENV<V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLDataSourcesA(
         &self,
         Direction: SQLUSMALLINT,
@@ -2067,8 +1948,6 @@ impl<V: OdbcVersion> SQLHENV<V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLDataSourcesW(
         &self,
         Direction: SQLUSMALLINT,
@@ -2101,8 +1980,6 @@ impl<V: OdbcVersion> SQLHENV<V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLDriversA(
         &self,
         Direction: SQLUSMALLINT,
@@ -2135,8 +2012,6 @@ impl<V: OdbcVersion> SQLHENV<V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLDriversW(
         &self,
         Direction: SQLUSMALLINT,
@@ -2169,8 +2044,7 @@ impl<V: OdbcVersion> SQLHENV<V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     pub fn SQLGetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>>(
         &self,
         Attribute: A,
@@ -2203,8 +2077,7 @@ impl<V: OdbcVersion> SQLHENV<V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     pub fn SQLSetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>>(
         // Reference to SQLHENV is mutable to make it impossible to have a connection
         // handle allocated on the environment handle when calling this function
@@ -2226,6 +2099,7 @@ impl<V: OdbcVersion> SQLHENV<V> {
     }
 }
 
+#[allow(non_snake_case)]
 impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// Supports an iterative method of discovering and enumerating the attributes and attribute values required to connect to a data source. Each call to **SQLBrowseConnect** returns successive levels of attributes and attribute values. When all levels have been enumerated, a connection to the data source is completed and a complete connection string is returned by **SQLBrowseConnect**. A return code of SQL_SUCCESS or SQL_SUCCESS_WITH_INFO indicates that all connection information has been specified and the application is now connected to the data source.
     ///
@@ -2234,8 +2108,7 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
+    #[allow(unused_variables)]
     pub fn SQLBrowseConnectA(
         self,
         InConnectionString: &OdbcStr<SQLCHAR>,
@@ -2281,8 +2154,6 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLBrowseConnectW(
         self,
         InConnectionString: &OdbcStr<SQLWCHAR>,
@@ -2328,8 +2199,6 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLDisconnect(self) -> (Result<SQLHDBC<'env, C2, V>, Self>, SQLRETURN)
     where
         Self: Disconnect,
@@ -2350,8 +2219,7 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     pub fn SQLGetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<C, A, V>>(
         // TODO: Not sure whether attributes should be checked when getting them with SQLGetConnectAttr
         &self,
@@ -2389,8 +2257,7 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     pub fn SQLGetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<C, A, V>>(
         // TODO: Not really sure whether attributes should be checked when getting them with SQLGetConnectAttr
         &self,
@@ -2428,8 +2295,7 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     pub fn SQLSetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<C, A, V>>(
         &self,
         Attribute: A,
@@ -2455,8 +2321,7 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     pub fn SQLSetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<C, A, V>>(
         &self,
         Attribute: A,
@@ -2476,6 +2341,7 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     }
 }
 
+#[allow(non_snake_case)]
 impl<'env, V: OdbcVersion> SQLHDBC<'env, C2, V> {
     /// Establishes connections to a driver and a data source. The connection handle references storage of all information about the connection to the data source, including status, transaction state, and error information.
     ///
@@ -2484,8 +2350,6 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C2, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLConnectA(
         self,
         ServerName: &OdbcStr<SQLCHAR>,
@@ -2525,8 +2389,6 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C2, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLConnectW(
         self,
         ServerName: &OdbcStr<SQLWCHAR>,
@@ -2566,11 +2428,9 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C2, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLDriverConnectA(
         self,
-        WindowHandle: Option<SQLHWND>,
+        _WindowHandle: Option<SQLHWND>,
         InConnectionString: &OdbcStr<SQLCHAR>,
         OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLCHAR>>>,
         StringLength2Ptr: &mut impl AsMutPtr<SQLSMALLINT>,
@@ -2611,11 +2471,9 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C2, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLDriverConnectW(
         self,
-        WindowHandle: Option<SQLHWND>,
+        _WindowHandle: Option<SQLHWND>,
         InConnectionString: &OdbcStr<SQLWCHAR>,
         OutConnectionString: Option<&mut OdbcStr<MaybeUninit<SQLWCHAR>>>,
         StringLength2Ptr: &mut impl AsMutPtr<SQLSMALLINT>,
@@ -2650,6 +2508,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C2, V> {
     }
 }
 
+#[allow(non_snake_case)]
 impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     /// Returns information about whether a driver supports a specific ODBC function. This function is implemented in the Driver Manager; it can also be implemented in drivers. If a driver implements **SQLGetFunctions**, the Driver Manager calls the function in the driver. Otherwise, it executes the function itself.
     ///
@@ -2658,8 +2517,6 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLGetFunctions(
         &self,
         FunctionId: FunctionId,
@@ -2681,8 +2538,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     pub fn SQLGetInfoA<A: Ident<Type = SQLUSMALLINT>, T: InfoType<A, V>>(
         // TODO: SQL_ODBC_VER can be called on connection that is not open
         &self,
@@ -2716,8 +2572,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case, unused_variables)]
+    #[allow(unused_variables)]
     pub fn SQLGetInfoW<A: Ident<Type = SQLUSMALLINT>, T: InfoType<A, V>>(
         // TODO: SQL_ODBC_VER can be called on connection that is not open
         &self,
@@ -2751,8 +2606,6 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLNativeSqlA(
         &self,
         InStatementText: &OdbcStr<SQLCHAR>,
@@ -2781,8 +2634,6 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLNativeSqlW(
         &self,
         InStatementText: &OdbcStr<SQLWCHAR>,
@@ -2811,8 +2662,6 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
     #[inline]
-    #[must_use]
-    #[allow(non_snake_case)]
     pub fn SQLEndTran(&self, CompletionType: CompletionType) -> SQLRETURN {
         // Not implemented on SQLHENV so as to to avoid confusion, considering that the same
         // functionality can be achieved by calling SQLEndTran repeatedly on SQLHDBC handle
@@ -2827,6 +2676,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     }
 }
 
+#[allow(non_snake_case)]
 impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
     ///
@@ -2835,7 +2685,6 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
     #[inline]
-    #[allow(non_snake_case)]
     pub fn SQLExecDirectA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
         let StatementText = StatementText.as_raw_slice();
 
@@ -2849,7 +2698,6 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
     #[inline]
-    #[allow(non_snake_case)]
     pub fn SQLExecDirectW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
         let StatementText = StatementText.as_raw_slice();
 
@@ -2863,7 +2711,6 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
     #[inline]
-    #[allow(non_snake_case)]
     pub fn SQLExecute(&self) -> SQLRETURN {
         unsafe { ffi::SQLExecute(self.as_SQLHANDLE()) }
     }
@@ -2875,20 +2722,17 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(non_snake_case)]
     pub fn SQLFetch(&self) -> SQLRETURN {
         unsafe { ffi::SQLFetch(self.as_SQLHANDLE()) }
     }
 
     /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
-    /// When working with an ODBC 2.x driver, the Driver Manager maps this function to **SQLExtendedFetch**. For more information, see Mapping Replacement Functions for Backward Compatibility of Applications.
     ///
     /// For complete documentation on SQLFetchScroll, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetchscroll-function).
     ///
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(non_snake_case)]
     pub fn SQLFetchScroll(&self, FetchOrientation: SQLSMALLINT, FetchOffset: SQLLEN) -> SQLRETURN {
         unsafe { ffi::SQLFetchScroll(self.as_SQLHANDLE(), FetchOrientation, FetchOffset) }
     }
@@ -2900,7 +2744,6 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(non_snake_case)]
     pub fn SQLSetPos(
         &self,
         RowNumber: SQLSETPOSIROW,
@@ -2918,6 +2761,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     }
 }
 
+#[allow(non_snake_case)]
 impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
     ///
@@ -2926,7 +2770,6 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
     #[inline]
-    #[allow(non_snake_case)]
     pub unsafe fn SQLExecDirectA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
         let StatementText = StatementText.as_raw_slice();
 
@@ -2940,7 +2783,6 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
     #[inline]
-    #[allow(non_snake_case)]
     pub unsafe fn SQLExecDirectW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
         let StatementText = StatementText.as_raw_slice();
 
@@ -2954,7 +2796,6 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
     #[inline]
-    #[allow(non_snake_case)]
     pub unsafe fn SQLExecute(&self) -> SQLRETURN {
         ffi::SQLExecute(self.as_SQLHANDLE())
     }
@@ -2966,20 +2807,17 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(non_snake_case)]
     pub unsafe fn SQLFetch(&self) -> SQLRETURN {
         ffi::SQLFetch(self.as_SQLHANDLE())
     }
 
     /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
-    /// When working with an ODBC 2.x driver, the Driver Manager maps this function to **SQLExtendedFetch**. For more information, see Mapping Replacement Functions for Backward Compatibility of Applications.
     ///
     /// For complete documentation on SQLFetchScroll, see [API reference](https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlfetchscroll-function).
     ///
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(non_snake_case)]
     pub unsafe fn SQLFetchScroll(
         &self,
         FetchOrientation: SQLSMALLINT,
@@ -2995,7 +2833,6 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(non_snake_case)]
     pub unsafe fn SQLSetPos(
         &self,
         RowNumber: SQLSETPOSIROW,
@@ -3011,6 +2848,7 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     }
 }
 
+#[allow(non_snake_case)]
 impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
     for SQLHSTMT<'conn, 'desc, 'buf, V>
 {
@@ -3024,7 +2862,7 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
     type ExplicitARD = SQLHDESC<'conn, AppDesc<'buf>, V>;
     type ExplicitAPD = SQLHDESC<'conn, AppDesc<'buf>, V>;
 
-    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, _: Option<&'buf B>)
     where
         B: ?Sized,
     {
@@ -3032,10 +2870,8 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
         //self.0.bind_col(TargetValuePtr)
     }
 
-    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(
-        &self,
-        TargetValuePtr: Option<&'buf B>,
-    ) where
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(&self, _: Option<&'buf B>)
+    where
         B: ?Sized,
     {
         // TODO:
@@ -3047,6 +2883,7 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
     }
 }
 
+#[allow(non_snake_case)]
 impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
     for UnsafeSQLHSTMT<'conn, 'desc, 'buf, V>
 {
@@ -3062,24 +2899,22 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
 
     // TODO: Don't bind (SQLPOINTER, SQLLEN) fat pointer when using raw_api
     #[cfg(not(feature = "odbc_debug"))]
-    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, _: Option<&'buf B>)
     where
         B: ?Sized,
     {
     }
     #[cfg(not(feature = "odbc_debug"))]
-    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(
-        &self,
-        TargetValuePtr: Option<&'buf B>,
-    ) where
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(&self, _: Option<&'buf B>)
+    where
         B: ?Sized,
     {
     }
     #[cfg(not(feature = "odbc_debug"))]
-    fn bind_strlen_or_ind(&self, StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>) {}
+    fn bind_strlen_or_ind(&self, _: Option<&'buf UnsafeCell<StrLenOrInd>>) {}
 
     #[cfg(feature = "odbc_debug")]
-    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, TargetValuePtr: Option<&'buf B>)
+    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, _: Option<&'buf B>)
     where
         B: ?Sized,
     {
@@ -3112,14 +2947,20 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
     }
 }
 
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for SQLHDESC<'_, DT, V> {}
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V> for RefSQLHDESC<'_, DT, V> {}
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V>
-    for UnsafeSQLHDESC<'_, DT, V>
+impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V>
+    for SQLHDESC<'conn, DT, V>
 {
 }
-impl<'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V>
-    for RefUnsafeSQLHDESC<'_, DT, V>
+impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V>
+    for RefSQLHDESC<'conn, DT, V>
+{
+}
+impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V>
+    for UnsafeSQLHDESC<'conn, DT, V>
+{
+}
+impl<'conn, 'buf, DT: DescType<'buf>, V: OdbcVersion> Descriptor<'buf, DT, V>
+    for RefUnsafeSQLHDESC<'conn, DT, V>
 {
 }
 

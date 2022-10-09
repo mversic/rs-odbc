@@ -4,7 +4,6 @@ use crate::c_types::CScalar;
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, SQLHDESC};
 use crate::str::{OdbcChar, OdbcStr};
-use crate::SQLLEN;
 use crate::{
     Ident, OdbcBool, OdbcDefined, Scalar, SQLCHAR, SQLINTEGER, SQLSMALLINT, SQLUINTEGER, SQLULEN,
     SQLWCHAR,
@@ -379,14 +378,7 @@ where
 {
 }
 
-// Implement DescField for references to descriptor fields (used by AttrSet)
-impl<'buf, D: Descriptor<'buf, DT, SQL_OV_ODBC3>, DT, A: Ident, T: Scalar>
-    DescField<'buf, D, DT, A, SQL_OV_ODBC3> for &T
-where
-    T: DescField<'buf, D, DT, A, SQL_OV_ODBC3>,
-    Self: AttrSet<A> + AttrLen<Self::DefinedBy, SQLINTEGER>,
-{
-}
+// Implement DescField for references to unsized (used by AttrSet)
 impl<'buf, D: Descriptor<'buf, DT, V>, DT, A: Ident, T: Scalar, V: OdbcVersion>
     DescField<'buf, D, DT, A, V> for &[T]
 where
@@ -506,11 +498,11 @@ unsafe impl Attr<SQL_DESC_ROWS_PROCESSED_PTR> for [UnsafeCell<SQLUINTEGER>] {
 unsafe impl Attr<SQL_DESC_ROWS_PROCESSED_PTR> for [UnsafeCell<SQLULEN>] {
     type DefinedBy = OdbcDefined;
 }
-impl<'buf, D: Descriptor<'buf, IRD, SQL_OV_ODBC3>>
+impl<'conn, 'buf, D: Descriptor<'buf, IRD, SQL_OV_ODBC3>>
     DescField<'buf, D, IRD, SQL_DESC_ROWS_PROCESSED_PTR, SQL_OV_ODBC3> for [UnsafeCell<SQLULEN>]
 {
     #[cfg(feature = "odbc_debug")]
-    fn update_handle<V: OdbcVersion>(&self, DescriptorHandle: &UnsafeSQLHDESC<IRD, V>) {
+    fn update_handle<V: OdbcVersion>(&self, DescriptorHandle: &UnsafeSQLHDESC<'conn, IRD, V>) {
         unimplemented!()
     }
 }
@@ -519,7 +511,7 @@ impl<'buf, D: Descriptor<'buf, IPD, SQL_OV_ODBC3>>
     for [UnsafeCell<SQLUINTEGER>]
 {
     #[cfg(feature = "odbc_debug")]
-    fn update_handle<V: OdbcVersion>(&self, DescriptorHandle: &UnsafeSQLHDESC<IPD, V>) {
+    fn update_handle<V: OdbcVersion>(&self, DescriptorHandle: &UnsafeSQLHDESC<'conn, IPD, V>) {
         unimplemented!()
     }
 }

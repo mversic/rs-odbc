@@ -58,7 +58,8 @@ pub type SQLSETPOSIROW = SQLUSMALLINT;
 #[cfg(target_pointer_width = "64")]
 pub type SQLSETPOSIROW = u64;
 
-type UWORD = u16;
+// TODO: Is this type required?
+//type UWORD = u16;
 pub type SQLPOINTER = *mut c_void;
 
 // TODO: Won't be required once GATs are implemented because

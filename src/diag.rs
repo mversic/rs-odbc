@@ -366,10 +366,11 @@ pub const SQL_ROW_NUMBER_UNKNOWN: DiagRowNumber = DiagRowNumber(-2);
 
 #[cfg(test)]
 mod test {
+    #![allow(non_snake_case)]
+
     use super::*;
 
     #[test]
-    #[allow(non_snake_case)]
     fn new_sqlstate_SQLCHAR() {
         let sqlstate = SQLSTATE::<SQLCHAR>::new("12345");
 
@@ -378,7 +379,6 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case)]
     fn new_sqlstate_SQLWCHAR() {
         let sqlstate = SQLSTATE::<SQLWCHAR>::new("12345");
 
@@ -388,20 +388,17 @@ mod test {
 
     #[test]
     #[should_panic]
-    #[allow(non_snake_case)]
     fn new_sqlstate_SQLCHAR_size_4() {
         SQLSTATE::<SQLCHAR>::new("0000");
     }
 
     #[test]
     #[should_panic]
-    #[allow(non_snake_case)]
     fn new_sqlstate_SQLWCHAR_size_4() {
         SQLSTATE::<SQLWCHAR>::new("0000");
     }
 
     #[test]
-    #[allow(non_snake_case)]
     fn sqlstate_SQLCHAR_cmp() {
         let sqlstate = SQLSTATE::<SQLCHAR>::new("12345");
 
@@ -410,7 +407,6 @@ mod test {
     }
 
     #[test]
-    #[allow(non_snake_case)]
     fn sqlstate_SQLWCHAR_cmp() {
         let sqlstate = SQLSTATE::<SQLWCHAR>::new("12345");
 

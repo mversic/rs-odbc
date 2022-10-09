@@ -1,36 +1,38 @@
+use core::{any::type_name, cell::Cell, marker::PhantomData, mem::ManuallyDrop, ptr::NonNull};
+
 #[double]
 use crate::api::ffi;
 use crate::api::{Allocate, Diagnostics, Handle};
 use crate::conn::{ConnState, C2, C3, C4};
 use crate::convert::{AsSQLHANDLE, IntoSQLPOINTER};
 use crate::desc::{AppDesc, IPD, IRD};
-use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION};
+use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80};
 #[cfg(feature = "odbc_debug")]
 use crate::stmt::{
     SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC, SQL_ATTR_IMP_ROW_DESC,
 };
 use crate::{sqlreturn::SQL_SUCCESS, Ident, SQLPOINTER};
 use mockall_double::double;
-use core::any::type_name;
-use core::cell::Cell;
-use core::marker::PhantomData;
-use core::mem::ManuallyDrop;
 
+/// Environment handle id
 #[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 1)]
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_ENV;
 
+/// Connection handle id
 #[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 2)]
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_DBC;
 
+/// Statement handle id
 #[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 3)]
 #[allow(non_camel_case_types)]
 pub struct SQL_HANDLE_STMT;
 
+/// Descriptor handle id
 #[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 4)]
 #[allow(non_camel_case_types)]
@@ -73,7 +75,7 @@ pub struct SQL_NULL_HANDLE;
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/environment-handles
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct SQLHENV<V: OdbcVersion> {
+pub struct SQLHENV<V: OdbcVersion = SQL_OV_ODBC3_80> {
     pub(crate) handle: SQLHANDLE,
     version: PhantomData<V>,
 }
@@ -82,10 +84,10 @@ impl<V: OdbcVersion> Handle for SQLHENV<V> {
     type Ident = SQL_HANDLE_ENV;
 }
 
-impl<V: OdbcVersion> Allocate<&SQL_NULL_HANDLE> for SQLHENV<V> {
-    unsafe fn from_raw(_: &SQL_NULL_HANDLE, handle: SQLHANDLE) -> Self {
+impl<V: OdbcVersion> Allocate<'_, SQL_NULL_HANDLE> for SQLHENV<V> {
+    unsafe fn from_raw(handle: NonNull<RawHandle>) -> Self {
         let val = Self {
-            handle,
+            handle: handle.as_ptr(),
             version: PhantomData,
         };
 
@@ -139,7 +141,7 @@ impl<V: OdbcVersion> Drop for SQLHENV<V> {
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/connection-handles
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct SQLHDBC<'env, C: ConnState, V: OdbcVersion> {
+pub struct SQLHDBC<'env, C: ConnState, V: OdbcVersion = SQL_OV_ODBC3_80> {
     pub(crate) handle: SQLHANDLE,
 
     parent: PhantomData<&'env ()>,
@@ -151,10 +153,10 @@ impl<C: ConnState, V: OdbcVersion> Handle for SQLHDBC<'_, C, V> {
     type Ident = SQL_HANDLE_DBC;
 }
 
-impl<'env, V: OdbcVersion> Allocate<&'env SQLHENV<V>> for SQLHDBC<'env, C2, V> {
-    unsafe fn from_raw(_: &'env SQLHENV<V>, handle: SQLHANDLE) -> Self {
+impl<'env, V: OdbcVersion> Allocate<'env, SQLHENV<V>> for SQLHDBC<'env, C2, V> {
+    unsafe fn from_raw(handle: NonNull<RawHandle>) -> Self {
         Self {
-            handle,
+            handle: handle.as_ptr(),
 
             parent: PhantomData,
             connected: PhantomData,
@@ -239,7 +241,7 @@ impl<'env, OC: ConnState, V: OdbcVersion> SQLHDBC<'env, OC, V> {
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/statement-handles
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct SQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion>(
+pub struct SQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion = SQL_OV_ODBC3_80>(
     pub(crate) UnsafeSQLHSTMT<'conn, 'desc, 'buf, V>,
 );
 
@@ -247,11 +249,12 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Handle for SQLHSTMT<'conn, 'desc, 'buf,
     type Ident = <UnsafeSQLHSTMT<'conn, 'desc, 'buf, V> as Handle>::Ident;
 }
 
-impl<'env, 'conn, V: OdbcVersion> Allocate<&'conn SQLHDBC<'env, C4, V>>
+#[allow(non_snake_case)]
+impl<'env, 'conn, V: OdbcVersion> Allocate<'conn, SQLHDBC<'env, C4, V>>
     for SQLHSTMT<'conn, '_, '_, V>
 {
-    unsafe fn from_raw(InputHandle: &'conn SQLHDBC<'env, C4, V>, handle: SQLHANDLE) -> Self {
-        Self(UnsafeSQLHSTMT::from_raw(InputHandle, handle))
+    unsafe fn from_raw(handle: NonNull<RawHandle>) -> Self {
+        Self(UnsafeSQLHSTMT::from_raw(handle))
     }
 }
 
@@ -263,7 +266,7 @@ unsafe impl<V: OdbcVersion> Send for SQLHSTMT<'_, '_, '_, V> {}
 ///
 #[derive(Debug)]
 #[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
-pub struct UnsafeSQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion> {
+pub struct UnsafeSQLHSTMT<'conn, 'desc, 'buf, V: OdbcVersion = SQL_OV_ODBC3_80> {
     pub(crate) handle: SQLHANDLE,
 
     parent: PhantomData<&'conn ()>,
@@ -302,11 +305,11 @@ impl<V: OdbcVersion> Handle for UnsafeSQLHSTMT<'_, '_, '_, V> {
     type Ident = SQL_HANDLE_STMT;
 }
 
-impl<'env, 'conn, V: OdbcVersion> Allocate<&'conn SQLHDBC<'env, C4, V>>
+impl<'env, 'conn, V: OdbcVersion> Allocate<'conn, SQLHDBC<'env, C4, V>>
     for UnsafeSQLHSTMT<'conn, '_, '_, V>
 {
     #[cfg(feature = "odbc_debug")]
-    unsafe fn from_raw(_: &'conn SQLHDBC<'conn, C4, V>, handle: SQLHANDLE) -> Self {
+    unsafe fn from_raw(handle: NonNull<RawHandle>) -> Self {
         unsafe {
             let ard = UnsafeSQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_ROW_DESC>(handle);
             let apd = UnsafeSQLHSTMT::<V>::get_descriptor_handle::<SQL_ATTR_APP_PARAM_DESC>(handle);
@@ -331,9 +334,9 @@ impl<'env, 'conn, V: OdbcVersion> Allocate<&'conn SQLHDBC<'env, C4, V>>
     }
 
     #[cfg(not(feature = "odbc_debug"))]
-    unsafe fn from_raw(_: &'conn SQLHDBC<'conn, C4, V>, handle: SQLHANDLE) -> Self {
+    unsafe fn from_raw(handle: NonNull<RawHandle>) -> Self {
         Self {
-            handle,
+            handle: handle.as_ptr(),
 
             parent: PhantomData,
             version: PhantomData,
@@ -407,17 +410,20 @@ impl<V: OdbcVersion> Drop for UnsafeSQLHSTMT<'_, '_, '_, V> {
 /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/descriptor-handles
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct SQLHDESC<'conn, DT, V: OdbcVersion>(pub(crate) UnsafeSQLHDESC<'conn, DT, V>);
+pub struct SQLHDESC<'conn, DT, V: OdbcVersion = SQL_OV_ODBC3_80>(
+    pub(crate) UnsafeSQLHDESC<'conn, DT, V>,
+);
 
 impl<DT, V: OdbcVersion> Handle for SQLHDESC<'_, DT, V> {
     type Ident = SQL_HANDLE_DESC;
 }
 
-impl<'env, 'conn, 'buf, V: OdbcVersion> Allocate<&'conn SQLHDBC<'env, C4, V>>
+#[allow(non_snake_case)]
+impl<'env, 'conn, 'buf, V: OdbcVersion> Allocate<'conn, SQLHDBC<'env, C4, V>>
     for SQLHDESC<'conn, AppDesc<'buf>, V>
 {
-    unsafe fn from_raw(InputHandle: &'conn SQLHDBC<'env, C4, V>, handle: SQLHANDLE) -> Self {
-        Self(UnsafeSQLHDESC::from_raw(InputHandle, handle))
+    unsafe fn from_raw(handle: NonNull<RawHandle>) -> Self {
+        Self(UnsafeSQLHDESC::from_raw(handle))
     }
 }
 
@@ -429,7 +435,7 @@ unsafe impl<DT, V: OdbcVersion> Send for SQLHDESC<'_, DT, V> {}
 ///
 #[derive(Debug)]
 #[cfg_attr(not(feature = "odbc_debug"), repr(transparent))]
-pub struct UnsafeSQLHDESC<'conn, T, V: OdbcVersion> {
+pub struct UnsafeSQLHDESC<'conn, T, V: OdbcVersion = SQL_OV_ODBC3_80> {
     pub(crate) handle: SQLHANDLE,
 
     parent: PhantomData<&'conn ()>,
@@ -447,12 +453,12 @@ impl<V: OdbcVersion, T> Handle for UnsafeSQLHDESC<'_, T, V> {
 }
 
 // Valid because SQLHDBC is covariant
-impl<'env, 'conn, 'buf, V: OdbcVersion> Allocate<&'conn SQLHDBC<'env, C4, V>>
+impl<'env, 'conn, 'buf, V: OdbcVersion> Allocate<'conn, SQLHDBC<'env, C4, V>>
     for UnsafeSQLHDESC<'conn, AppDesc<'buf>, V>
 {
-    unsafe fn from_raw(_: &'conn SQLHDBC<'env, C4, V>, handle: SQLHANDLE) -> Self {
+    unsafe fn from_raw(handle: NonNull<RawHandle>) -> Self {
         Self {
-            handle,
+            handle: handle.as_ptr(),
 
             parent: PhantomData,
             version: PhantomData,
@@ -474,7 +480,9 @@ impl<V: OdbcVersion, DT> Drop for UnsafeSQLHDESC<'_, DT, V> {
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct RefUnsafeSQLHDESC<'conn, DT, V: OdbcVersion>(ManuallyDrop<UnsafeSQLHDESC<'conn, DT, V>>);
+pub struct RefUnsafeSQLHDESC<'conn, DT, V: OdbcVersion = SQL_OV_ODBC3_80>(
+    ManuallyDrop<UnsafeSQLHDESC<'conn, DT, V>>,
+);
 unsafe impl<DT, V: OdbcVersion> AsSQLHANDLE for RefUnsafeSQLHDESC<'_, DT, V> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.0.as_SQLHANDLE()
@@ -488,8 +496,10 @@ impl<DT, V: OdbcVersion> Diagnostics for RefUnsafeSQLHDESC<'_, DT, V> {}
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct RefSQLHDESC<'conn, DT, V: OdbcVersion>(RefUnsafeSQLHDESC<'conn, DT, V>);
-unsafe impl<DT, V: OdbcVersion> AsSQLHANDLE for RefSQLHDESC<'_, DT, V> {
+pub struct RefSQLHDESC<'conn, DT, V: OdbcVersion = SQL_OV_ODBC3_80>(
+    RefUnsafeSQLHDESC<'conn, DT, V>,
+);
+unsafe impl<'conn, DT, V: OdbcVersion> AsSQLHANDLE for RefSQLHDESC<'conn, DT, V> {
     fn as_SQLHANDLE(&self) -> SQLHANDLE {
         self.0.as_SQLHANDLE()
     }
@@ -522,11 +532,10 @@ mod test {
     #![allow(non_snake_case)]
 
     use super::*;
-    use crate::env::SQL_OV_ODBC3_80;
 
     #[test]
     fn env_SQL_OV_ODBC3_80_version_set() {
-        let env_raw_handle = 13 as SQLHANDLE;
+        let env_raw_handle = NonNull::new(13 as SQLHANDLE).unwrap();
 
         let SQLSetEnvAttr_ctx = ffi::SQLSetEnvAttr_context();
         let SQLFreeHandle_ctx = ffi::SQLFreeHandle_context();
@@ -535,7 +544,7 @@ mod test {
             .expect()
             .once()
             .withf_st(move |x, y, z, w| {
-                *x == env_raw_handle
+                *x == env_raw_handle.as_ptr()
                     && *y == SQL_ATTR_ODBC_VERSION::IDENTIFIER
                     && *z == SQL_OV_ODBC3_80::IDENTIFIER.into_SQLPOINTER()
                     && *w == 0
@@ -544,10 +553,10 @@ mod test {
         SQLFreeHandle_ctx
             .expect()
             .once()
-            .withf_st(move |x, y| *x == SQL_HANDLE_ENV::IDENTIFIER && *y == env_raw_handle)
+            .withf_st(move |x, y| *x == SQL_HANDLE_ENV::IDENTIFIER && *y == env_raw_handle.as_ptr())
             .return_const(SQL_SUCCESS);
 
-        unsafe { SQLHENV::<SQL_OV_ODBC3_80>::from_raw(&SQL_NULL_HANDLE, env_raw_handle) };
+        unsafe { SQLHENV::<SQL_OV_ODBC3_80>::from_raw(env_raw_handle) };
     }
 
     #[test]

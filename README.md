@@ -93,7 +93,7 @@ if SQL_SUCCEEDED(ret1) {
 handles makes it possible to implement the ODBC state transition FSM inside the Rust's type system
 
 3. ODBC functions which take pointer and it's length take reference to a slice instead. Slice references
-prevent the possibility of the application writer to write/read pass the end of the allocation unit.
+prevent the possibility of the application writer to write/read past the end of the allocation unit.
 
 <table>
 <tr>

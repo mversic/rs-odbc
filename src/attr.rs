@@ -13,8 +13,8 @@ use core::{cell::UnsafeCell, fmt::Debug, mem::MaybeUninit};
 pub unsafe trait Attr<A: Ident> {
     type DefinedBy: Def;
 }
-pub unsafe trait AttrGet<A>: AsMutSQLPOINTER + AttrZeroAssert {}
-pub unsafe trait AttrSet<A>: IntoSQLPOINTER {}
+pub unsafe trait AttrGet<A: Ident>: Attr<A> + AsMutSQLPOINTER + AttrZeroAssert {}
+pub unsafe trait AttrSet<A: Ident>: IntoSQLPOINTER + Sized {}
 
 // TODO: https://github.com/rust-lang/rust/issues/35121
 // Use never type ! when it is available on stable
@@ -75,12 +75,6 @@ where
     OdbcStr<SQLWCHAR>: Attr<A> + AttrGet<A>,
 {
     type DefinedBy = <OdbcStr<SQLWCHAR> as Attr<A>>::DefinedBy;
-}
-unsafe impl<A: Ident, T: Scalar> Attr<A> for &T
-where
-    T: Attr<A>,
-{
-    type DefinedBy = T::DefinedBy;
 }
 unsafe impl<A: Ident, T> Attr<A> for &[T]
 where
