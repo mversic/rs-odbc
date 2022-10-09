@@ -34,16 +34,6 @@ impl<T> DerefMut for OdbcStr<T> {
         &mut self.0
     }
 }
-//impl AsRef<OdbcStr<UnsafeCell<SQLCHAR>>> for UnsafeCell<str> {
-//    fn as_ref(&self) -> &OdbcStr<UnsafeCell<SQLCHAR>> {
-//        self.get() as *const SQLCHAR
-//    }
-//}
-//impl AsMut<OdbcStr<UnsafeCell<SQLCHAR>>> for UnsafeCell<str> {
-//    fn as_mut(&mut self) -> &mut OdbcStr<UnsafeCell<SQLCHAR>> {
-//        unsafe { self.get }
-//    }
-//}
 impl AsRef<OdbcStr<SQLCHAR>> for str {
     fn as_ref(&self) -> &OdbcStr<SQLCHAR> {
         self.as_bytes().as_ref()
@@ -72,6 +62,25 @@ impl AsRef<OdbcStr<SQLWCHAR>> for [SQLWCHAR] {
 impl AsMut<OdbcStr<SQLWCHAR>> for [SQLWCHAR] {
     fn as_mut(&mut self) -> &mut OdbcStr<SQLWCHAR> {
         unsafe { &mut *(self as *mut [SQLWCHAR] as *mut OdbcStr<SQLWCHAR>) }
+    }
+}
+impl AsRef<OdbcStr<UnsafeCell<SQLCHAR>>> for UnsafeCell<str> {
+    fn as_ref(&self) -> &OdbcStr<UnsafeCell<SQLCHAR>> {
+        // FIXME: Relies on the implicit assumption that str is transmutable into [u8]
+        // SAFETY: Types are transparent
+        unsafe { core::mem::transmute(self) }
+    }
+}
+impl AsRef<OdbcStr<UnsafeCell<SQLCHAR>>> for UnsafeCell<[SQLCHAR]> {
+    fn as_ref(&self) -> &OdbcStr<UnsafeCell<SQLCHAR>> {
+        // SAFETY: Types are transparent
+        unsafe { core::mem::transmute(self) }
+    }
+}
+impl AsRef<OdbcStr<UnsafeCell<SQLWCHAR>>> for UnsafeCell<[SQLWCHAR]> {
+    fn as_ref(&self) -> &OdbcStr<UnsafeCell<SQLWCHAR>> {
+        // SAFETY: Types are transparent
+        unsafe { core::mem::transmute(self) }
     }
 }
 impl AsMut<OdbcStr<MaybeUninit<SQLCHAR>>> for [MaybeUninit<SQLCHAR>]

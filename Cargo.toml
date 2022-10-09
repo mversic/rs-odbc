@@ -13,7 +13,7 @@ mockall = "0.11.2"
 # TODO: use miri eventually
 
 [dependencies]
-rs-odbc_derive = {path = "rs-odbc_derive", version = "0.2.0"}
+rs-odbc_derive = "0.1.0"
 mockall_double = "0.3.0"
 
 [features]

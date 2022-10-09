@@ -15,7 +15,8 @@ pub trait CData<TT: Ident, V: OdbcVersion>: CDataLen {}
 
 /// Care must be taken because references to DeferredBuf might be written to
 // TODO: Do I need to disambiguate between BindCol and BindParameters deferred buffers
-pub unsafe trait DeferredBuf<S, TT: Ident, V: OdbcVersion>: CDataLen + AsSQLPOINTER {}
+// TODO: add bound D: Descriptor
+pub unsafe trait DeferredBuf<D, TT: Ident, V: OdbcVersion>: CDataLen + AsSQLPOINTER {}
 
 impl<TT: Ident, T: CScalar, V: OdbcVersion> CData<TT, V> for MaybeUninit<T> where T: CData<TT, V> {}
 
