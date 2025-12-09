@@ -5,9 +5,9 @@ use core::{
 };
 
 use crate::{
-    env::OdbcVersion,
-    handle::{RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, SQLHDESC},
     Ident, SQLCHAR, SQLWCHAR,
+    env::OdbcVersion,
+    handle::{RefSQLHDESC, RefUnsafeSQLHDESC, SQLHDESC, UnsafeSQLHDESC},
 };
 
 pub trait OdbcChar {}

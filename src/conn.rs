@@ -3,11 +3,11 @@ use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::handle::SQLHDBC;
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{
-    info::TxnIsolation, Ident, OdbcBool, OdbcDefined, Scalar, SQLCHAR, SQLINTEGER, SQLUINTEGER,
-    SQLWCHAR,
+    Ident, OdbcBool, OdbcDefined, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR, Scalar,
+    info::TxnIsolation,
 };
-use rs_odbc_derive::{odbc_type, Ident};
 use core::mem::MaybeUninit;
+use rs_odbc_derive::{Ident, odbc_type};
 
 pub trait ConnState: private::ConnState {}
 
@@ -120,8 +120,8 @@ mod private {
     use crate::convert::AsSQLHANDLE;
     use crate::handle::SQLHDBC;
     use crate::{env, sqlreturn};
-    use mockall_double::double;
     use core::any;
+    use mockall_double::double;
 
     pub trait ConnState {
         // TODO: If drop impl specialization is allowed this fn will not be required
@@ -159,7 +159,7 @@ mod private {
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 101)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ATTR_ACCESS_MODE;
 unsafe impl Attr<SQL_ATTR_ACCESS_MODE> for AccessMode {
     type DefinedBy = OdbcDefined;
@@ -171,7 +171,7 @@ unsafe impl AttrSet<SQL_ATTR_ACCESS_MODE> for AccessMode {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 102)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 // TODO: Implement in type system
 pub struct SQL_ATTR_AUTOCOMMIT;
 unsafe impl Attr<SQL_ATTR_AUTOCOMMIT> for AutoCommit {
@@ -184,7 +184,7 @@ unsafe impl AttrSet<SQL_ATTR_AUTOCOMMIT> for AutoCommit {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 113)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ATTR_CONNECTION_TIMEOUT;
 unsafe impl Attr<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
@@ -196,7 +196,7 @@ unsafe impl AttrSet<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 109)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ATTR_CURRENT_CATALOG;
 unsafe impl<CH: OdbcChar> Attr<SQL_ATTR_CURRENT_CATALOG> for OdbcStr<CH> {
     type DefinedBy = OdbcDefined;
@@ -208,7 +208,7 @@ unsafe impl<CH: OdbcChar> AttrSet<SQL_ATTR_CURRENT_CATALOG> for &OdbcStr<CH> {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 103)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ATTR_LOGIN_TIMEOUT;
 unsafe impl Attr<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
@@ -219,7 +219,7 @@ unsafe impl AttrSet<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 112)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ATTR_PACKET_SIZE;
 unsafe impl Attr<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {
     type DefinedBy = OdbcDefined;
@@ -230,7 +230,7 @@ unsafe impl AttrSet<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 104)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ATTR_TRACE;
 unsafe impl Attr<SQL_ATTR_TRACE> for Trace {
     type DefinedBy = OdbcDefined;
@@ -242,7 +242,7 @@ unsafe impl AttrSet<SQL_ATTR_TRACE> for Trace {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 105)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ATTR_TRACEFILE;
 unsafe impl<CH: OdbcChar> Attr<SQL_ATTR_TRACEFILE> for OdbcStr<CH> {
     type DefinedBy = OdbcDefined;
@@ -254,7 +254,7 @@ unsafe impl<CH: OdbcChar> AttrSet<SQL_ATTR_TRACEFILE> for &OdbcStr<CH> {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 106)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ATTR_TRANSLATE_LIB;
 unsafe impl<CH: OdbcChar> Attr<SQL_ATTR_TRANSLATE_LIB> for OdbcStr<CH> {
     type DefinedBy = OdbcDefined;
@@ -265,7 +265,7 @@ unsafe impl<CH: OdbcChar> AttrSet<SQL_ATTR_TRANSLATE_LIB> for &OdbcStr<CH> {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 10001)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_ATTR_AUTO_IPD;
 unsafe impl Attr<SQL_ATTR_AUTO_IPD> for OdbcBool {
@@ -277,7 +277,7 @@ unsafe impl AttrGet<SQL_ATTR_AUTO_IPD> for OdbcBool {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 117)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE;
 unsafe impl Attr<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {
     type DefinedBy = OdbcDefined;
@@ -297,7 +297,7 @@ unsafe impl AttrSet<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEn
 // but it says that drivers conforming to earlier versions can support this field
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 1209)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_ATTR_CONNECTION_DEAD;
 unsafe impl Attr<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {
@@ -308,7 +308,7 @@ unsafe impl AttrGet<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 108)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ATTR_TXN_ISOLATION;
 unsafe impl Attr<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {
     type DefinedBy = OdbcDefined;
@@ -321,7 +321,7 @@ unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 107)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_ATTR_TRANSLATE_OPTION;
 //unsafe impl Attr<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {
 //    type DefinedBy = OdbcDefined;
@@ -361,18 +361,18 @@ unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 111)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_ATTR_QUIET_MODE;
 //impl ConnAttr<C, SQL_ATTR_QUIET_MODE, SQL_OV_ODBC3> for {}
 
 // TODO: Not found in documentation, only in implementation
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 114)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_ATTR_DISCONNECT_BEHAVIOR;
 
 //#[derive(odbc_type)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct DisconnectBehavior;
 //pub const SQL_DB_RETURN_TO_POOL: DisconnectBehavior = DisconnectBehavior(0);
 //pub const SQL_DB_DISCONNECT: DisconnectBehavior = DisconnectBehavior(1);
@@ -392,7 +392,7 @@ unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 //// TODO: These 4 are not in Documentation??
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 115)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_ATTR_ANSI_APP;
 //impl ConnAttr<SQL_OV_ODBC3_51, SQL_ATTR_ANSI_APP>, for AnsiApp {}
 //impl AttrGet<SQL_ATTR_ANSI_APP>> for AnsiApp {}
@@ -405,7 +405,7 @@ unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 116)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_ATTR_RESET_CONNECTION;
 //impl ConnAttr<SQL_OV_ODBC3_80, SQL_ATTR_RESET_CONNECTION> for ResetConnection {}
 //impl AttrGet<SQL_ATTR_RESET_CONNECTION>> for ResetConnection {}
@@ -418,7 +418,7 @@ unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 
 //#[derive(Ident)]
 //#[identifier(SQLINTEGER, 122)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_ATTR_CREDENTIALS;
 //unsafe impl<CH: OdbcChar> Attr<SQL_ATTR_CREDENTIALS> for OdbcStr<CH> {
 //    type DefinedBy = OdbcDefined;
@@ -429,7 +429,7 @@ unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 123)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ATTR_REFRESH_CONNECTION;
 unsafe impl Attr<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {
     type DefinedBy = OdbcDefined;
@@ -474,7 +474,6 @@ pub const SQL_CD_FALSE: ConnectionDead = ConnectionDead(0);
 pub const SQL_CD_TRUE: ConnectionDead = ConnectionDead(1);
 
 #[odbc_type(SQLINTEGER)]
-#[allow(non_camel_case_types)]
 pub struct RefreshConnection;
 pub const SQL_REFRESH_NOW: RefreshConnection = RefreshConnection(-1);
 pub const SQL_REFRESH_AUTO: RefreshConnection = RefreshConnection(0);
@@ -484,14 +483,14 @@ pub const SQL_REFRESH_MANUAL: RefreshConnection = RefreshConnection(1);
 mod test {
     #![allow(non_snake_case)]
 
-    use super::*;
-    use crate::api::mock_ffi as ffi;
-    use crate::api::Allocate;
-    use crate::env::SQL_OV_ODBC3_80;
-    use crate::handle::SQLHANDLE;
-    use crate::sqlreturn::SQL_SUCCESS;
-    use crate::stmt::SQL_ASYNC_ENABLE_OFF;
-    use crate::SQL_TRUE;
+    //use super::*;
+    //use crate::SQL_TRUE;
+    //use crate::api::Allocate;
+    //use crate::api::mock_ffi as ffi;
+    //use crate::env::SQL_OV_ODBC3_80;
+    //use crate::handle::SQLHANDLE;
+    //use crate::sqlreturn::SQL_SUCCESS;
+    //use crate::stmt::SQL_ASYNC_ENABLE_OFF;
 
     //#[test]
     //fn test_SQL_ATTR_METADATA_ID_is_ConnAttr() {

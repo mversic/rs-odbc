@@ -65,10 +65,7 @@ pub const SQL_METADATA_CHANGED: SQLRETURN = SQLRETURN(103);
 #[cfg(feature = "v4")]
 pub const SQL_MORE_DATA: SQLRETURN = SQLRETURN(104);
 
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 pub fn SQL_SUCCEEDED<T: Into<SQLRETURN>>(ret: T) -> bool {
-    match ret.into() {
-        SQL_SUCCESS | SQL_SUCCESS_WITH_INFO => true,
-        _ => false,
-    }
+    matches!(ret.into(), SQL_SUCCESS | SQL_SUCCESS_WITH_INFO)
 }

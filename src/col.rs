@@ -1,7 +1,7 @@
 use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
-use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
+use crate::env::{OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::str::{OdbcChar, OdbcStr};
-use crate::{Ident, OdbcDefined, Scalar, SQLCHAR, SQLLEN, SQLSMALLINT, SQLWCHAR};
+use crate::{Ident, OdbcDefined, SQLCHAR, SQLLEN, SQLSMALLINT, SQLWCHAR, Scalar};
 use core::mem::MaybeUninit;
 use rs_odbc_derive::Ident;
 
@@ -77,7 +77,7 @@ where
 
 // TODO: These seem to be from v2.0
 //#[deprecated]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //enum SQLColAttrIdents {
 //    SQL_COLUMN_COUNT = 0,
 //    SQL_COLUMN_NAME = 1,
@@ -94,7 +94,7 @@ where
 // This is the only header field, others are record fields
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 1001)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_COUNT;
 unsafe impl Attr<SQL_DESC_COUNT> for SQLLEN {
     type DefinedBy = OdbcDefined;
@@ -102,27 +102,27 @@ unsafe impl Attr<SQL_DESC_COUNT> for SQLLEN {
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 2)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_CONCISE_TYPE;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 6)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_DISPLAY_SIZE;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 8)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_UNSIGNED;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 9)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_FIXED_PREC_SCALE;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_UPDATABLE;
 
 ///// Describes the updatability of the column in the result set, not the column in the base table.
@@ -136,17 +136,17 @@ pub struct SQL_DESC_UPDATABLE;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 11)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_AUTO_UNIQUE_VALUE;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 12)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_CASE_SENSITIVE;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 13)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_SEARCHABLE;
 // TODO:
 // SQLIdents subdefines for SQL_COLUMN_SEARCHABLE These are also used by SQLGetInfo
@@ -159,92 +159,92 @@ pub struct SQL_DESC_SEARCHABLE;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 14)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_TYPE_NAME;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 15)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_TABLE_NAME;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 16)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_SCHEMA_NAME;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 17)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_CATALOG_NAME;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 18)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_LABEL;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 22)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_BASE_COLUMN_NAME;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 23)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_BASE_TABLE_NAME;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 27)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_LITERAL_PREFIX;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 28)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_LITERAL_SUFFIX;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 29)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_LOCAL_TYPE_NAME;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 32)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_NUM_PREC_RADIX;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 1002)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_TYPE;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 1003)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_LENGTH;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 1005)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_PRECISION;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 1006)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_SCALE;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 1008)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_NULLABLE;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 1011)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_NAME;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 1012)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_UNNAMED;
 
 //#[repr(SQLSMALLINT)]
@@ -257,7 +257,7 @@ pub struct SQL_DESC_UNNAMED;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 1013)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_OCTET_LENGTH;
 
 // TODO: These are unknown, find their values

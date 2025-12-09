@@ -1,9 +1,9 @@
 use core::mem::MaybeUninit;
+use rs_odbc::SQL_DRIVER_COMPLETE;
 use rs_odbc::api::{Allocate, Statement};
 use rs_odbc::env::SQL_OV_ODBC3_80;
-use rs_odbc::handle::{SQLHDBC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE};
+use rs_odbc::handle::{SQL_NULL_HANDLE, SQLHDBC, SQLHENV, SQLHSTMT};
 use rs_odbc::sqlreturn::SQL_SUCCESS;
-use rs_odbc::SQL_DRIVER_COMPLETE;
 
 fn main() {
     let statement = "SELECT id, first_name, last_name FROM People ORDER BY 1, 3, 2;";

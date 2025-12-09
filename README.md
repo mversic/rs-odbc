@@ -1,7 +1,6 @@
 # RS-ODBC
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/mversic/rs-odbc/blob/master/LICENSE)
-![Build](https://github.com/mversic/rs-odbc/actions/workflows/odbc-ci.yml/badge.svg)
 [![Crates.io](https://img.shields.io/crates/v/rs-odbc.svg)](https://crates.io/crates/rs-odbc)
 
 Rust implementation of the ODBC API that looks and feels like ODBC but is safe
@@ -241,7 +240,7 @@ which implement additional unsafe API which makes some of the statement function
 
 Integration tests use dockerized environment which has database and ODBC driver already set up.
 
-Testing environment can be set up with `docker-compose up -d`<br/>
+Testing environment can be set up with `docker compose up -d`<br/>
 Tests are executed with `docker exec -t rs-odbc sh -lc 'cargo test'`
 
 * use `RUSTFLAGS=-Awarnings` to silence compiler warnings which make compile tests fail

@@ -5,11 +5,11 @@ use crate::env::OdbcVersion;
 use crate::handle::SQLHSTMT;
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{
-    sqlreturn::SQLRETURN, Def, Ident, OdbcDefined, Scalar, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER,
-    SQLSMALLINT, SQLWCHAR,
+    Def, Ident, OdbcDefined, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLWCHAR,
+    Scalar, sqlreturn::SQLRETURN,
 };
 use core::mem::MaybeUninit;
-use rs_odbc_derive::{odbc_type, Ident};
+use rs_odbc_derive::{Ident, odbc_type};
 
 pub trait DiagField<H: Handle, D: Ident>: Attr<D> + AttrLen<Self::DefinedBy, SQLSMALLINT> {
     // TODO: These could be checked by the type system
@@ -102,8 +102,11 @@ where
     type StrLen = Void;
 
     fn len(&self) -> SQLSMALLINT {
-        // This is ok because MaybeUninit<T> has the same memory layout as T
-        <MaybeUninit<SQLSTATE<C>>>::len(unsafe { core::mem::transmute(self) })
+        // `MaybeUninit<T>` has the same memory layout as `T`
+        let state =
+            unsafe { core::mem::transmute::<&SQLSTATE<C>, &MaybeUninit<SQLSTATE<C>>>(self) };
+
+        <MaybeUninit<SQLSTATE<C>>>::len(state)
     }
 }
 unsafe impl<AD: Def> AttrLen<AD, SQLSMALLINT> for MaybeUninit<SQLSTATE<SQLCHAR>> {
@@ -154,7 +157,7 @@ impl<D: Ident, H: Handle> DiagField<H, D> for OdbcStr<MaybeUninit<SQLWCHAR>> whe
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, -1249)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_CURSOR_ROW_COUNT;
 unsafe impl Attr<SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {
     type DefinedBy = OdbcDefined;
@@ -164,7 +167,7 @@ unsafe impl AttrGet<SQL_DIAG_CURSOR_ROW_COUNT> for SQLLEN {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 7)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_DYNAMIC_FUNCTION;
 unsafe impl Attr<SQL_DIAG_DYNAMIC_FUNCTION> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
@@ -177,7 +180,7 @@ unsafe impl AttrGet<SQL_DIAG_DYNAMIC_FUNCTION> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 12)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_DYNAMIC_FUNCTION_CODE;
 unsafe impl Attr<SQL_DIAG_DYNAMIC_FUNCTION_CODE> for DiagDynamicFunctionCode {
     type DefinedBy = OdbcDefined;
@@ -190,7 +193,7 @@ unsafe impl AttrGet<SQL_DIAG_DYNAMIC_FUNCTION_CODE> for DiagDynamicFunctionCode 
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 2)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_NUMBER;
 unsafe impl Attr<SQL_DIAG_NUMBER> for SQLINTEGER {
     type DefinedBy = OdbcDefined;
@@ -200,7 +203,7 @@ unsafe impl AttrGet<SQL_DIAG_NUMBER> for SQLINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 1)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_RETURNCODE;
 unsafe impl Attr<SQL_DIAG_RETURNCODE> for SQLRETURN {
     type DefinedBy = OdbcDefined;
@@ -210,7 +213,7 @@ unsafe impl AttrGet<SQL_DIAG_RETURNCODE> for SQLRETURN {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 3)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_ROW_COUNT;
 unsafe impl Attr<SQL_DIAG_ROW_COUNT> for SQLLEN {
     type DefinedBy = OdbcDefined;
@@ -224,7 +227,7 @@ unsafe impl AttrGet<SQL_DIAG_ROW_COUNT> for SQLLEN {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 8)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_CLASS_ORIGIN;
 unsafe impl Attr<SQL_DIAG_CLASS_ORIGIN> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
@@ -234,7 +237,7 @@ unsafe impl AttrGet<SQL_DIAG_CLASS_ORIGIN> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, -1247)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_COLUMN_NUMBER;
 unsafe impl Attr<SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {
     type DefinedBy = OdbcDefined;
@@ -247,7 +250,7 @@ unsafe impl AttrGet<SQL_DIAG_COLUMN_NUMBER> for DiagColumnNumber {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 10)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_CONNECTION_NAME;
 unsafe impl Attr<SQL_DIAG_CONNECTION_NAME> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
@@ -257,7 +260,7 @@ unsafe impl AttrGet<SQL_DIAG_CONNECTION_NAME> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 6)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_MESSAGE_TEXT;
 unsafe impl Attr<SQL_DIAG_MESSAGE_TEXT> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
@@ -267,7 +270,7 @@ unsafe impl AttrGet<SQL_DIAG_MESSAGE_TEXT> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 5)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_NATIVE;
 unsafe impl Attr<SQL_DIAG_NATIVE> for SQLINTEGER {
     type DefinedBy = OdbcDefined;
@@ -277,7 +280,7 @@ unsafe impl AttrGet<SQL_DIAG_NATIVE> for SQLINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, -1248)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_ROW_NUMBER;
 unsafe impl Attr<SQL_DIAG_ROW_NUMBER> for DiagRowNumber {
     type DefinedBy = OdbcDefined;
@@ -287,7 +290,7 @@ unsafe impl AttrGet<SQL_DIAG_ROW_NUMBER> for DiagRowNumber {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 11)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_SERVER_NAME;
 unsafe impl Attr<SQL_DIAG_SERVER_NAME> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
@@ -297,7 +300,7 @@ unsafe impl AttrGet<SQL_DIAG_SERVER_NAME> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 4)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_SQLSTATE;
 unsafe impl<C: OdbcChar> Attr<SQL_DIAG_SQLSTATE> for SQLSTATE<C> {
     type DefinedBy = OdbcDefined;
@@ -308,7 +311,7 @@ unsafe impl<C: OdbcChar> AttrGet<SQL_DIAG_SQLSTATE> for SQLSTATE<C> {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 9)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DIAG_SUBCLASS_ORIGIN;
 unsafe impl Attr<SQL_DIAG_SUBCLASS_ORIGIN> for OdbcStr<SQLCHAR> {
     type DefinedBy = OdbcDefined;
@@ -366,7 +369,7 @@ pub const SQL_ROW_NUMBER_UNKNOWN: DiagRowNumber = DiagRowNumber(-2);
 
 #[cfg(test)]
 mod test {
-    #![allow(non_snake_case)]
+    #![expect(non_snake_case)]
 
     use super::*;
 

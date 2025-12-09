@@ -1,8 +1,8 @@
 use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
 use crate::str::{OdbcChar, OdbcStr};
-use crate::{Ident, OdbcDefined, Scalar, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR};
+use crate::{Ident, OdbcDefined, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR, Scalar};
 use core::mem::MaybeUninit;
-use rs_odbc_derive::{odbc_type, Ident};
+use rs_odbc_derive::{Ident, odbc_type};
 
 pub trait EnvAttr<A: Ident, V: OdbcVersion>:
     Attr<A, DefinedBy = OdbcDefined> + AttrLen<OdbcDefined, SQLINTEGER>
@@ -78,7 +78,7 @@ where
 // otherwise don't expose this attribute unless there is a valid use-case
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 200)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 // This is read-only attribute because
 // it's handled by the type system
 pub(crate) struct SQL_ATTR_ODBC_VERSION;
@@ -90,7 +90,7 @@ pub(crate) struct SQL_ATTR_ODBC_VERSION;
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 202)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ATTR_CP_MATCH;
 unsafe impl Attr<SQL_ATTR_CP_MATCH> for CpMatch {
     type DefinedBy = OdbcDefined;
@@ -101,7 +101,7 @@ unsafe impl AttrSet<SQL_ATTR_CP_MATCH> for CpMatch {}
 
 #[derive(Ident)]
 #[identifier(SQLINTEGER, 201)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ATTR_CONNECTION_POOLING;
 unsafe impl Attr<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {
     type DefinedBy = OdbcDefined;
@@ -117,21 +117,21 @@ pub trait OdbcVersion {
     const IDENTIFIER: SQLUINTEGER;
 }
 #[derive(Debug)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum SQL_OV_ODBC3 {}
 impl OdbcVersion for SQL_OV_ODBC3 {
     type PrevVersion = SQL_OV_ODBC3;
     const IDENTIFIER: SQLUINTEGER = 3;
 }
 #[derive(Debug)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum SQL_OV_ODBC3_80 {}
 impl OdbcVersion for SQL_OV_ODBC3_80 {
     type PrevVersion = SQL_OV_ODBC3;
     const IDENTIFIER: SQLUINTEGER = 380;
 }
 #[derive(Debug)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum SQL_OV_ODBC4 {}
 impl OdbcVersion for SQL_OV_ODBC4 {
     type PrevVersion = SQL_OV_ODBC3_80;

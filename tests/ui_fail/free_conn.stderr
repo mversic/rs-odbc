@@ -1,6 +1,8 @@
 error[E0505]: cannot move out of `env` because it is borrowed
   --> tests/ui_fail/free_conn.rs:15:5
    |
+11 |     let env = get_env_handle();
+   |         --- binding `env` declared here
 12 |     let (conn, _) = SQLHDBC::SQLAllocHandle(&env);
    |                                             ---- borrow of `env` occurs here
 ...

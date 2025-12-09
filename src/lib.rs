@@ -20,11 +20,11 @@ pub mod str;
 // so users can import from this lib directly
 use core::{ffi::c_void, fmt::Debug};
 use rs_odbc_derive::odbc_type;
-pub use {api::*, c_types::*, sql_types::*};
 pub use {
     BulkOperation::*, CompletionType::*, DriverCompletion::*, FreeStmtOption::*, FunctionId::*,
     IdentifierType::*, LockType::*, Operation::*, Reserved::*, Scope::*, Unique::*,
 };
+pub use {api::*, c_types::*, sql_types::*};
 
 // TODO: Add support for mingw-x64 on x86 platform
 
@@ -155,7 +155,6 @@ impl Scalar for SQLULEN {}
 // SQL_ATTR_OUTPUT_NTS(u32, true), SQL_ATTR_AUTO_IPD(u32, _)
 // WARN: SQL_ATTR_METADATA_ID is SQLULEN
 #[odbc_type(SQLUINTEGER)]
-#[allow(non_camel_case_types)]
 pub struct OdbcBool;
 pub const SQL_FALSE: OdbcBool = OdbcBool(0);
 pub const SQL_TRUE: OdbcBool = OdbcBool(1);
@@ -174,7 +173,7 @@ pub const SQL_NULLABLE: NullAllowed = NullAllowed(1);
 pub const SQL_NULLABLE_UNKNOWN: NullAllowed = NullAllowed(2);
 
 #[odbc_type(SQLUSMALLINT)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum DriverCompletion {
     SQL_DRIVER_NOPROMPT = 0,
     SQL_DRIVER_COMPLETE = 1,
@@ -183,14 +182,14 @@ pub enum DriverCompletion {
 }
 
 #[odbc_type(SQLSMALLINT)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum IdentifierType {
     SQL_BEST_ROWID = 1,
     SQL_ROWVER = 2,
 }
 
 #[odbc_type(SQLUSMALLINT)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum BulkOperation {
     SQL_ADD = 4,
     SQL_UPDATE_BY_BOOKMARK = 5,
@@ -199,7 +198,7 @@ pub enum BulkOperation {
 }
 
 #[odbc_type(SQLUSMALLINT)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum Operation {
     SQL_POSITION = 0,
     SQL_REFRESH = 1,
@@ -208,7 +207,7 @@ pub enum Operation {
 }
 
 #[odbc_type(SQLUSMALLINT)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum LockType {
     SQL_LOCK_NO_CHANGE = 0,
     SQL_LOCK_EXCLUSIVE = 1,
@@ -216,14 +215,14 @@ pub enum LockType {
 }
 
 #[odbc_type(SQLSMALLINT)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum CompletionType {
     SQL_COMMIT = 0,
     SQL_ROLLBACK = 1,
 }
 
 #[odbc_type(SQLUSMALLINT)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum FreeStmtOption {
     SQL_CLOSE = 0,
     SQL_UNBIND = 2,
@@ -231,21 +230,21 @@ pub enum FreeStmtOption {
 }
 
 #[odbc_type(SQLUSMALLINT)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum Reserved {
     SQL_QUICK = 0,
     SQL_ENSURE = 1,
 }
 
 #[odbc_type(SQLUSMALLINT)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum Unique {
     SQL_INDEX_UNIQUE = 0,
     SQL_INDEX_ALL = 1,
 }
 
 #[odbc_type(SQLSMALLINT)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum Scope {
     SQL_SCOPE_CURROW = 0,
     SQL_SCOPE_TRANSACTION = 1,
@@ -253,7 +252,6 @@ pub enum Scope {
 }
 
 #[odbc_type(SQLSMALLINT)]
-#[allow(non_camel_case_types)]
 // TODO: Think about splitting for IO
 pub struct IOType;
 pub const SQL_PARAM_INPUT: IOType = IOType(1);
@@ -280,7 +278,7 @@ pub const SQL_ALL_SCHEMAS: &str = "%";
 pub const SQL_ALL_TABLE_TYPES: &str = "%";
 
 #[odbc_type(SQLUSMALLINT)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub enum FunctionId {
     SQL_API_ODBC3_ALL_FUNCTIONS = 999,
     SQL_API_SQLALLOCCONNECT = 1,

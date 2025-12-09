@@ -1,8 +1,11 @@
 error[E0505]: cannot move out of `stmt` because it is borrowed
-  --> $DIR/get_ard.rs:38:5
+  --> tests/ui_fail/get_ard.rs:38:5
    |
+33 |     let stmt = stmt.unwrap();
+   |         ---- binding `stmt` declared here
+34 |
 35 |     stmt.SQLGetStmtAttrA(SQL_ATTR_APP_ROW_DESC, Some(&mut desc), None);
-   |     ------------------------------------------------------------------ borrow of `stmt` occurs here
+   |     ---- borrow of `stmt` occurs here
 ...
 38 |     stmt.SQLFreeHandle();
    |     ^^^^ move out of `stmt` occurs here

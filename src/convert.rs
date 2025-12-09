@@ -1,16 +1,16 @@
 use crate::{
+    SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLUINTEGER, SQLULEN, SQLUSMALLINT,
+    SQLWCHAR, Scalar,
     c_types::CScalar,
     conn::ConnState,
     desc::DescType,
     env::OdbcVersion,
     handle::{
-        RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, UnsafeSQLHSTMT, SQLHANDLE, SQLHDBC,
-        SQLHDESC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE,
+        RefSQLHDESC, RefUnsafeSQLHDESC, SQL_NULL_HANDLE, SQLHANDLE, SQLHDBC, SQLHDESC, SQLHENV,
+        SQLHSTMT, UnsafeSQLHDESC, UnsafeSQLHSTMT,
     },
     slice_len,
     str::{Ansi, OdbcChar, OdbcStr, Unicode},
-    Scalar, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSMALLINT, SQLUINTEGER, SQLULEN,
-    SQLUSMALLINT, SQLWCHAR,
 };
 use core::{cell::UnsafeCell, fmt::Debug, mem::MaybeUninit};
 
@@ -27,20 +27,20 @@ pub unsafe trait AsMutPtr<T> {
 /// A value-to-SQLPOINTER conversion that consumes the input value.
 /// Invariant: SQLPOINTER obtained through this trait is never written to
 pub unsafe trait IntoSQLPOINTER: Copy {
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     fn into_SQLPOINTER(self) -> SQLPOINTER;
 }
 
 /// Used to do a cheap reference-to-SQLPOINTER conversion.
 /// Invariant: SQLPOINTER obtained through this trait is never written to
 pub unsafe trait AsSQLPOINTER {
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     fn as_SQLPOINTER(&self) -> SQLPOINTER;
 }
 
 /// Used to do a cheap mutable reference-to-SQLPOINTER conversion.
 pub unsafe trait AsMutSQLPOINTER {
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER;
 }
 
@@ -56,7 +56,7 @@ pub(crate) unsafe trait AsMutRawSlice<CH, LEN: Copy> {
 }
 
 pub unsafe trait AsSQLHANDLE {
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     fn as_SQLHANDLE(&self) -> SQLHANDLE;
 }
 
@@ -262,13 +262,14 @@ unsafe impl<DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<RefUnsafeSQLHDES
         self.as_mut_ptr().cast()
     }
 }
-unsafe impl<'conn, 'desc, DT, V: OdbcVersion> AsMutSQLPOINTER
-    for MaybeUninit<RefSQLHDESC<'conn, DT, V>>
-{
+unsafe impl<'conn, DT, V: OdbcVersion> AsMutSQLPOINTER for MaybeUninit<RefSQLHDESC<'conn, DT, V>> {
     fn as_mut_SQLPOINTER(&mut self) -> SQLPOINTER {
         // Valid because RefSQLHDESC is a transparent newtype wrapper over RefUnsafeSQLHDESC
         unsafe {
-            core::mem::transmute::<_, &mut MaybeUninit<RefUnsafeSQLHDESC<'conn, DT, V>>>(self)
+            core::mem::transmute::<
+                &mut MaybeUninit<RefSQLHDESC<'conn, DT, V>>,
+                &mut MaybeUninit<RefUnsafeSQLHDESC<'conn, DT, V>>,
+            >(self)
         }
         .as_mut_SQLPOINTER()
     }

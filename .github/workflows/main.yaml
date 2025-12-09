@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: master
+  pull_request:
+    branches: master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-analysis:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: "rustfmt, clippy"
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Rust Format + Check + Lint
+      run: |
+        cargo fmt --all --check
+        cargo clippy --workspace --benches --tests --examples --quiet
+
+  build:
+    runs-on: ubuntu-latest
+    needs: static-analysis
+
+    steps:
+    - uses: actions/checkout@v6
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Build rs-odbc docker image
+      run: docker compose build
+
+    - name: Start rs-odbc docker container
+      run: docker compose up -d
+
+    - name: Build rs-odbc
+      run: docker exec -t rs-odbc sh -lc 'cargo build --release'
+
+    - name: Run tests for rs-odbc
+      # TODO: Don't allow warnings even in tests
+      run: docker exec -t rs-odbc sh -lc 'RUSTFLAGS=-Awarnings cargo test --release'

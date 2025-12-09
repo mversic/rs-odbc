@@ -1,10 +1,10 @@
+use crate::Ident;
+use crate::SQLPOINTER;
 use crate::convert::AsSQLPOINTER;
 use crate::env::{OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC};
 use crate::sql_types::*;
 use crate::str::{OdbcChar, OdbcStr};
-use crate::Ident;
-use crate::SQLPOINTER;
 use crate::{
     SQLBIGINT, SQLCHAR, SQLDOUBLE, SQLINTEGER, SQLLEN, SQLREAL, SQLSCHAR, SQLSMALLINT, SQLUBIGINT,
     SQLUINTEGER, SQLUSMALLINT, SQLWCHAR,
@@ -101,10 +101,10 @@ const SQL_C_TINYINT: SQLSMALLINT = SqlTypeV3::identifier(&SQL_TINYINT);
 // TODO: This value is discouraged from being used
 //#[derive(Ident)]
 //#[identifier(SQLSMALLINT, 99)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //struct SQL_C_DEFAULT;
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_CHAR;
 impl Ident for SQL_C_CHAR {
     type Type = SQLSMALLINT;
@@ -112,7 +112,7 @@ impl Ident for SQL_C_CHAR {
 }
 impl<V: OdbcVersion> CData<SQL_C_CHAR, V> for OdbcStr<SQLCHAR> {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_WCHAR;
 impl Ident for SQL_C_WCHAR {
     type Type = SQLSMALLINT;
@@ -120,7 +120,7 @@ impl Ident for SQL_C_WCHAR {
 }
 impl<V: OdbcVersion> CData<SQL_C_WCHAR, V> for OdbcStr<SQLWCHAR> {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_SSHORT;
 impl Ident for SQL_C_SSHORT {
     type Type = SQLSMALLINT;
@@ -128,7 +128,7 @@ impl Ident for SQL_C_SSHORT {
 }
 impl<V: OdbcVersion> CData<SQL_C_SSHORT, V> for SQLSMALLINT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_USHORT;
 impl Ident for SQL_C_USHORT {
     type Type = SQLSMALLINT;
@@ -136,7 +136,7 @@ impl Ident for SQL_C_USHORT {
 }
 impl<V: OdbcVersion> CData<SQL_C_USHORT, V> for SQLUSMALLINT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_SLONG;
 impl Ident for SQL_C_SLONG {
     type Type = SQLSMALLINT;
@@ -144,7 +144,7 @@ impl Ident for SQL_C_SLONG {
 }
 impl<V: OdbcVersion> CData<SQL_C_SLONG, V> for SQLINTEGER {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_ULONG;
 impl Ident for SQL_C_ULONG {
     type Type = SQLSMALLINT;
@@ -152,7 +152,7 @@ impl Ident for SQL_C_ULONG {
 }
 impl<V: OdbcVersion> CData<SQL_C_ULONG, V> for SQLUINTEGER {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_FLOAT;
 impl Ident for SQL_C_FLOAT {
     type Type = SQLSMALLINT;
@@ -160,7 +160,7 @@ impl Ident for SQL_C_FLOAT {
 }
 impl<V: OdbcVersion> CData<SQL_C_FLOAT, V> for SQLREAL {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_DOUBLE;
 impl Ident for SQL_C_DOUBLE {
     type Type = SQLSMALLINT;
@@ -168,7 +168,7 @@ impl Ident for SQL_C_DOUBLE {
 }
 impl<V: OdbcVersion> CData<SQL_C_DOUBLE, V> for SQLDOUBLE {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_BIT;
 impl Ident for SQL_C_BIT {
     type Type = SQLSMALLINT;
@@ -176,7 +176,7 @@ impl Ident for SQL_C_BIT {
 }
 impl<V: OdbcVersion> CData<SQL_C_BIT, V> for SQLCHAR {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_STINYINT;
 impl Ident for SQL_C_STINYINT {
     type Type = SQLSMALLINT;
@@ -184,7 +184,7 @@ impl Ident for SQL_C_STINYINT {
 }
 impl<V: OdbcVersion> CData<SQL_C_STINYINT, V> for SQLSCHAR {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_UTINYINT;
 impl Ident for SQL_C_UTINYINT {
     type Type = SQLSMALLINT;
@@ -192,7 +192,7 @@ impl Ident for SQL_C_UTINYINT {
 }
 impl<V: OdbcVersion> CData<SQL_C_UTINYINT, V> for SQLCHAR {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_SBIGINT;
 impl Ident for SQL_C_SBIGINT {
     type Type = SQLSMALLINT;
@@ -200,7 +200,7 @@ impl Ident for SQL_C_SBIGINT {
 }
 impl<V: OdbcVersion> CData<SQL_C_SBIGINT, V> for SQLBIGINT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_UBIGINT;
 impl Ident for SQL_C_UBIGINT {
     type Type = SQLSMALLINT;
@@ -208,7 +208,7 @@ impl Ident for SQL_C_UBIGINT {
 }
 impl<V: OdbcVersion> CData<SQL_C_UBIGINT, V> for SQLUBIGINT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_BINARY;
 impl Ident for SQL_C_BINARY {
     type Type = SQLSMALLINT;
@@ -219,7 +219,7 @@ impl<V: OdbcVersion> CData<SQL_C_BINARY, V> for OdbcStr<SQLCHAR> {}
 // TODO: Weird?
 pub use SQL_C_BINARY as SQL_C_VARBOOKMARK;
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_NUMERIC;
 impl Ident for SQL_C_NUMERIC {
     type Type = SQLSMALLINT;
@@ -228,7 +228,7 @@ impl Ident for SQL_C_NUMERIC {
 impl<V: OdbcVersion> CData<SQL_C_NUMERIC, V> for SQL_NUMERIC_STRUCT {}
 
 // TODO: This is 3.5
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_GUID;
 impl Ident for SQL_C_GUID {
     type Type = SQLSMALLINT;
@@ -236,7 +236,7 @@ impl Ident for SQL_C_GUID {
 }
 impl CData<SQL_C_GUID, SQL_OV_ODBC3_80> for SQLGUID {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_TYPE_DATE;
 impl Ident for SQL_C_TYPE_DATE {
     type Type = SQLSMALLINT;
@@ -244,7 +244,7 @@ impl Ident for SQL_C_TYPE_DATE {
 }
 impl<V: OdbcVersion> CData<SQL_C_TYPE_DATE, V> for SQL_DATE_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIME;
 impl Ident for SQL_C_TYPE_TIME {
     type Type = SQLSMALLINT;
@@ -252,7 +252,7 @@ impl Ident for SQL_C_TYPE_TIME {
 }
 impl<V: OdbcVersion> CData<SQL_C_TYPE_TIME, V> for SQL_TIME_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIMESTAMP;
 impl Ident for SQL_C_TYPE_TIMESTAMP {
     type Type = SQLSMALLINT;
@@ -260,7 +260,7 @@ impl Ident for SQL_C_TYPE_TIMESTAMP {
 }
 impl<V: OdbcVersion> CData<SQL_C_TYPE_TIMESTAMP, V> for SQL_TIMESTAMP_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIME_WITH_TIMEZONE;
 impl Ident for SQL_C_TYPE_TIME_WITH_TIMEZONE {
     type Type = SQLSMALLINT;
@@ -268,7 +268,7 @@ impl Ident for SQL_C_TYPE_TIME_WITH_TIMEZONE {
 }
 impl CData<SQL_C_TYPE_TIME_WITH_TIMEZONE, SQL_OV_ODBC4> for SQL_TIME_WITH_TIMEZONE_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE;
 impl Ident for SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE {
     type Type = SQLSMALLINT;
@@ -279,7 +279,7 @@ impl CData<SQL_C_TYPE_TIMESTAMP_WITH_TIMEZONE, SQL_OV_ODBC4>
 {
 }
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_YEAR;
 impl Ident for SQL_C_INTERVAL_YEAR {
     type Type = SQLSMALLINT;
@@ -287,7 +287,7 @@ impl Ident for SQL_C_INTERVAL_YEAR {
 }
 impl<V: OdbcVersion> CData<SQL_C_INTERVAL_YEAR, V> for SQL_INTERVAL_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_MONTH;
 impl Ident for SQL_C_INTERVAL_MONTH {
     type Type = SQLSMALLINT;
@@ -295,7 +295,7 @@ impl Ident for SQL_C_INTERVAL_MONTH {
 }
 impl<V: OdbcVersion> CData<SQL_C_INTERVAL_MONTH, V> for SQL_INTERVAL_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_DAY;
 impl Ident for SQL_C_INTERVAL_DAY {
     type Type = SQLSMALLINT;
@@ -303,7 +303,7 @@ impl Ident for SQL_C_INTERVAL_DAY {
 }
 impl<V: OdbcVersion> CData<SQL_C_INTERVAL_DAY, V> for SQL_INTERVAL_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_HOUR;
 impl Ident for SQL_C_INTERVAL_HOUR {
     type Type = SQLSMALLINT;
@@ -311,7 +311,7 @@ impl Ident for SQL_C_INTERVAL_HOUR {
 }
 impl<V: OdbcVersion> CData<SQL_C_INTERVAL_HOUR, V> for SQL_INTERVAL_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_MINUTE;
 impl Ident for SQL_C_INTERVAL_MINUTE {
     type Type = SQLSMALLINT;
@@ -319,7 +319,7 @@ impl Ident for SQL_C_INTERVAL_MINUTE {
 }
 impl<V: OdbcVersion> CData<SQL_C_INTERVAL_MINUTE, V> for SQL_INTERVAL_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_SECOND;
 impl Ident for SQL_C_INTERVAL_SECOND {
     type Type = SQLSMALLINT;
@@ -327,7 +327,7 @@ impl Ident for SQL_C_INTERVAL_SECOND {
 }
 impl<V: OdbcVersion> CData<SQL_C_INTERVAL_SECOND, V> for SQL_INTERVAL_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_YEAR_TO_MONTH;
 impl Ident for SQL_C_INTERVAL_YEAR_TO_MONTH {
     type Type = SQLSMALLINT;
@@ -335,7 +335,7 @@ impl Ident for SQL_C_INTERVAL_YEAR_TO_MONTH {
 }
 impl<V: OdbcVersion> CData<SQL_C_INTERVAL_YEAR_TO_MONTH, V> for SQL_INTERVAL_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_DAY_TO_HOUR;
 impl Ident for SQL_C_INTERVAL_DAY_TO_HOUR {
     type Type = SQLSMALLINT;
@@ -343,7 +343,7 @@ impl Ident for SQL_C_INTERVAL_DAY_TO_HOUR {
 }
 impl<V: OdbcVersion> CData<SQL_C_INTERVAL_DAY_TO_HOUR, V> for SQL_INTERVAL_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_DAY_TO_MINUTE;
 impl Ident for SQL_C_INTERVAL_DAY_TO_MINUTE {
     type Type = SQLSMALLINT;
@@ -351,7 +351,7 @@ impl Ident for SQL_C_INTERVAL_DAY_TO_MINUTE {
 }
 impl<V: OdbcVersion> CData<SQL_C_INTERVAL_DAY_TO_MINUTE, V> for SQL_INTERVAL_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_DAY_TO_SECOND;
 impl Ident for SQL_C_INTERVAL_DAY_TO_SECOND {
     type Type = SQLSMALLINT;
@@ -359,7 +359,7 @@ impl Ident for SQL_C_INTERVAL_DAY_TO_SECOND {
 }
 impl<V: OdbcVersion> CData<SQL_C_INTERVAL_DAY_TO_SECOND, V> for SQL_INTERVAL_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_HOUR_TO_MINUTE;
 impl Ident for SQL_C_INTERVAL_HOUR_TO_MINUTE {
     type Type = SQLSMALLINT;
@@ -367,7 +367,7 @@ impl Ident for SQL_C_INTERVAL_HOUR_TO_MINUTE {
 }
 impl<V: OdbcVersion> CData<SQL_C_INTERVAL_HOUR_TO_MINUTE, V> for SQL_INTERVAL_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_HOUR_TO_SECOND;
 impl Ident for SQL_C_INTERVAL_HOUR_TO_SECOND {
     type Type = SQLSMALLINT;
@@ -375,7 +375,7 @@ impl Ident for SQL_C_INTERVAL_HOUR_TO_SECOND {
 }
 impl<V: OdbcVersion> CData<SQL_C_INTERVAL_HOUR_TO_SECOND, V> for SQL_INTERVAL_STRUCT {}
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_C_INTERVAL_MINUTE_TO_SECOND;
 impl Ident for SQL_C_INTERVAL_MINUTE_TO_SECOND {
     type Type = SQLSMALLINT;
@@ -388,14 +388,14 @@ impl<V: OdbcVersion> CData<SQL_C_INTERVAL_MINUTE_TO_SECOND, V> for SQL_INTERVAL_
 // Also, these types can only be used for SQLGetData so be careful to implement only for CData<TT>
 // because it'll get imeplemented for DeferredBuf automatically. In this case some restructuring
 // would be required but it would be transparent to the users of the library
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_ARD_TYPE;
 //impl Ident for SQL_ARD_TYPE {
 //    type Type = SQLSMALLINT;
 //    const IDENTIFIER: Self::Type = SqlTypeV3::identifier(&SQL_ARD_TYPE);
 //}
 //
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_APD_TYPE;
 //impl Ident for SQL_APD_TYPE {
 //    type Type = SQLSMALLINT;
@@ -418,7 +418,7 @@ pub struct SQL_NUMERIC_STRUCT {
 }
 
 #[repr(C)]
-#[allow(non_camel_case_types, non_snake_case)]
+#[expect(non_snake_case)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct SQLGUID {
     pub Data1: u32,
@@ -510,7 +510,7 @@ impl core::fmt::Debug for SQL_INTERVAL_STRUCT {
 // TODO: Probably shouldn't use an enum with C FFI
 // But it's literally defined as enum in ODBC
 #[repr(C)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum SQLINTERVAL {
     SQL_IS_YEAR = 1,

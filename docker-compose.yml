@@ -1,4 +1,4 @@
-version: '3'
+name: rs-odbc
 
 services:
   mariadb:
@@ -11,3 +11,9 @@ services:
       MARIADB_ALLOW_EMPTY_PASSWORD: 'true'
     volumes:
       - './:/root/rs-odbc'
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-uroot", "--silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s

@@ -3,7 +3,7 @@ use core::{any::type_name, cell::Cell, marker::PhantomData, mem::ManuallyDrop, p
 #[double]
 use crate::api::ffi;
 use crate::api::{Allocate, Diagnostics, Handle};
-use crate::conn::{ConnState, C2, C3, C4};
+use crate::conn::{C2, C3, C4, ConnState};
 use crate::convert::{AsSQLHANDLE, IntoSQLPOINTER};
 use crate::desc::{AppDesc, IPD, IRD};
 use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80};
@@ -11,31 +11,31 @@ use crate::env::{OdbcVersion, SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3_80};
 use crate::stmt::{
     SQL_ATTR_APP_PARAM_DESC, SQL_ATTR_APP_ROW_DESC, SQL_ATTR_IMP_PARAM_DESC, SQL_ATTR_IMP_ROW_DESC,
 };
-use crate::{sqlreturn::SQL_SUCCESS, Ident, SQLPOINTER};
+use crate::{Ident, SQLPOINTER, sqlreturn::SQL_SUCCESS};
 use mockall_double::double;
 
 /// Environment handle id
 #[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 1)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_HANDLE_ENV;
 
 /// Connection handle id
 #[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 2)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_HANDLE_DBC;
 
 /// Statement handle id
 #[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 3)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_HANDLE_STMT;
 
 /// Descriptor handle id
 #[derive(rs_odbc_derive::Ident)]
 #[identifier(SQLSMALLINT, 4)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_HANDLE_DESC;
 
 // TODO: Check https://github.com/microsoft/ODBC-Specification/blob/b7ef71fba508ed010cd979428efae3091b732d75/Windows/inc/sqltypes.h
@@ -55,10 +55,9 @@ pub struct RawHandle {
 
 // TODO: Think about making it newtype with private field
 // This type must not be public ever because of the issues around Drop
-#[allow(non_camel_case_types)]
 pub type SQLHANDLE = *mut RawHandle;
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_NULL_HANDLE;
 
 /// An environment is a global context which holds information such as:
@@ -91,12 +90,14 @@ impl<V: OdbcVersion> Allocate<'_, SQL_NULL_HANDLE> for SQLHENV<V> {
             version: PhantomData,
         };
 
-        let sql_return = ffi::SQLSetEnvAttr(
-            val.as_SQLHANDLE(),
-            SQL_ATTR_ODBC_VERSION::IDENTIFIER,
-            V::IDENTIFIER.into_SQLPOINTER(),
-            0, // TODO: Use AttrLen::len()
-        );
+        let sql_return = unsafe {
+            ffi::SQLSetEnvAttr(
+                val.as_SQLHANDLE(),
+                SQL_ATTR_ODBC_VERSION::IDENTIFIER,
+                V::IDENTIFIER.into_SQLPOINTER(),
+                0, // TODO: Use AttrLen::len()
+            )
+        };
 
         if sql_return != SQL_SUCCESS {
             panic!(
@@ -249,12 +250,11 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Handle for SQLHSTMT<'conn, 'desc, 'buf,
     type Ident = <UnsafeSQLHSTMT<'conn, 'desc, 'buf, V> as Handle>::Ident;
 }
 
-#[allow(non_snake_case)]
 impl<'env, 'conn, V: OdbcVersion> Allocate<'conn, SQLHDBC<'env, C4, V>>
     for SQLHSTMT<'conn, '_, '_, V>
 {
     unsafe fn from_raw(handle: NonNull<RawHandle>) -> Self {
-        Self(UnsafeSQLHSTMT::from_raw(handle))
+        Self(unsafe { UnsafeSQLHSTMT::from_raw(handle) })
     }
 }
 
@@ -389,17 +389,17 @@ impl<V: OdbcVersion> Drop for UnsafeSQLHSTMT<'_, '_, '_, V> {
 /// A descriptor is a collection of metadata that describes the parameters of an SQL
 /// statement or the columns of a result set. Thus, a descriptor can fill four roles:
 /// * (APD)Application Parameter Descriptor:
-///     Contains information about the application buffers bound to the parameters in an
-///     SQL statement, such as their addresses, lengths, and C data types.
+///   Contains information about the application buffers bound to the parameters in an
+///   SQL statement, such as their addresses, lengths, and C data types.
 /// * (IPD)Implementation Parameter Descriptor:
-///     Contains information about the parameters in an SQL statement, such as their SQL
-///     data types, lengths, and nullability.
+///   Contains information about the parameters in an SQL statement, such as their SQL
+///   data types, lengths, and nullability.
 /// * (ARD)Application Row Descriptor:
-///     Contains information about the application buffers bound to the columns in a
-///     result set, such as their addresses, lengths, and C data types.
+///   Contains information about the application buffers bound to the columns in a
+///   result set, such as their addresses, lengths, and C data types.
 /// * (IRD)Implementation Row Descriptor:
-///     Contains information about the columns in a result set, such as their SQL data
-///     types, lengths, and nullability.
+///   Contains information about the columns in a result set, such as their SQL data
+///   types, lengths, and nullability.
 ///
 /// Four descriptors are allocated automatically when a statement is allocated, but
 /// applications can also allocate descriptors with SQLAllocHandle. They are allocated on
@@ -418,12 +418,11 @@ impl<DT, V: OdbcVersion> Handle for SQLHDESC<'_, DT, V> {
     type Ident = SQL_HANDLE_DESC;
 }
 
-#[allow(non_snake_case)]
 impl<'env, 'conn, 'buf, V: OdbcVersion> Allocate<'conn, SQLHDBC<'env, C4, V>>
     for SQLHDESC<'conn, AppDesc<'buf>, V>
 {
     unsafe fn from_raw(handle: NonNull<RawHandle>) -> Self {
-        Self(UnsafeSQLHDESC::from_raw(handle))
+        Self(unsafe { UnsafeSQLHDESC::from_raw(handle) })
     }
 }
 

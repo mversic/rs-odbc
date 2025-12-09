@@ -1,5 +1,5 @@
-use crate::env::{OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::SQLSMALLINT;
+use crate::env::{OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use rs_odbc_derive::odbc_type;
 
 pub trait SqlType<V: OdbcVersion> {
@@ -7,28 +7,33 @@ pub trait SqlType<V: OdbcVersion> {
 }
 
 #[odbc_type(SQLSMALLINT)]
-#[allow(non_camel_case_types)]
 pub struct SqlTypeV3;
 
 #[odbc_type(SQLSMALLINT)]
-#[allow(non_camel_case_types)]
 pub struct SqlTypeV3_8;
 
 #[odbc_type(SQLSMALLINT)]
-#[allow(non_camel_case_types)]
 pub struct SqlTypeV4;
 
 impl<V: OdbcVersion> SqlType<V> for SqlTypeV3 {
-    fn identifier(self) -> SQLSMALLINT { self.0 }
+    fn identifier(self) -> SQLSMALLINT {
+        self.0
+    }
 }
 impl SqlType<SQL_OV_ODBC3_80> for SqlTypeV3_8 {
-    fn identifier(self) -> SQLSMALLINT { self.0 }
+    fn identifier(self) -> SQLSMALLINT {
+        self.0
+    }
 }
 impl SqlType<SQL_OV_ODBC4> for SqlTypeV3_8 {
-    fn identifier(self) -> SQLSMALLINT { self.0 }
+    fn identifier(self) -> SQLSMALLINT {
+        self.0
+    }
 }
 impl SqlType<SQL_OV_ODBC4> for SqlTypeV4 {
-    fn identifier(self) -> SQLSMALLINT { self.0 }
+    fn identifier(self) -> SQLSMALLINT {
+        self.0
+    }
 }
 
 /// Data type cannot be determined
@@ -246,7 +251,6 @@ pub const SQL_DATETIME: SqlTypeV3 = SqlTypeV3(9);
 pub const SQL_INTERVAL: SqlTypeV3 = SqlTypeV3(10);
 
 #[odbc_type(SQLSMALLINT)]
-#[allow(non_camel_case_types)]
 pub struct DatetimeIntervalCode;
 
 // Subcodes for the specific verbose datetime data type

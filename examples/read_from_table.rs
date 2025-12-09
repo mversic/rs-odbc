@@ -2,9 +2,9 @@ use core::{cell::UnsafeCell, mem::MaybeUninit};
 use rs_odbc::api::{Allocate, Statement};
 use rs_odbc::c_types::{SQL_C_CHAR, SQL_C_SSHORT};
 use rs_odbc::env::SQL_OV_ODBC3_80;
-use rs_odbc::handle::{SQLHDBC, SQLHENV, SQLHSTMT, SQL_NULL_HANDLE};
+use rs_odbc::handle::{SQL_NULL_HANDLE, SQLHDBC, SQLHENV, SQLHSTMT};
 use rs_odbc::sqlreturn::{SQL_NO_DATA, SQL_SUCCEEDED, SQL_SUCCESS};
-use rs_odbc::{SQLCHAR, SQL_DRIVER_COMPLETE};
+use rs_odbc::{SQL_DRIVER_COMPLETE, SQLCHAR};
 
 fn main() {
     let (henv, res) = SQLHENV::<SQL_OV_ODBC3_80>::SQLAllocHandle(&SQL_NULL_HANDLE);

@@ -2,11 +2,11 @@ use crate::c_types::{CScalar, StrLenOrInd};
 use crate::convert::{AsMutPtr, AsMutSQLPOINTER, IntoSQLPOINTER};
 use crate::desc::AppDesc;
 use crate::env::OdbcVersion;
-use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, SQLHDESC};
+use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC, SQLHDESC, UnsafeSQLHDESC};
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{
-    slice_len, Def, DriverDefined, Ident, OdbcDefined, Scalar, SQLCHAR, SQLINTEGER, SQLLEN,
-    SQLSMALLINT, SQLUINTEGER, SQLULEN, SQLUSMALLINT, SQLWCHAR,
+    Def, DriverDefined, Ident, OdbcDefined, SQLCHAR, SQLINTEGER, SQLLEN, SQLSMALLINT, SQLUINTEGER,
+    SQLULEN, SQLUSMALLINT, SQLWCHAR, Scalar, slice_len,
 };
 use core::{cell::UnsafeCell, fmt::Debug, mem::MaybeUninit};
 
@@ -117,8 +117,9 @@ where
     type StrLen = Void;
 
     fn len(&self) -> LEN {
-        // Transmute is safe because MaybeUninit<T> has the same size and alignment as T
-        <MaybeUninit<_> as AttrLen<AD, LEN>>::len(unsafe { core::mem::transmute(self) })
+        // SAFETY: `MaybeUninit<T>` has the same size and alignment as `T`
+        let attr = unsafe { core::mem::transmute::<&T, &MaybeUninit<T>>(self) };
+        <MaybeUninit<_> as AttrLen<AD, LEN>>::len(attr)
     }
 }
 unsafe impl<T: Ident, LEN: Scalar> AttrLen<OdbcDefined, LEN> for MaybeUninit<T>
@@ -150,8 +151,9 @@ where
     type StrLen = <OdbcStr<MaybeUninit<CH>> as AttrLen<AD, LEN>>::StrLen;
 
     fn len(&self) -> LEN {
-        // Transmute is safe because MaybeUninit<T> has the same size and alignment as T
-        <OdbcStr<MaybeUninit<CH>> as AttrLen<AD, LEN>>::len(unsafe { core::mem::transmute(self) })
+        // SAFETY: `MaybeUninit<T>` has the same size and alignment as `T`
+        let attr = unsafe { core::mem::transmute::<&OdbcStr<CH>, &OdbcStr<MaybeUninit<CH>>>(self) };
+        <OdbcStr<MaybeUninit<CH>> as AttrLen<AD, LEN>>::len(attr)
     }
 }
 unsafe impl<AD: Def, CH: OdbcChar, LEN: Scalar> AttrLen<AD, LEN> for OdbcStr<MaybeUninit<CH>>
@@ -198,8 +200,9 @@ where
     type StrLen = <[MaybeUninit<SQLCHAR>] as AttrLen<AD, LEN>>::StrLen;
 
     fn len(&self) -> LEN {
-        // Transmute is safe because MaybeUninit<T> has the same size and alignment as T
-        <[MaybeUninit<SQLCHAR>] as AttrLen<AD, LEN>>::len(unsafe { core::mem::transmute(self) })
+        // SAFETY: `MaybeUninit<T>` has the same size and alignment as `T`
+        let attr = unsafe { core::mem::transmute::<&[SQLCHAR], &[MaybeUninit<SQLCHAR>]>(self) };
+        <[MaybeUninit<SQLCHAR>] as AttrLen<AD, LEN>>::len(attr)
     }
 }
 unsafe impl<AD: Def, T: Ident, LEN: Scalar> AttrLen<AD, LEN> for [T]
@@ -280,8 +283,13 @@ where
 
     fn len(&self) -> LEN {
         // Transmute is safe because RefSQLHDESC is a transparent wrapper over RefUnsafeSQLHDESC
-        unsafe { core::mem::transmute::<_, &MaybeUninit<RefUnsafeSQLHDESC<'conn, DT, V>>>(self) }
-            .len()
+        let attr = unsafe {
+            core::mem::transmute::<
+                &MaybeUninit<RefSQLHDESC<DT, V>>,
+                &MaybeUninit<RefUnsafeSQLHDESC<DT, V>>,
+            >(self)
+        };
+        attr.len()
     }
 }
 unsafe impl<LEN: Scalar, V: OdbcVersion> AttrLen<OdbcDefined, LEN>
@@ -316,8 +324,13 @@ where
 
     fn len(&self) -> LEN {
         // Transmute is safe because SQLHDESC is a transparent wrapper over UnsafeSQLHDESC
-        unsafe { core::mem::transmute::<_, Option<&UnsafeSQLHDESC<'conn, AppDesc<'buf>, V>>>(self) }
-            .len()
+        let attr = unsafe {
+            core::mem::transmute::<
+                &Option<&SQLHDESC<AppDesc<'buf>, V>>,
+                &Option<&UnsafeSQLHDESC<AppDesc<'buf>, V>>,
+            >(self)
+        };
+        attr.len()
     }
 }
 

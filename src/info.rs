@@ -2,10 +2,10 @@ use crate::attr::{Attr, AttrGet, AttrLen};
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{
-    Ident, OdbcDefined, Scalar, SQLCHAR, SQLSMALLINT, SQLUINTEGER, SQLUSMALLINT, SQLWCHAR,
+    Ident, OdbcDefined, SQLCHAR, SQLSMALLINT, SQLUINTEGER, SQLUSMALLINT, SQLWCHAR, Scalar,
 };
-use rs_odbc_derive::{odbc_bitmask, odbc_type, Ident};
 use core::mem::MaybeUninit;
+use rs_odbc_derive::{Ident, odbc_bitmask, odbc_type};
 
 pub trait InfoType<I: Ident, V: OdbcVersion>:
     Attr<I> + AttrLen<Self::DefinedBy, SQLSMALLINT>
@@ -65,19 +65,19 @@ impl<I: Ident, V: OdbcVersion> InfoType<I, V> for OdbcStr<MaybeUninit<SQLWCHAR>>
 
 // These aliases include extensions of abbreviations
 pub use SQL_MAX_CATALOG_NAME_LEN as SQL_MAXIMUM_CATALOG_NAME_LENGTH;
+pub use SQL_MAX_COLUMN_NAME_LEN as SQL_MAXIMUM_COLUMN_NAME_LENGTH;
 pub use SQL_MAX_COLUMNS_IN_GROUP_BY as SQL_MAXIMUM_COLUMNS_IN_GROUP_BY;
 pub use SQL_MAX_COLUMNS_IN_ORDER_BY as SQL_MAXIMUM_COLUMNS_IN_ORDER_BY;
 pub use SQL_MAX_COLUMNS_IN_SELECT as SQL_MAXIMUM_COLUMNS_IN_SELECT;
 pub use SQL_MAX_COLUMNS_IN_TABLE as SQL_MAXIMUM_COLUMNS_IN_TABLE;
-pub use SQL_MAX_COLUMN_NAME_LEN as SQL_MAXIMUM_COLUMN_NAME_LENGTH;
 pub use SQL_MAX_CONCURRENT_ACTIVITIES as SQL_MAXIMUM_CONCURRENT_ACTIVITIES;
 pub use SQL_MAX_CURSOR_NAME_LEN as SQL_MAXIMUM_CURSOR_NAME_LENGTH;
 pub use SQL_MAX_DRIVER_CONNECTIONS as SQL_MAXIMUM_DRIVER_CONNECTIONS;
 pub use SQL_MAX_IDENTIFIER_LEN as SQL_MAXIMUM_IDENTIFIER_LENGTH;
 pub use SQL_MAX_SCHEMA_NAME_LEN as SQL_MAXIMUM_SCHEMA_NAME_LENGTH;
 pub use SQL_MAX_STATEMENT_LEN as SQL_MAXIMUM_STATEMENT_LENGTH;
-pub use SQL_MAX_TABLES_IN_SELECT as SQL_MAXIMUM_TABLES_IN_SELECT;
 pub use SQL_MAX_TABLE_NAME_LEN as SQL_MAXIMUM_TABLE_NAME_LENGTH;
+pub use SQL_MAX_TABLES_IN_SELECT as SQL_MAXIMUM_TABLES_IN_SELECT;
 pub use SQL_MAX_USER_NAME_LEN as SQL_MAXIMUM_USER_NAME_LENGTH;
 pub use SQL_MULT_RESULT_SETS as SQL_MULTIPLE_RESULT_SETS;
 pub use SQL_OJ_CAPABILITIES as SQL_OUTER_JOIN_CAPABILITIES;
@@ -93,7 +93,7 @@ pub use SQL_MAX_ROW_SIZE as SQL_MAXIMUM_ROW_SIZE;
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 171)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DM_VER;
 impl InfoType<SQL_DM_VER, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_DM_VER> for OdbcStr<SQLCHAR> {
@@ -103,7 +103,7 @@ unsafe impl AttrGet<SQL_DM_VER> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10000)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_XOPEN_CLI_YEAR;
 impl InfoType<SQL_XOPEN_CLI_YEAR, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_XOPEN_CLI_YEAR> for OdbcStr<SQLCHAR> {
@@ -113,7 +113,7 @@ unsafe impl AttrGet<SQL_XOPEN_CLI_YEAR> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 134)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CREATE_VIEW;
 impl InfoType<SQL_CREATE_VIEW, SQL_OV_ODBC3> for CreateView {}
 unsafe impl Attr<SQL_CREATE_VIEW> for CreateView {
@@ -123,7 +123,7 @@ unsafe impl AttrGet<SQL_CREATE_VIEW> for CreateView {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 155)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SQL92_DATETIME_FUNCTIONS;
 impl InfoType<SQL_SQL92_DATETIME_FUNCTIONS, SQL_OV_ODBC3> for DatetimeFunctions {}
 unsafe impl Attr<SQL_SQL92_DATETIME_FUNCTIONS> for DatetimeFunctions {
@@ -133,7 +133,7 @@ unsafe impl AttrGet<SQL_SQL92_DATETIME_FUNCTIONS> for DatetimeFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 156)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SQL92_FOREIGN_KEY_DELETE_RULE;
 impl InfoType<SQL_SQL92_FOREIGN_KEY_DELETE_RULE, SQL_OV_ODBC3> for ForeignKeyDeleteRule {}
 unsafe impl Attr<SQL_SQL92_FOREIGN_KEY_DELETE_RULE> for ForeignKeyDeleteRule {
@@ -143,7 +143,7 @@ unsafe impl AttrGet<SQL_SQL92_FOREIGN_KEY_DELETE_RULE> for ForeignKeyDeleteRule 
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 157)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SQL92_FOREIGN_KEY_UPDATE_RULE;
 impl InfoType<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE, SQL_OV_ODBC3> for ForeignKeyUpdateRule {}
 unsafe impl Attr<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE> for ForeignKeyUpdateRule {
@@ -153,7 +153,7 @@ unsafe impl AttrGet<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE> for ForeignKeyUpdateRule 
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 158)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SQL92_GRANT;
 impl InfoType<SQL_SQL92_GRANT, SQL_OV_ODBC3> for Grant {}
 unsafe impl Attr<SQL_SQL92_GRANT> for Grant {
@@ -163,7 +163,7 @@ unsafe impl AttrGet<SQL_SQL92_GRANT> for Grant {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 119)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DATETIME_LITERALS;
 impl InfoType<SQL_DATETIME_LITERALS, SQL_OV_ODBC3> for DatetimeLiterals {}
 unsafe impl Attr<SQL_DATETIME_LITERALS> for DatetimeLiterals {
@@ -173,7 +173,7 @@ unsafe impl AttrGet<SQL_DATETIME_LITERALS> for DatetimeLiterals {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 159)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SQL92_NUMERIC_VALUE_FUNCTIONS;
 impl InfoType<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS, SQL_OV_ODBC3> for NumericValueFunctions {}
 unsafe impl Attr<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS> for NumericValueFunctions {
@@ -183,7 +183,7 @@ unsafe impl AttrGet<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS> for NumericValueFunctions
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 160)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SQL92_PREDICATES;
 impl InfoType<SQL_SQL92_PREDICATES, SQL_OV_ODBC3> for Predicates {}
 unsafe impl Attr<SQL_SQL92_PREDICATES> for Predicates {
@@ -193,7 +193,7 @@ unsafe impl AttrGet<SQL_SQL92_PREDICATES> for Predicates {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 161)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SQL92_RELATIONAL_JOIN_OPERATORS;
 impl InfoType<SQL_SQL92_RELATIONAL_JOIN_OPERATORS, SQL_OV_ODBC3> for RelationalJoinOperators {}
 unsafe impl Attr<SQL_SQL92_RELATIONAL_JOIN_OPERATORS> for RelationalJoinOperators {
@@ -203,7 +203,7 @@ unsafe impl AttrGet<SQL_SQL92_RELATIONAL_JOIN_OPERATORS> for RelationalJoinOpera
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 162)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SQL92_REVOKE;
 impl InfoType<SQL_SQL92_REVOKE, SQL_OV_ODBC3> for Revoke {}
 unsafe impl Attr<SQL_SQL92_REVOKE> for Revoke {
@@ -213,7 +213,7 @@ unsafe impl AttrGet<SQL_SQL92_REVOKE> for Revoke {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 163)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SQL92_ROW_VALUE_CONSTRUCTOR;
 impl InfoType<SQL_SQL92_ROW_VALUE_CONSTRUCTOR, SQL_OV_ODBC3> for RowValueConstructor {}
 unsafe impl Attr<SQL_SQL92_ROW_VALUE_CONSTRUCTOR> for RowValueConstructor {
@@ -223,7 +223,7 @@ unsafe impl AttrGet<SQL_SQL92_ROW_VALUE_CONSTRUCTOR> for RowValueConstructor {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 164)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SQL92_STRING_FUNCTIONS;
 impl InfoType<SQL_SQL92_STRING_FUNCTIONS, SQL_OV_ODBC3> for StringScalarFunctions {}
 unsafe impl Attr<SQL_SQL92_STRING_FUNCTIONS> for StringScalarFunctions {
@@ -233,7 +233,7 @@ unsafe impl AttrGet<SQL_SQL92_STRING_FUNCTIONS> for StringScalarFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 165)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SQL92_VALUE_EXPRESSIONS;
 impl InfoType<SQL_SQL92_VALUE_EXPRESSIONS, SQL_OV_ODBC3> for ValueExpressions {}
 unsafe impl Attr<SQL_SQL92_VALUE_EXPRESSIONS> for ValueExpressions {
@@ -243,7 +243,7 @@ unsafe impl AttrGet<SQL_SQL92_VALUE_EXPRESSIONS> for ValueExpressions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 166)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_STANDARD_CLI_CONFORMANCE;
 impl InfoType<SQL_STANDARD_CLI_CONFORMANCE, SQL_OV_ODBC3> for StandardCliConformance {}
 unsafe impl Attr<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {
@@ -254,7 +254,7 @@ unsafe impl AttrGet<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 // TODO: What about these
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 0)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_INFO_FIRST;
 //impl InfoType<SQL_INFO_FIRST, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_INFO_FIRST> for {
@@ -264,7 +264,7 @@ unsafe impl AttrGet<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 12)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_ODBC_SAG_CLI_CONFORMANCE;
 //impl InfoType<SQL_ODBC_SAG_CLI_CONFORMANCE, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_ODBC_SAG_CLI_CONFORMANCE> for {
@@ -274,7 +274,7 @@ unsafe impl AttrGet<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, SQL_UNION)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_UNION_STATEMENT;
 //impl InfoType<SQL_UNION_STATEMENT, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_UNION_STATEMENT> for {
@@ -284,7 +284,7 @@ unsafe impl AttrGet<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 174)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_SCHEMA_INFERENCE;
 //impl InfoType<SQL_SCHEMA_INFERENCE, SQL_OV_ODBC4> for {}
 //unsafe impl Attr<SQL_SCHEMA_INFERENCE> for {
@@ -294,7 +294,7 @@ unsafe impl AttrGet<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 175)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_BINARY_FUNCTIONS;
 impl InfoType<SQL_BINARY_FUNCTIONS, SQL_OV_ODBC4> for BinaryFunctions {}
 unsafe impl Attr<SQL_BINARY_FUNCTIONS> for BinaryFunctions {
@@ -304,7 +304,7 @@ unsafe impl AttrGet<SQL_BINARY_FUNCTIONS> for BinaryFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 176)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ISO_STRING_FUNCTIONS;
 impl InfoType<SQL_ISO_STRING_FUNCTIONS, SQL_OV_ODBC4> for StringScalarFunctions {}
 unsafe impl Attr<SQL_ISO_STRING_FUNCTIONS> for StringScalarFunctions {
@@ -314,7 +314,7 @@ unsafe impl AttrGet<SQL_ISO_STRING_FUNCTIONS> for StringScalarFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 177)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ISO_BINARY_FUNCTIONS;
 impl InfoType<SQL_ISO_BINARY_FUNCTIONS, SQL_OV_ODBC4> for IsoBinaryFunctions {}
 unsafe impl Attr<SQL_ISO_BINARY_FUNCTIONS> for IsoBinaryFunctions {
@@ -324,7 +324,7 @@ unsafe impl AttrGet<SQL_ISO_BINARY_FUNCTIONS> for IsoBinaryFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 178)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_LIMIT_ESCAPE_CLAUSE;
 impl InfoType<SQL_LIMIT_ESCAPE_CLAUSE, SQL_OV_ODBC4> for LimitEscapeClause {}
 unsafe impl Attr<SQL_LIMIT_ESCAPE_CLAUSE> for LimitEscapeClause {
@@ -334,7 +334,7 @@ unsafe impl AttrGet<SQL_LIMIT_ESCAPE_CLAUSE> for LimitEscapeClause {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 179)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_NATIVE_ESCAPE_CLAUSE;
 impl InfoType<SQL_NATIVE_ESCAPE_CLAUSE, SQL_OV_ODBC4> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_NATIVE_ESCAPE_CLAUSE> for OdbcStr<SQLCHAR> {
@@ -344,7 +344,7 @@ unsafe impl AttrGet<SQL_NATIVE_ESCAPE_CLAUSE> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 180)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_RETURN_ESCAPE_CLAUSE;
 impl InfoType<SQL_RETURN_ESCAPE_CLAUSE, SQL_OV_ODBC4> for ReturnEscapeClause {}
 unsafe impl Attr<SQL_RETURN_ESCAPE_CLAUSE> for ReturnEscapeClause {
@@ -354,7 +354,7 @@ unsafe impl AttrGet<SQL_RETURN_ESCAPE_CLAUSE> for ReturnEscapeClause {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 181)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_FORMAT_ESCAPE_CLAUSE;
 impl InfoType<SQL_FORMAT_ESCAPE_CLAUSE, SQL_OV_ODBC4> for FormatEscapeClause {}
 unsafe impl Attr<SQL_FORMAT_ESCAPE_CLAUSE> for FormatEscapeClause {
@@ -364,7 +364,7 @@ unsafe impl AttrGet<SQL_FORMAT_ESCAPE_CLAUSE> for FormatEscapeClause {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 155)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ISO_DATETIME_FUNCTIONS;
 impl InfoType<SQL_ISO_DATETIME_FUNCTIONS, SQL_OV_ODBC4> for DatetimeFunctions {}
 unsafe impl Attr<SQL_ISO_DATETIME_FUNCTIONS> for DatetimeFunctions {
@@ -374,7 +374,7 @@ unsafe impl AttrGet<SQL_ISO_DATETIME_FUNCTIONS> for DatetimeFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 156)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ISO_FOREIGN_KEY_DELETE_RULE;
 impl InfoType<SQL_ISO_FOREIGN_KEY_DELETE_RULE, SQL_OV_ODBC4> for ForeignKeyDeleteRule {}
 unsafe impl Attr<SQL_ISO_FOREIGN_KEY_DELETE_RULE> for ForeignKeyDeleteRule {
@@ -384,7 +384,7 @@ unsafe impl AttrGet<SQL_ISO_FOREIGN_KEY_DELETE_RULE> for ForeignKeyDeleteRule {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 157)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ISO_FOREIGN_KEY_UPDATE_RULE;
 impl InfoType<SQL_ISO_FOREIGN_KEY_UPDATE_RULE, SQL_OV_ODBC4> for ForeignKeyUpdateRule {}
 unsafe impl Attr<SQL_ISO_FOREIGN_KEY_UPDATE_RULE> for ForeignKeyUpdateRule {
@@ -394,7 +394,7 @@ unsafe impl AttrGet<SQL_ISO_FOREIGN_KEY_UPDATE_RULE> for ForeignKeyUpdateRule {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 158)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ISO_GRANT;
 impl InfoType<SQL_ISO_GRANT, SQL_OV_ODBC4> for Grant {}
 unsafe impl Attr<SQL_ISO_GRANT> for Grant {
@@ -404,7 +404,7 @@ unsafe impl AttrGet<SQL_ISO_GRANT> for Grant {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 159)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ISO_NUMERIC_VALUE_FUNCTIONS;
 impl InfoType<SQL_ISO_NUMERIC_VALUE_FUNCTIONS, SQL_OV_ODBC4> for NumericValueFunctions {}
 unsafe impl Attr<SQL_ISO_NUMERIC_VALUE_FUNCTIONS> for NumericValueFunctions {
@@ -414,7 +414,7 @@ unsafe impl AttrGet<SQL_ISO_NUMERIC_VALUE_FUNCTIONS> for NumericValueFunctions {
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 160)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ISO_PREDICATES;
 impl InfoType<SQL_ISO_PREDICATES, SQL_OV_ODBC4> for Predicates {}
 unsafe impl Attr<SQL_ISO_PREDICATES> for Predicates {
@@ -424,7 +424,7 @@ unsafe impl AttrGet<SQL_ISO_PREDICATES> for Predicates {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 161)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ISO_RELATIONAL_JOIN_OPERATORS;
 impl InfoType<SQL_ISO_RELATIONAL_JOIN_OPERATORS, SQL_OV_ODBC4> for RelationalJoinOperators {}
 unsafe impl Attr<SQL_ISO_RELATIONAL_JOIN_OPERATORS> for RelationalJoinOperators {
@@ -434,7 +434,7 @@ unsafe impl AttrGet<SQL_ISO_RELATIONAL_JOIN_OPERATORS> for RelationalJoinOperato
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 162)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ISO_REVOKE;
 impl InfoType<SQL_ISO_REVOKE, SQL_OV_ODBC4> for Revoke {}
 unsafe impl Attr<SQL_ISO_REVOKE> for Revoke {
@@ -444,7 +444,7 @@ unsafe impl AttrGet<SQL_ISO_REVOKE> for Revoke {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 163)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ISO_ROW_VALUE_CONSTRUCTOR;
 impl InfoType<SQL_ISO_ROW_VALUE_CONSTRUCTOR, SQL_OV_ODBC4> for RowValueConstructor {}
 unsafe impl Attr<SQL_ISO_ROW_VALUE_CONSTRUCTOR> for RowValueConstructor {
@@ -454,7 +454,7 @@ unsafe impl AttrGet<SQL_ISO_ROW_VALUE_CONSTRUCTOR> for RowValueConstructor {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 165)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ISO_VALUE_EXPRESSIONS;
 impl InfoType<SQL_ISO_VALUE_EXPRESSIONS, SQL_OV_ODBC4> for ValueExpressions {}
 unsafe impl Attr<SQL_ISO_VALUE_EXPRESSIONS> for ValueExpressions {
@@ -468,7 +468,7 @@ unsafe impl AttrGet<SQL_ISO_VALUE_EXPRESSIONS> for ValueExpressions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 116)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ACTIVE_ENVIRONMENTS;
 impl InfoType<SQL_ACTIVE_ENVIRONMENTS, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_ACTIVE_ENVIRONMENTS> for SQLUSMALLINT {
@@ -478,7 +478,7 @@ unsafe impl AttrGet<SQL_ACTIVE_ENVIRONMENTS> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10023)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ASYNC_DBC_FUNCTIONS;
 impl InfoType<SQL_ASYNC_DBC_FUNCTIONS, SQL_OV_ODBC3_80> for AsyncDbcFunctions {}
 unsafe impl Attr<SQL_ASYNC_DBC_FUNCTIONS> for AsyncDbcFunctions {
@@ -488,7 +488,7 @@ unsafe impl AttrGet<SQL_ASYNC_DBC_FUNCTIONS> for AsyncDbcFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10021)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ASYNC_MODE;
 impl InfoType<SQL_ASYNC_MODE, SQL_OV_ODBC3> for AsyncMode {}
 unsafe impl Attr<SQL_ASYNC_MODE> for AsyncMode {
@@ -498,7 +498,7 @@ unsafe impl AttrGet<SQL_ASYNC_MODE> for AsyncMode {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10025)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ASYNC_NOTIFICATION;
 impl InfoType<SQL_ASYNC_NOTIFICATION, SQL_OV_ODBC3_80> for AsyncNotification {}
 unsafe impl Attr<SQL_ASYNC_NOTIFICATION> for AsyncNotification {
@@ -508,7 +508,7 @@ unsafe impl AttrGet<SQL_ASYNC_NOTIFICATION> for AsyncNotification {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 120)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_BATCH_ROW_COUNT;
 impl InfoType<SQL_BATCH_ROW_COUNT, SQL_OV_ODBC3> for BatchRowCount {}
 unsafe impl Attr<SQL_BATCH_ROW_COUNT> for BatchRowCount {
@@ -518,7 +518,7 @@ unsafe impl AttrGet<SQL_BATCH_ROW_COUNT> for BatchRowCount {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 121)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_BATCH_SUPPORT;
 impl InfoType<SQL_BATCH_SUPPORT, SQL_OV_ODBC3> for BatchSupport {}
 unsafe impl Attr<SQL_BATCH_SUPPORT> for BatchSupport {
@@ -528,7 +528,7 @@ unsafe impl AttrGet<SQL_BATCH_SUPPORT> for BatchSupport {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 2)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DATA_SOURCE_NAME;
 impl InfoType<SQL_DATA_SOURCE_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_DATA_SOURCE_NAME> for OdbcStr<SQLCHAR> {
@@ -538,7 +538,7 @@ unsafe impl AttrGet<SQL_DATA_SOURCE_NAME> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10024)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DRIVER_AWARE_POOLING_SUPPORTED;
 impl InfoType<SQL_DRIVER_AWARE_POOLING_SUPPORTED, SQL_OV_ODBC3_80> for DriverAwarePoolingSupported {}
 unsafe impl Attr<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSupported {
@@ -549,7 +549,7 @@ unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSu
 // TODO: How are these handles used?
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 3)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_DRIVER_HDBC;
 //impl InfoType<SQL_DRIVER_HDBC, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_DRIVER_HDBC> for {
@@ -559,7 +559,7 @@ unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSu
 //
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 135)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_DRIVER_HDESC;
 //impl InfoType<SQL_DRIVER_HDESC, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_DRIVER_HDESC> for {
@@ -569,7 +569,7 @@ unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSu
 //
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 4)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_DRIVER_HENV;
 //impl InfoType<SQL_DRIVER_HENV, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_DRIVER_HENV> for {
@@ -579,7 +579,7 @@ unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSu
 //
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 76)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_DRIVER_HLIB;
 //impl InfoType<SQL_DRIVER_HLIB, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_DRIVER_HLIB> for {
@@ -589,7 +589,7 @@ unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSu
 //
 //#[derive(Ident)]
 //#[identifier(SQLUSMALLINT, 5)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_DRIVER_HSTMT;
 //impl InfoType<SQL_DRIVER_HSTMT, SQL_OV_ODBC3> for {}
 //unsafe impl Attr<SQL_DRIVER_HSTMT> for {
@@ -599,7 +599,7 @@ unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSu
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 6)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DRIVER_NAME;
 impl InfoType<SQL_DRIVER_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_DRIVER_NAME> for OdbcStr<SQLCHAR> {
@@ -609,7 +609,7 @@ unsafe impl AttrGet<SQL_DRIVER_NAME> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 77)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DRIVER_ODBC_VER;
 impl InfoType<SQL_DRIVER_ODBC_VER, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_DRIVER_ODBC_VER> for OdbcStr<SQLCHAR> {
@@ -619,7 +619,7 @@ unsafe impl AttrGet<SQL_DRIVER_ODBC_VER> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 7)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DRIVER_VER;
 impl InfoType<SQL_DRIVER_VER, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_DRIVER_VER> for OdbcStr<SQLCHAR> {
@@ -629,7 +629,7 @@ unsafe impl AttrGet<SQL_DRIVER_VER> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 144)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DYNAMIC_CURSOR_ATTRIBUTES1;
 impl InfoType<SQL_DYNAMIC_CURSOR_ATTRIBUTES1, SQL_OV_ODBC3> for CursorAttributes1 {}
 unsafe impl Attr<SQL_DYNAMIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
@@ -639,7 +639,7 @@ unsafe impl AttrGet<SQL_DYNAMIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 145)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DYNAMIC_CURSOR_ATTRIBUTES2;
 impl InfoType<SQL_DYNAMIC_CURSOR_ATTRIBUTES2, SQL_OV_ODBC3> for CursorAttributes2 {}
 unsafe impl Attr<SQL_DYNAMIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
@@ -649,7 +649,7 @@ unsafe impl AttrGet<SQL_DYNAMIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 146)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1;
 impl InfoType<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1, SQL_OV_ODBC3> for CursorAttributes1 {}
 unsafe impl Attr<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
@@ -659,7 +659,7 @@ unsafe impl AttrGet<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 147)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2;
 impl InfoType<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2, SQL_OV_ODBC3> for CursorAttributes2 {}
 unsafe impl Attr<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
@@ -669,7 +669,7 @@ unsafe impl AttrGet<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 84)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_FILE_USAGE;
 impl InfoType<SQL_FILE_USAGE, SQL_OV_ODBC3> for FileUsage {}
 unsafe impl Attr<SQL_FILE_USAGE> for FileUsage {
@@ -679,7 +679,7 @@ unsafe impl AttrGet<SQL_FILE_USAGE> for FileUsage {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 81)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_GETDATA_EXTENSIONS;
 impl InfoType<SQL_GETDATA_EXTENSIONS, SQL_OV_ODBC3> for GetdataExtensions {}
 unsafe impl Attr<SQL_GETDATA_EXTENSIONS> for GetdataExtensions {
@@ -689,7 +689,7 @@ unsafe impl AttrGet<SQL_GETDATA_EXTENSIONS> for GetdataExtensions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 149)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_INFO_SCHEMA_VIEWS;
 impl InfoType<SQL_INFO_SCHEMA_VIEWS, SQL_OV_ODBC3> for InfoSchemaViews {}
 unsafe impl Attr<SQL_INFO_SCHEMA_VIEWS> for InfoSchemaViews {
@@ -699,7 +699,7 @@ unsafe impl AttrGet<SQL_INFO_SCHEMA_VIEWS> for InfoSchemaViews {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 150)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_KEYSET_CURSOR_ATTRIBUTES1;
 impl InfoType<SQL_KEYSET_CURSOR_ATTRIBUTES1, SQL_OV_ODBC3> for CursorAttributes1 {}
 unsafe impl Attr<SQL_KEYSET_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
@@ -709,7 +709,7 @@ unsafe impl AttrGet<SQL_KEYSET_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 151)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_KEYSET_CURSOR_ATTRIBUTES2;
 impl InfoType<SQL_KEYSET_CURSOR_ATTRIBUTES2, SQL_OV_ODBC3> for CursorAttributes2 {}
 unsafe impl Attr<SQL_KEYSET_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
@@ -719,7 +719,7 @@ unsafe impl AttrGet<SQL_KEYSET_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10022)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_ASYNC_CONCURRENT_STATEMENTS;
 impl InfoType<SQL_MAX_ASYNC_CONCURRENT_STATEMENTS, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl Attr<SQL_MAX_ASYNC_CONCURRENT_STATEMENTS> for SQLUINTEGER {
@@ -729,7 +729,7 @@ unsafe impl AttrGet<SQL_MAX_ASYNC_CONCURRENT_STATEMENTS> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 1)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_CONCURRENT_ACTIVITIES;
 impl InfoType<SQL_MAX_CONCURRENT_ACTIVITIES, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_CONCURRENT_ACTIVITIES> for SQLUSMALLINT {
@@ -739,7 +739,7 @@ unsafe impl AttrGet<SQL_MAX_CONCURRENT_ACTIVITIES> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 0)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_DRIVER_CONNECTIONS;
 impl InfoType<SQL_MAX_DRIVER_CONNECTIONS, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_DRIVER_CONNECTIONS> for SQLUSMALLINT {
@@ -749,7 +749,7 @@ unsafe impl AttrGet<SQL_MAX_DRIVER_CONNECTIONS> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 152)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ODBC_INTERFACE_CONFORMANCE;
 impl InfoType<SQL_ODBC_INTERFACE_CONFORMANCE, SQL_OV_ODBC3> for OdbcInterfaceConformance {}
 unsafe impl Attr<SQL_ODBC_INTERFACE_CONFORMANCE> for OdbcInterfaceConformance {
@@ -759,7 +759,7 @@ unsafe impl AttrGet<SQL_ODBC_INTERFACE_CONFORMANCE> for OdbcInterfaceConformance
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ODBC_VER;
 impl InfoType<SQL_ODBC_VER, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_ODBC_VER> for OdbcStr<SQLCHAR> {
@@ -769,7 +769,7 @@ unsafe impl AttrGet<SQL_ODBC_VER> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 153)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_PARAM_ARRAY_ROW_COUNTS;
 impl InfoType<SQL_PARAM_ARRAY_ROW_COUNTS, SQL_OV_ODBC3> for ParamArrayRowCounts {}
 unsafe impl Attr<SQL_PARAM_ARRAY_ROW_COUNTS> for ParamArrayRowCounts {
@@ -779,7 +779,7 @@ unsafe impl AttrGet<SQL_PARAM_ARRAY_ROW_COUNTS> for ParamArrayRowCounts {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 154)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_PARAM_ARRAY_SELECTS;
 impl InfoType<SQL_PARAM_ARRAY_SELECTS, SQL_OV_ODBC3> for ParamArraySelects {}
 unsafe impl Attr<SQL_PARAM_ARRAY_SELECTS> for ParamArraySelects {
@@ -789,7 +789,7 @@ unsafe impl AttrGet<SQL_PARAM_ARRAY_SELECTS> for ParamArraySelects {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 11)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ROW_UPDATES;
 impl InfoType<SQL_ROW_UPDATES, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_ROW_UPDATES> for OdbcStr<SQLCHAR> {
@@ -799,7 +799,7 @@ unsafe impl AttrGet<SQL_ROW_UPDATES> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 14)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SEARCH_PATTERN_ESCAPE;
 impl InfoType<SQL_SEARCH_PATTERN_ESCAPE, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_SEARCH_PATTERN_ESCAPE> for OdbcStr<SQLCHAR> {
@@ -809,7 +809,7 @@ unsafe impl AttrGet<SQL_SEARCH_PATTERN_ESCAPE> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 13)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SERVER_NAME;
 impl InfoType<SQL_SERVER_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_SERVER_NAME> for OdbcStr<SQLCHAR> {
@@ -819,7 +819,7 @@ unsafe impl AttrGet<SQL_SERVER_NAME> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 167)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_STATIC_CURSOR_ATTRIBUTES1;
 impl InfoType<SQL_STATIC_CURSOR_ATTRIBUTES1, SQL_OV_ODBC3> for CursorAttributes1 {}
 unsafe impl Attr<SQL_STATIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
@@ -829,7 +829,7 @@ unsafe impl AttrGet<SQL_STATIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 168)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_STATIC_CURSOR_ATTRIBUTES2;
 impl InfoType<SQL_STATIC_CURSOR_ATTRIBUTES2, SQL_OV_ODBC3> for CursorAttributes2 {}
 unsafe impl Attr<SQL_STATIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
@@ -843,7 +843,7 @@ unsafe impl AttrGet<SQL_STATIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 16)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DATABASE_NAME;
 impl InfoType<SQL_DATABASE_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_DATABASE_NAME> for OdbcStr<SQLCHAR> {
@@ -853,7 +853,7 @@ unsafe impl AttrGet<SQL_DATABASE_NAME> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 17)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DBMS_NAME;
 impl InfoType<SQL_DBMS_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_DBMS_NAME> for OdbcStr<SQLCHAR> {
@@ -863,7 +863,7 @@ unsafe impl AttrGet<SQL_DBMS_NAME> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 18)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DBMS_VER;
 impl InfoType<SQL_DBMS_VER, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_DBMS_VER> for OdbcStr<SQLCHAR> {
@@ -877,7 +877,7 @@ unsafe impl AttrGet<SQL_DBMS_VER> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 20)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ACCESSIBLE_PROCEDURES;
 impl InfoType<SQL_ACCESSIBLE_PROCEDURES, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_ACCESSIBLE_PROCEDURES> for OdbcStr<SQLCHAR> {
@@ -887,7 +887,7 @@ unsafe impl AttrGet<SQL_ACCESSIBLE_PROCEDURES> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 19)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ACCESSIBLE_TABLES;
 impl InfoType<SQL_ACCESSIBLE_TABLES, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_ACCESSIBLE_TABLES> for OdbcStr<SQLCHAR> {
@@ -897,7 +897,7 @@ unsafe impl AttrGet<SQL_ACCESSIBLE_TABLES> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 82)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_BOOKMARK_PERSISTENCE;
 impl InfoType<SQL_BOOKMARK_PERSISTENCE, SQL_OV_ODBC3> for BookmarkPersistence {}
 unsafe impl Attr<SQL_BOOKMARK_PERSISTENCE> for BookmarkPersistence {
@@ -907,7 +907,7 @@ unsafe impl AttrGet<SQL_BOOKMARK_PERSISTENCE> for BookmarkPersistence {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 42)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CATALOG_TERM;
 impl InfoType<SQL_CATALOG_TERM, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_CATALOG_TERM> for OdbcStr<SQLCHAR> {
@@ -917,7 +917,7 @@ unsafe impl AttrGet<SQL_CATALOG_TERM> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10004)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_COLLATION_SEQ;
 impl InfoType<SQL_COLLATION_SEQ, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_COLLATION_SEQ> for OdbcStr<SQLCHAR> {
@@ -927,7 +927,7 @@ unsafe impl AttrGet<SQL_COLLATION_SEQ> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 22)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONCAT_NULL_BEHAVIOR;
 impl InfoType<SQL_CONCAT_NULL_BEHAVIOR, SQL_OV_ODBC3> for ConcatNullBehavior {}
 unsafe impl Attr<SQL_CONCAT_NULL_BEHAVIOR> for ConcatNullBehavior {
@@ -937,7 +937,7 @@ unsafe impl AttrGet<SQL_CONCAT_NULL_BEHAVIOR> for ConcatNullBehavior {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 23)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CURSOR_COMMIT_BEHAVIOR;
 impl InfoType<SQL_CURSOR_COMMIT_BEHAVIOR, SQL_OV_ODBC3> for CursorBehavior {}
 unsafe impl Attr<SQL_CURSOR_COMMIT_BEHAVIOR> for CursorBehavior {
@@ -947,7 +947,7 @@ unsafe impl AttrGet<SQL_CURSOR_COMMIT_BEHAVIOR> for CursorBehavior {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 24)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CURSOR_ROLLBACK_BEHAVIOR;
 impl InfoType<SQL_CURSOR_ROLLBACK_BEHAVIOR, SQL_OV_ODBC3> for CursorBehavior {}
 unsafe impl Attr<SQL_CURSOR_ROLLBACK_BEHAVIOR> for CursorBehavior {
@@ -957,7 +957,7 @@ unsafe impl AttrGet<SQL_CURSOR_ROLLBACK_BEHAVIOR> for CursorBehavior {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10001)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CURSOR_SENSITIVITY;
 impl InfoType<SQL_CURSOR_SENSITIVITY, SQL_OV_ODBC3> for CursorSensitivity {}
 unsafe impl Attr<SQL_CURSOR_SENSITIVITY> for CursorSensitivity {
@@ -967,7 +967,7 @@ unsafe impl AttrGet<SQL_CURSOR_SENSITIVITY> for CursorSensitivity {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 25)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DATA_SOURCE_READ_ONLY;
 impl InfoType<SQL_DATA_SOURCE_READ_ONLY, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_DATA_SOURCE_READ_ONLY> for OdbcStr<SQLCHAR> {
@@ -977,7 +977,7 @@ unsafe impl AttrGet<SQL_DATA_SOURCE_READ_ONLY> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 26)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DEFAULT_TXN_ISOLATION;
 impl InfoType<SQL_DEFAULT_TXN_ISOLATION, SQL_OV_ODBC3> for TxnIsolation {}
 unsafe impl Attr<SQL_DEFAULT_TXN_ISOLATION> for TxnIsolation {
@@ -987,7 +987,7 @@ unsafe impl AttrGet<SQL_DEFAULT_TXN_ISOLATION> for TxnIsolation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10002)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESCRIBE_PARAMETER;
 impl InfoType<SQL_DESCRIBE_PARAMETER, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_DESCRIBE_PARAMETER> for OdbcStr<SQLCHAR> {
@@ -997,7 +997,7 @@ unsafe impl AttrGet<SQL_DESCRIBE_PARAMETER> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 36)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MULT_RESULT_SETS;
 impl InfoType<SQL_MULT_RESULT_SETS, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_MULT_RESULT_SETS> for OdbcStr<SQLCHAR> {
@@ -1007,7 +1007,7 @@ unsafe impl AttrGet<SQL_MULT_RESULT_SETS> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 37)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MULTIPLE_ACTIVE_TXN;
 impl InfoType<SQL_MULTIPLE_ACTIVE_TXN, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_MULTIPLE_ACTIVE_TXN> for OdbcStr<SQLCHAR> {
@@ -1017,7 +1017,7 @@ unsafe impl AttrGet<SQL_MULTIPLE_ACTIVE_TXN> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 111)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_NEED_LONG_DATA_LEN;
 impl InfoType<SQL_NEED_LONG_DATA_LEN, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_NEED_LONG_DATA_LEN> for OdbcStr<SQLCHAR> {
@@ -1027,7 +1027,7 @@ unsafe impl AttrGet<SQL_NEED_LONG_DATA_LEN> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 85)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_NULL_COLLATION;
 impl InfoType<SQL_NULL_COLLATION, SQL_OV_ODBC3> for NullCollation {}
 unsafe impl Attr<SQL_NULL_COLLATION> for NullCollation {
@@ -1037,7 +1037,7 @@ unsafe impl AttrGet<SQL_NULL_COLLATION> for NullCollation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 40)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_PROCEDURE_TERM;
 impl InfoType<SQL_PROCEDURE_TERM, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_PROCEDURE_TERM> for OdbcStr<SQLCHAR> {
@@ -1047,7 +1047,7 @@ unsafe impl AttrGet<SQL_PROCEDURE_TERM> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 39)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SCHEMA_TERM;
 impl InfoType<SQL_SCHEMA_TERM, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_SCHEMA_TERM> for OdbcStr<SQLCHAR> {
@@ -1057,7 +1057,7 @@ unsafe impl AttrGet<SQL_SCHEMA_TERM> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 44)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SCROLL_OPTIONS;
 impl InfoType<SQL_SCROLL_OPTIONS, SQL_OV_ODBC3> for ScrollOptions {}
 unsafe impl Attr<SQL_SCROLL_OPTIONS> for ScrollOptions {
@@ -1067,7 +1067,7 @@ unsafe impl AttrGet<SQL_SCROLL_OPTIONS> for ScrollOptions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 45)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_TABLE_TERM;
 impl InfoType<SQL_TABLE_TERM, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_TABLE_TERM> for OdbcStr<SQLCHAR> {
@@ -1077,7 +1077,7 @@ unsafe impl AttrGet<SQL_TABLE_TERM> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 46)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_TXN_CAPABLE;
 impl InfoType<SQL_TXN_CAPABLE, SQL_OV_ODBC3> for TxnCapable {}
 unsafe impl Attr<SQL_TXN_CAPABLE> for TxnCapable {
@@ -1087,7 +1087,7 @@ unsafe impl AttrGet<SQL_TXN_CAPABLE> for TxnCapable {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 72)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_TXN_ISOLATION_OPTION;
 impl InfoType<SQL_TXN_ISOLATION_OPTION, SQL_OV_ODBC3> for TxnIsolation {}
 unsafe impl Attr<SQL_TXN_ISOLATION_OPTION> for TxnIsolation {
@@ -1097,7 +1097,7 @@ unsafe impl AttrGet<SQL_TXN_ISOLATION_OPTION> for TxnIsolation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 47)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_USER_NAME;
 impl InfoType<SQL_USER_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_USER_NAME> for OdbcStr<SQLCHAR> {
@@ -1111,7 +1111,7 @@ unsafe impl AttrGet<SQL_USER_NAME> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 169)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_AGGREGATE_FUNCTIONS;
 impl InfoType<SQL_AGGREGATE_FUNCTIONS, SQL_OV_ODBC3> for AggregateFunctions {}
 unsafe impl Attr<SQL_AGGREGATE_FUNCTIONS> for AggregateFunctions {
@@ -1121,7 +1121,7 @@ unsafe impl AttrGet<SQL_AGGREGATE_FUNCTIONS> for AggregateFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 117)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ALTER_DOMAIN;
 impl InfoType<SQL_ALTER_DOMAIN, SQL_OV_ODBC3> for AlterDomain {}
 unsafe impl Attr<SQL_ALTER_DOMAIN> for AlterDomain {
@@ -1131,7 +1131,7 @@ unsafe impl AttrGet<SQL_ALTER_DOMAIN> for AlterDomain {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 86)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ALTER_TABLE;
 impl InfoType<SQL_ALTER_TABLE, SQL_OV_ODBC3> for AlterTable {}
 unsafe impl Attr<SQL_ALTER_TABLE> for AlterTable {
@@ -1141,7 +1141,7 @@ unsafe impl AttrGet<SQL_ALTER_TABLE> for AlterTable {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 114)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CATALOG_LOCATION;
 impl InfoType<SQL_CATALOG_LOCATION, SQL_OV_ODBC3> for CatalogLocation {}
 unsafe impl Attr<SQL_CATALOG_LOCATION> for CatalogLocation {
@@ -1151,7 +1151,7 @@ unsafe impl AttrGet<SQL_CATALOG_LOCATION> for CatalogLocation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10003)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CATALOG_NAME;
 impl InfoType<SQL_CATALOG_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_CATALOG_NAME> for OdbcStr<SQLCHAR> {
@@ -1161,7 +1161,7 @@ unsafe impl AttrGet<SQL_CATALOG_NAME> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 41)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CATALOG_NAME_SEPARATOR;
 impl InfoType<SQL_CATALOG_NAME_SEPARATOR, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_CATALOG_NAME_SEPARATOR> for OdbcStr<SQLCHAR> {
@@ -1171,7 +1171,7 @@ unsafe impl AttrGet<SQL_CATALOG_NAME_SEPARATOR> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 92)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CATALOG_USAGE;
 impl InfoType<SQL_CATALOG_USAGE, SQL_OV_ODBC3> for CatalogUsage {}
 unsafe impl Attr<SQL_CATALOG_USAGE> for CatalogUsage {
@@ -1181,7 +1181,7 @@ unsafe impl AttrGet<SQL_CATALOG_USAGE> for CatalogUsage {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 87)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_COLUMN_ALIAS;
 impl InfoType<SQL_COLUMN_ALIAS, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_COLUMN_ALIAS> for OdbcStr<SQLCHAR> {
@@ -1191,7 +1191,7 @@ unsafe impl AttrGet<SQL_COLUMN_ALIAS> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 74)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CORRELATION_NAME;
 impl InfoType<SQL_CORRELATION_NAME, SQL_OV_ODBC3> for CorrelationName {}
 unsafe impl Attr<SQL_CORRELATION_NAME> for CorrelationName {
@@ -1201,7 +1201,7 @@ unsafe impl AttrGet<SQL_CORRELATION_NAME> for CorrelationName {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 127)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CREATE_ASSERTION;
 impl InfoType<SQL_CREATE_ASSERTION, SQL_OV_ODBC3> for CreateAssertion {}
 unsafe impl Attr<SQL_CREATE_ASSERTION> for CreateAssertion {
@@ -1211,7 +1211,7 @@ unsafe impl AttrGet<SQL_CREATE_ASSERTION> for CreateAssertion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 128)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CREATE_CHARACTER_SET;
 impl InfoType<SQL_CREATE_CHARACTER_SET, SQL_OV_ODBC3> for CreateCharacterSet {}
 unsafe impl Attr<SQL_CREATE_CHARACTER_SET> for CreateCharacterSet {
@@ -1221,7 +1221,7 @@ unsafe impl AttrGet<SQL_CREATE_CHARACTER_SET> for CreateCharacterSet {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 129)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CREATE_COLLATION;
 impl InfoType<SQL_CREATE_COLLATION, SQL_OV_ODBC3> for CreateCollation {}
 unsafe impl Attr<SQL_CREATE_COLLATION> for CreateCollation {
@@ -1231,7 +1231,7 @@ unsafe impl AttrGet<SQL_CREATE_COLLATION> for CreateCollation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 130)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CREATE_DOMAIN;
 impl InfoType<SQL_CREATE_DOMAIN, SQL_OV_ODBC3> for CreateDomain {}
 unsafe impl Attr<SQL_CREATE_DOMAIN> for CreateDomain {
@@ -1241,7 +1241,7 @@ unsafe impl AttrGet<SQL_CREATE_DOMAIN> for CreateDomain {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 131)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CREATE_SCHEMA;
 impl InfoType<SQL_CREATE_SCHEMA, SQL_OV_ODBC3> for CreateSchema {}
 unsafe impl Attr<SQL_CREATE_SCHEMA> for CreateSchema {
@@ -1251,7 +1251,7 @@ unsafe impl AttrGet<SQL_CREATE_SCHEMA> for CreateSchema {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 132)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CREATE_TABLE;
 impl InfoType<SQL_CREATE_TABLE, SQL_OV_ODBC3> for CreateTable {}
 unsafe impl Attr<SQL_CREATE_TABLE> for CreateTable {
@@ -1261,7 +1261,7 @@ unsafe impl AttrGet<SQL_CREATE_TABLE> for CreateTable {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 133)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CREATE_TRANSLATION;
 impl InfoType<SQL_CREATE_TRANSLATION, SQL_OV_ODBC3> for CreateTranslation {}
 unsafe impl Attr<SQL_CREATE_TRANSLATION> for CreateTranslation {
@@ -1271,7 +1271,7 @@ unsafe impl AttrGet<SQL_CREATE_TRANSLATION> for CreateTranslation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 170)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DDL_INDEX;
 impl InfoType<SQL_DDL_INDEX, SQL_OV_ODBC3> for DdlIndex {}
 unsafe impl Attr<SQL_DDL_INDEX> for DdlIndex {
@@ -1281,7 +1281,7 @@ unsafe impl AttrGet<SQL_DDL_INDEX> for DdlIndex {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 136)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DROP_ASSERTION;
 impl InfoType<SQL_DROP_ASSERTION, SQL_OV_ODBC3> for DropAssertion {}
 unsafe impl Attr<SQL_DROP_ASSERTION> for DropAssertion {
@@ -1291,7 +1291,7 @@ unsafe impl AttrGet<SQL_DROP_ASSERTION> for DropAssertion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 137)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DROP_CHARACTER_SET;
 impl InfoType<SQL_DROP_CHARACTER_SET, SQL_OV_ODBC3> for DropCharacterSet {}
 unsafe impl Attr<SQL_DROP_CHARACTER_SET> for DropCharacterSet {
@@ -1301,7 +1301,7 @@ unsafe impl AttrGet<SQL_DROP_CHARACTER_SET> for DropCharacterSet {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 138)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DROP_COLLATION;
 impl InfoType<SQL_DROP_COLLATION, SQL_OV_ODBC3> for DropCollation {}
 unsafe impl Attr<SQL_DROP_COLLATION> for DropCollation {
@@ -1311,7 +1311,7 @@ unsafe impl AttrGet<SQL_DROP_COLLATION> for DropCollation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 139)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DROP_DOMAIN;
 impl InfoType<SQL_DROP_DOMAIN, SQL_OV_ODBC3> for DropDomain {}
 unsafe impl Attr<SQL_DROP_DOMAIN> for DropDomain {
@@ -1321,7 +1321,7 @@ unsafe impl AttrGet<SQL_DROP_DOMAIN> for DropDomain {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 140)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DROP_SCHEMA;
 impl InfoType<SQL_DROP_SCHEMA, SQL_OV_ODBC3> for DropSchema {}
 unsafe impl Attr<SQL_DROP_SCHEMA> for DropSchema {
@@ -1331,7 +1331,7 @@ unsafe impl AttrGet<SQL_DROP_SCHEMA> for DropSchema {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 141)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DROP_TABLE;
 impl InfoType<SQL_DROP_TABLE, SQL_OV_ODBC3> for DropTable {}
 unsafe impl Attr<SQL_DROP_TABLE> for DropTable {
@@ -1341,7 +1341,7 @@ unsafe impl AttrGet<SQL_DROP_TABLE> for DropTable {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 142)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DROP_TRANSLATION;
 impl InfoType<SQL_DROP_TRANSLATION, SQL_OV_ODBC3> for DropTranslation {}
 unsafe impl Attr<SQL_DROP_TRANSLATION> for DropTranslation {
@@ -1351,7 +1351,7 @@ unsafe impl AttrGet<SQL_DROP_TRANSLATION> for DropTranslation {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 143)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DROP_VIEW;
 impl InfoType<SQL_DROP_VIEW, SQL_OV_ODBC3> for DropView {}
 unsafe impl Attr<SQL_DROP_VIEW> for DropView {
@@ -1361,7 +1361,7 @@ unsafe impl AttrGet<SQL_DROP_VIEW> for DropView {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 27)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_EXPRESSIONS_IN_ORDERBY;
 impl InfoType<SQL_EXPRESSIONS_IN_ORDERBY, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_EXPRESSIONS_IN_ORDERBY> for OdbcStr<SQLCHAR> {
@@ -1371,7 +1371,7 @@ unsafe impl AttrGet<SQL_EXPRESSIONS_IN_ORDERBY> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 88)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_GROUP_BY;
 impl InfoType<SQL_GROUP_BY, SQL_OV_ODBC3> for GroupBy {}
 unsafe impl Attr<SQL_GROUP_BY> for GroupBy {
@@ -1381,7 +1381,7 @@ unsafe impl AttrGet<SQL_GROUP_BY> for GroupBy {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 28)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_IDENTIFIER_CASE;
 impl InfoType<SQL_IDENTIFIER_CASE, SQL_OV_ODBC3> for IdentifierCase {}
 unsafe impl Attr<SQL_IDENTIFIER_CASE> for IdentifierCase {
@@ -1391,7 +1391,7 @@ unsafe impl AttrGet<SQL_IDENTIFIER_CASE> for IdentifierCase {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 29)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_IDENTIFIER_QUOTE_CHAR;
 impl InfoType<SQL_IDENTIFIER_QUOTE_CHAR, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_IDENTIFIER_QUOTE_CHAR> for OdbcStr<SQLCHAR> {
@@ -1401,7 +1401,7 @@ unsafe impl AttrGet<SQL_IDENTIFIER_QUOTE_CHAR> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 148)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_INDEX_KEYWORDS;
 impl InfoType<SQL_INDEX_KEYWORDS, SQL_OV_ODBC3> for IndexKeywords {}
 unsafe impl Attr<SQL_INDEX_KEYWORDS> for IndexKeywords {
@@ -1411,7 +1411,7 @@ unsafe impl AttrGet<SQL_INDEX_KEYWORDS> for IndexKeywords {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 171)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_INSERT_STATEMENT;
 impl InfoType<SQL_INSERT_STATEMENT, SQL_OV_ODBC3> for InsertStatement {}
 unsafe impl Attr<SQL_INSERT_STATEMENT> for InsertStatement {
@@ -1421,7 +1421,7 @@ unsafe impl AttrGet<SQL_INSERT_STATEMENT> for InsertStatement {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 73)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_INTEGRITY;
 impl InfoType<SQL_INTEGRITY, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_INTEGRITY> for OdbcStr<SQLCHAR> {
@@ -1431,7 +1431,7 @@ unsafe impl AttrGet<SQL_INTEGRITY> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 89)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_KEYWORDS;
 impl InfoType<SQL_KEYWORDS, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_KEYWORDS> for OdbcStr<SQLCHAR> {
@@ -1441,7 +1441,7 @@ unsafe impl AttrGet<SQL_KEYWORDS> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 113)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_LIKE_ESCAPE_CLAUSE;
 impl InfoType<SQL_LIKE_ESCAPE_CLAUSE, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_LIKE_ESCAPE_CLAUSE> for OdbcStr<SQLCHAR> {
@@ -1451,7 +1451,7 @@ unsafe impl AttrGet<SQL_LIKE_ESCAPE_CLAUSE> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 75)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_NON_NULLABLE_COLUMNS;
 impl InfoType<SQL_NON_NULLABLE_COLUMNS, SQL_OV_ODBC3> for NonNullableColumns {}
 unsafe impl Attr<SQL_NON_NULLABLE_COLUMNS> for NonNullableColumns {
@@ -1461,7 +1461,7 @@ unsafe impl AttrGet<SQL_NON_NULLABLE_COLUMNS> for NonNullableColumns {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 115)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_OJ_CAPABILITIES;
 impl InfoType<SQL_OJ_CAPABILITIES, SQL_OV_ODBC3> for OjCapabilities {}
 unsafe impl Attr<SQL_OJ_CAPABILITIES> for OjCapabilities {
@@ -1471,7 +1471,7 @@ unsafe impl AttrGet<SQL_OJ_CAPABILITIES> for OjCapabilities {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 90)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_ORDER_BY_COLUMNS_IN_SELECT;
 impl InfoType<SQL_ORDER_BY_COLUMNS_IN_SELECT, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_ORDER_BY_COLUMNS_IN_SELECT> for OdbcStr<SQLCHAR> {
@@ -1481,7 +1481,7 @@ unsafe impl AttrGet<SQL_ORDER_BY_COLUMNS_IN_SELECT> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 38)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_OUTER_JOINS;
 impl InfoType<SQL_OUTER_JOINS, SQL_OV_ODBC3> for OuterJoins {}
 unsafe impl Attr<SQL_OUTER_JOINS> for OuterJoins {
@@ -1491,7 +1491,7 @@ unsafe impl AttrGet<SQL_OUTER_JOINS> for OuterJoins {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 21)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_PROCEDURES;
 impl InfoType<SQL_PROCEDURES, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_PROCEDURES> for OdbcStr<SQLCHAR> {
@@ -1501,7 +1501,7 @@ unsafe impl AttrGet<SQL_PROCEDURES> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 93)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_QUOTED_IDENTIFIER_CASE;
 impl InfoType<SQL_QUOTED_IDENTIFIER_CASE, SQL_OV_ODBC3> for IdentifierCase {}
 unsafe impl Attr<SQL_QUOTED_IDENTIFIER_CASE> for IdentifierCase {
@@ -1511,7 +1511,7 @@ unsafe impl AttrGet<SQL_QUOTED_IDENTIFIER_CASE> for IdentifierCase {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 91)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SCHEMA_USAGE;
 impl InfoType<SQL_SCHEMA_USAGE, SQL_OV_ODBC3> for SchemaUsage {}
 unsafe impl Attr<SQL_SCHEMA_USAGE> for SchemaUsage {
@@ -1521,7 +1521,7 @@ unsafe impl AttrGet<SQL_SCHEMA_USAGE> for SchemaUsage {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 94)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SPECIAL_CHARACTERS;
 impl InfoType<SQL_SPECIAL_CHARACTERS, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_SPECIAL_CHARACTERS> for OdbcStr<SQLCHAR> {
@@ -1531,7 +1531,7 @@ unsafe impl AttrGet<SQL_SPECIAL_CHARACTERS> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 118)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SQL_CONFORMANCE;
 impl InfoType<SQL_SQL_CONFORMANCE, SQL_OV_ODBC3> for SqlConformance {}
 unsafe impl Attr<SQL_SQL_CONFORMANCE> for SqlConformance {
@@ -1541,7 +1541,7 @@ unsafe impl AttrGet<SQL_SQL_CONFORMANCE> for SqlConformance {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 95)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SUBQUERIES;
 impl InfoType<SQL_SUBQUERIES, SQL_OV_ODBC3> for Subqueries {}
 unsafe impl Attr<SQL_SUBQUERIES> for Subqueries {
@@ -1551,7 +1551,7 @@ unsafe impl AttrGet<SQL_SUBQUERIES> for Subqueries {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 96)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_UNION;
 impl InfoType<SQL_UNION, SQL_OV_ODBC3> for Union {}
 unsafe impl Attr<SQL_UNION> for Union {
@@ -1565,7 +1565,7 @@ unsafe impl AttrGet<SQL_UNION> for Union {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 112)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_BINARY_LITERAL_LEN;
 impl InfoType<SQL_MAX_BINARY_LITERAL_LEN, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl Attr<SQL_MAX_BINARY_LITERAL_LEN> for SQLUINTEGER {
@@ -1575,7 +1575,7 @@ unsafe impl AttrGet<SQL_MAX_BINARY_LITERAL_LEN> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 34)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_CATALOG_NAME_LEN;
 impl InfoType<SQL_MAX_CATALOG_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_CATALOG_NAME_LEN> for SQLUSMALLINT {
@@ -1585,7 +1585,7 @@ unsafe impl AttrGet<SQL_MAX_CATALOG_NAME_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 108)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_CHAR_LITERAL_LEN;
 impl InfoType<SQL_MAX_CHAR_LITERAL_LEN, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl Attr<SQL_MAX_CHAR_LITERAL_LEN> for SQLUINTEGER {
@@ -1595,7 +1595,7 @@ unsafe impl AttrGet<SQL_MAX_CHAR_LITERAL_LEN> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 30)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_COLUMN_NAME_LEN;
 impl InfoType<SQL_MAX_COLUMN_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_COLUMN_NAME_LEN> for SQLUSMALLINT {
@@ -1605,7 +1605,7 @@ unsafe impl AttrGet<SQL_MAX_COLUMN_NAME_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 97)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_COLUMNS_IN_GROUP_BY;
 impl InfoType<SQL_MAX_COLUMNS_IN_GROUP_BY, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_COLUMNS_IN_GROUP_BY> for SQLUSMALLINT {
@@ -1615,7 +1615,7 @@ unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_GROUP_BY> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 98)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_COLUMNS_IN_INDEX;
 impl InfoType<SQL_MAX_COLUMNS_IN_INDEX, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_COLUMNS_IN_INDEX> for SQLUSMALLINT {
@@ -1625,7 +1625,7 @@ unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_INDEX> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 99)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_COLUMNS_IN_ORDER_BY;
 impl InfoType<SQL_MAX_COLUMNS_IN_ORDER_BY, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_COLUMNS_IN_ORDER_BY> for SQLUSMALLINT {
@@ -1635,7 +1635,7 @@ unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_ORDER_BY> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 100)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_COLUMNS_IN_SELECT;
 impl InfoType<SQL_MAX_COLUMNS_IN_SELECT, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_COLUMNS_IN_SELECT> for SQLUSMALLINT {
@@ -1645,7 +1645,7 @@ unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_SELECT> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 101)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_COLUMNS_IN_TABLE;
 impl InfoType<SQL_MAX_COLUMNS_IN_TABLE, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_COLUMNS_IN_TABLE> for SQLUSMALLINT {
@@ -1655,7 +1655,7 @@ unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_TABLE> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 31)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_CURSOR_NAME_LEN;
 impl InfoType<SQL_MAX_CURSOR_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_CURSOR_NAME_LEN> for SQLUSMALLINT {
@@ -1665,7 +1665,7 @@ unsafe impl AttrGet<SQL_MAX_CURSOR_NAME_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 10005)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_IDENTIFIER_LEN;
 impl InfoType<SQL_MAX_IDENTIFIER_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_IDENTIFIER_LEN> for SQLUSMALLINT {
@@ -1675,7 +1675,7 @@ unsafe impl AttrGet<SQL_MAX_IDENTIFIER_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 102)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_INDEX_SIZE;
 impl InfoType<SQL_MAX_INDEX_SIZE, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl Attr<SQL_MAX_INDEX_SIZE> for SQLUINTEGER {
@@ -1685,7 +1685,7 @@ unsafe impl AttrGet<SQL_MAX_INDEX_SIZE> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 33)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_PROCEDURE_NAME_LEN;
 impl InfoType<SQL_MAX_PROCEDURE_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_PROCEDURE_NAME_LEN> for SQLUSMALLINT {
@@ -1695,7 +1695,7 @@ unsafe impl AttrGet<SQL_MAX_PROCEDURE_NAME_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 104)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_ROW_SIZE;
 impl InfoType<SQL_MAX_ROW_SIZE, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl Attr<SQL_MAX_ROW_SIZE> for SQLUINTEGER {
@@ -1705,7 +1705,7 @@ unsafe impl AttrGet<SQL_MAX_ROW_SIZE> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 103)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_ROW_SIZE_INCLUDES_LONG;
 impl InfoType<SQL_MAX_ROW_SIZE_INCLUDES_LONG, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
 unsafe impl Attr<SQL_MAX_ROW_SIZE_INCLUDES_LONG> for OdbcStr<SQLCHAR> {
@@ -1715,7 +1715,7 @@ unsafe impl AttrGet<SQL_MAX_ROW_SIZE_INCLUDES_LONG> for OdbcStr<SQLCHAR> {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 32)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_SCHEMA_NAME_LEN;
 impl InfoType<SQL_MAX_SCHEMA_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_SCHEMA_NAME_LEN> for SQLUSMALLINT {
@@ -1725,7 +1725,7 @@ unsafe impl AttrGet<SQL_MAX_SCHEMA_NAME_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 105)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_STATEMENT_LEN;
 impl InfoType<SQL_MAX_STATEMENT_LEN, SQL_OV_ODBC3> for SQLUINTEGER {}
 unsafe impl Attr<SQL_MAX_STATEMENT_LEN> for SQLUINTEGER {
@@ -1735,7 +1735,7 @@ unsafe impl AttrGet<SQL_MAX_STATEMENT_LEN> for SQLUINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 35)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_TABLE_NAME_LEN;
 impl InfoType<SQL_MAX_TABLE_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_TABLE_NAME_LEN> for SQLUSMALLINT {
@@ -1745,7 +1745,7 @@ unsafe impl AttrGet<SQL_MAX_TABLE_NAME_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 106)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_TABLES_IN_SELECT;
 impl InfoType<SQL_MAX_TABLES_IN_SELECT, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_TABLES_IN_SELECT> for SQLUSMALLINT {
@@ -1755,7 +1755,7 @@ unsafe impl AttrGet<SQL_MAX_TABLES_IN_SELECT> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 107)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_MAX_USER_NAME_LEN;
 impl InfoType<SQL_MAX_USER_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
 unsafe impl Attr<SQL_MAX_USER_NAME_LEN> for SQLUSMALLINT {
@@ -1769,7 +1769,7 @@ unsafe impl AttrGet<SQL_MAX_USER_NAME_LEN> for SQLUSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 48)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_FUNCTIONS;
 impl InfoType<SQL_CONVERT_FUNCTIONS, SQL_OV_ODBC3> for ConvertFunctions {}
 unsafe impl Attr<SQL_CONVERT_FUNCTIONS> for ConvertFunctions {
@@ -1779,7 +1779,7 @@ unsafe impl AttrGet<SQL_CONVERT_FUNCTIONS> for ConvertFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 49)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_NUMERIC_FUNCTIONS;
 impl InfoType<SQL_NUMERIC_FUNCTIONS, SQL_OV_ODBC3> for NumericFunctions {}
 unsafe impl Attr<SQL_NUMERIC_FUNCTIONS> for NumericFunctions {
@@ -1789,7 +1789,7 @@ unsafe impl AttrGet<SQL_NUMERIC_FUNCTIONS> for NumericFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 50)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_STRING_FUNCTIONS;
 impl InfoType<SQL_STRING_FUNCTIONS, SQL_OV_ODBC3> for StringFunctions {}
 unsafe impl Attr<SQL_STRING_FUNCTIONS> for StringFunctions {
@@ -1799,7 +1799,7 @@ unsafe impl AttrGet<SQL_STRING_FUNCTIONS> for StringFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 51)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_SYSTEM_FUNCTIONS;
 impl InfoType<SQL_SYSTEM_FUNCTIONS, SQL_OV_ODBC3> for SystemFunctions {}
 unsafe impl Attr<SQL_SYSTEM_FUNCTIONS> for SystemFunctions {
@@ -1809,7 +1809,7 @@ unsafe impl AttrGet<SQL_SYSTEM_FUNCTIONS> for SystemFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 109)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_TIMEDATE_ADD_INTERVALS;
 impl InfoType<SQL_TIMEDATE_ADD_INTERVALS, SQL_OV_ODBC3> for TimedateIntervals {}
 unsafe impl Attr<SQL_TIMEDATE_ADD_INTERVALS> for TimedateIntervals {
@@ -1819,7 +1819,7 @@ unsafe impl AttrGet<SQL_TIMEDATE_ADD_INTERVALS> for TimedateIntervals {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 110)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_TIMEDATE_DIFF_INTERVALS;
 impl InfoType<SQL_TIMEDATE_DIFF_INTERVALS, SQL_OV_ODBC3> for TimedateIntervals {}
 unsafe impl Attr<SQL_TIMEDATE_DIFF_INTERVALS> for TimedateIntervals {
@@ -1829,7 +1829,7 @@ unsafe impl AttrGet<SQL_TIMEDATE_DIFF_INTERVALS> for TimedateIntervals {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 52)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_TIMEDATE_FUNCTIONS;
 impl InfoType<SQL_TIMEDATE_FUNCTIONS, SQL_OV_ODBC3> for TimedateFunctions {}
 unsafe impl Attr<SQL_TIMEDATE_FUNCTIONS> for TimedateFunctions {
@@ -1843,7 +1843,7 @@ unsafe impl AttrGet<SQL_TIMEDATE_FUNCTIONS> for TimedateFunctions {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 53)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_BIGINT;
 impl InfoType<SQL_CONVERT_BIGINT, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_BIGINT> for Conversion {
@@ -1853,7 +1853,7 @@ unsafe impl AttrGet<SQL_CONVERT_BIGINT> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 54)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_BINARY;
 impl InfoType<SQL_CONVERT_BINARY, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_BINARY> for Conversion {
@@ -1863,7 +1863,7 @@ unsafe impl AttrGet<SQL_CONVERT_BINARY> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 55)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_BIT;
 impl InfoType<SQL_CONVERT_BIT, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_BIT> for Conversion {
@@ -1873,7 +1873,7 @@ unsafe impl AttrGet<SQL_CONVERT_BIT> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 56)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_CHAR;
 impl InfoType<SQL_CONVERT_CHAR, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_CHAR> for Conversion {
@@ -1883,7 +1883,7 @@ unsafe impl AttrGet<SQL_CONVERT_CHAR> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 57)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_DATE;
 impl InfoType<SQL_CONVERT_DATE, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_DATE> for Conversion {
@@ -1893,7 +1893,7 @@ unsafe impl AttrGet<SQL_CONVERT_DATE> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 58)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_DECIMAL;
 impl InfoType<SQL_CONVERT_DECIMAL, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_DECIMAL> for Conversion {
@@ -1903,7 +1903,7 @@ unsafe impl AttrGet<SQL_CONVERT_DECIMAL> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 59)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_DOUBLE;
 impl InfoType<SQL_CONVERT_DOUBLE, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_DOUBLE> for Conversion {
@@ -1913,7 +1913,7 @@ unsafe impl AttrGet<SQL_CONVERT_DOUBLE> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 60)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_FLOAT;
 impl InfoType<SQL_CONVERT_FLOAT, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_FLOAT> for Conversion {
@@ -1923,7 +1923,7 @@ unsafe impl AttrGet<SQL_CONVERT_FLOAT> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 61)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_INTEGER;
 impl InfoType<SQL_CONVERT_INTEGER, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_INTEGER> for Conversion {
@@ -1933,7 +1933,7 @@ unsafe impl AttrGet<SQL_CONVERT_INTEGER> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 123)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_INTERVAL_DAY_TIME;
 impl InfoType<SQL_CONVERT_INTERVAL_DAY_TIME, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_INTERVAL_DAY_TIME> for Conversion {
@@ -1943,7 +1943,7 @@ unsafe impl AttrGet<SQL_CONVERT_INTERVAL_DAY_TIME> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 124)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_INTERVAL_YEAR_MONTH;
 impl InfoType<SQL_CONVERT_INTERVAL_YEAR_MONTH, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_INTERVAL_YEAR_MONTH> for Conversion {
@@ -1953,7 +1953,7 @@ unsafe impl AttrGet<SQL_CONVERT_INTERVAL_YEAR_MONTH> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 71)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_LONGVARBINARY;
 impl InfoType<SQL_CONVERT_LONGVARBINARY, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_LONGVARBINARY> for Conversion {
@@ -1963,7 +1963,7 @@ unsafe impl AttrGet<SQL_CONVERT_LONGVARBINARY> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 62)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_LONGVARCHAR;
 impl InfoType<SQL_CONVERT_LONGVARCHAR, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_LONGVARCHAR> for Conversion {
@@ -1973,7 +1973,7 @@ unsafe impl AttrGet<SQL_CONVERT_LONGVARCHAR> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 63)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_NUMERIC;
 impl InfoType<SQL_CONVERT_NUMERIC, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_NUMERIC> for Conversion {
@@ -1983,7 +1983,7 @@ unsafe impl AttrGet<SQL_CONVERT_NUMERIC> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 64)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_REAL;
 impl InfoType<SQL_CONVERT_REAL, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_REAL> for Conversion {
@@ -1993,7 +1993,7 @@ unsafe impl AttrGet<SQL_CONVERT_REAL> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 65)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_SMALLINT;
 impl InfoType<SQL_CONVERT_SMALLINT, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_SMALLINT> for Conversion {
@@ -2003,7 +2003,7 @@ unsafe impl AttrGet<SQL_CONVERT_SMALLINT> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 66)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_TIME;
 impl InfoType<SQL_CONVERT_TIME, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_TIME> for Conversion {
@@ -2013,7 +2013,7 @@ unsafe impl AttrGet<SQL_CONVERT_TIME> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 67)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_TIMESTAMP;
 impl InfoType<SQL_CONVERT_TIMESTAMP, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_TIMESTAMP> for Conversion {
@@ -2023,7 +2023,7 @@ unsafe impl AttrGet<SQL_CONVERT_TIMESTAMP> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 68)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_TINYINT;
 impl InfoType<SQL_CONVERT_TINYINT, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_TINYINT> for Conversion {
@@ -2033,7 +2033,7 @@ unsafe impl AttrGet<SQL_CONVERT_TINYINT> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 69)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_VARBINARY;
 impl InfoType<SQL_CONVERT_VARBINARY, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_VARBINARY> for Conversion {
@@ -2043,7 +2043,7 @@ unsafe impl AttrGet<SQL_CONVERT_VARBINARY> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 70)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_VARCHAR;
 impl InfoType<SQL_CONVERT_VARCHAR, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_VARCHAR> for Conversion {
@@ -2053,7 +2053,7 @@ unsafe impl AttrGet<SQL_CONVERT_VARCHAR> for Conversion {}
 
 #[derive(Ident)]
 #[identifier(SQLUSMALLINT, 173)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_CONVERT_GUID;
 impl InfoType<SQL_CONVERT_GUID, SQL_OV_ODBC3> for Conversion {}
 unsafe impl Attr<SQL_CONVERT_GUID> for Conversion {

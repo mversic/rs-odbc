@@ -2,14 +2,14 @@ use crate::api::Descriptor;
 use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
 use crate::c_types::CScalar;
 use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
-use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC, UnsafeSQLHDESC, SQLHDESC};
+use crate::handle::{RefSQLHDESC, RefUnsafeSQLHDESC, SQLHDESC, UnsafeSQLHDESC};
 use crate::str::{OdbcChar, OdbcStr};
 use crate::{
-    Ident, OdbcBool, OdbcDefined, Scalar, SQLCHAR, SQLINTEGER, SQLSMALLINT, SQLUINTEGER, SQLULEN,
-    SQLWCHAR,
+    Ident, OdbcBool, OdbcDefined, SQLCHAR, SQLINTEGER, SQLSMALLINT, SQLUINTEGER, SQLULEN, SQLWCHAR,
+    Scalar,
 };
 use core::{cell::UnsafeCell, marker::PhantomData, mem::MaybeUninit};
-use rs_odbc_derive::{odbc_type, Ident};
+use rs_odbc_derive::{Ident, odbc_type};
 
 // TODO: It's unclear if this trait is required because
 // of column lifetime binding or it can be removed
@@ -18,8 +18,6 @@ pub trait DescType<'buf> {}
 // TODO: The statement attribute SQL_ATTR_USE_BOOKMARKS should always be set before calling SQLSetDescField to set bookmark fields. While this is not mandatory, it is strongly recommended.
 pub trait DescField<'buf, D: Descriptor<'buf, DT, V>, DT, A: Ident, V: OdbcVersion>:
     Attr<A> + AttrLen<Self::DefinedBy, SQLINTEGER>
-where
-    D: ?Sized,
 {
     // TODO: Implement for buffers to bind their lifetimes
     fn update_handle(&self, _: &D)
@@ -57,72 +55,72 @@ impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, SQLHDESC<'conn, DT, SQL_OV_ODBC3_80>, DT, A, SQL_OV_ODBC3_80> for T
 where
     T: DescField<
-        'buf,
-        SQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            SQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, SQLHDESC<'conn, DT, SQL_OV_ODBC4>, DT, A, SQL_OV_ODBC4> for T
 where
     T: DescField<
-        'buf,
-        SQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            SQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, SQLHDESC<'conn, DT, SQL_OV_ODBC3_80>, DT, A, SQL_OV_ODBC3_80> for [T]
 where
     [T]: DescField<
-        'buf,
-        SQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            SQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, SQLHDESC<'conn, DT, SQL_OV_ODBC4>, DT, A, SQL_OV_ODBC4> for [T]
 where
     [T]: DescField<
-        'buf,
-        SQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            SQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, CH: OdbcChar>
     DescField<'buf, SQLHDESC<'conn, DT, SQL_OV_ODBC3_80>, DT, A, SQL_OV_ODBC3_80> for OdbcStr<CH>
 where
     OdbcStr<CH>: DescField<
-        'buf,
-        SQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            SQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, CH: OdbcChar>
     DescField<'buf, SQLHDESC<'conn, DT, SQL_OV_ODBC4>, DT, A, SQL_OV_ODBC4> for OdbcStr<CH>
 where
     OdbcStr<CH>: DescField<
-        'buf,
-        SQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            SQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 
@@ -131,48 +129,48 @@ impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, UnsafeSQLHDESC<'conn, DT, SQL_OV_ODBC3_80>, DT, A, SQL_OV_ODBC3_80> for T
 where
     T: DescField<
-        'buf,
-        UnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            UnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, UnsafeSQLHDESC<'conn, DT, SQL_OV_ODBC4>, DT, A, SQL_OV_ODBC4> for T
 where
     T: DescField<
-        'buf,
-        UnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            UnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, UnsafeSQLHDESC<'conn, DT, SQL_OV_ODBC3_80>, DT, A, SQL_OV_ODBC3_80> for [T]
 where
     [T]: DescField<
-        'buf,
-        UnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            UnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, UnsafeSQLHDESC<'conn, DT, SQL_OV_ODBC4>, DT, A, SQL_OV_ODBC4> for [T]
 where
     [T]: DescField<
-        'buf,
-        UnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            UnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, CH: OdbcChar>
@@ -180,24 +178,24 @@ impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, CH: OdbcChar>
     for OdbcStr<CH>
 where
     OdbcStr<CH>: DescField<
-        'buf,
-        UnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            UnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, CH: OdbcChar>
     DescField<'buf, UnsafeSQLHDESC<'conn, DT, SQL_OV_ODBC4>, DT, A, SQL_OV_ODBC4> for OdbcStr<CH>
 where
     OdbcStr<CH>: DescField<
-        'buf,
-        UnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            UnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 
@@ -206,72 +204,72 @@ impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, RefSQLHDESC<'conn, DT, SQL_OV_ODBC3_80>, DT, A, SQL_OV_ODBC3_80> for T
 where
     T: DescField<
-        'buf,
-        RefSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            RefSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, RefSQLHDESC<'conn, DT, SQL_OV_ODBC4>, DT, A, SQL_OV_ODBC4> for T
 where
     T: DescField<
-        'buf,
-        RefSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            RefSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, RefSQLHDESC<'conn, DT, SQL_OV_ODBC3_80>, DT, A, SQL_OV_ODBC3_80> for [T]
 where
     [T]: DescField<
-        'buf,
-        RefSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            RefSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, RefSQLHDESC<'conn, DT, SQL_OV_ODBC4>, DT, A, SQL_OV_ODBC4> for [T]
 where
     [T]: DescField<
-        'buf,
-        RefSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            RefSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, CH: OdbcChar>
     DescField<'buf, RefSQLHDESC<'conn, DT, SQL_OV_ODBC3_80>, DT, A, SQL_OV_ODBC3_80> for OdbcStr<CH>
 where
     OdbcStr<CH>: DescField<
-        'buf,
-        RefSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            RefSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, CH: OdbcChar>
     DescField<'buf, RefSQLHDESC<'conn, DT, SQL_OV_ODBC4>, DT, A, SQL_OV_ODBC4> for OdbcStr<CH>
 where
     OdbcStr<CH>: DescField<
-        'buf,
-        RefSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            RefSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 
@@ -280,48 +278,48 @@ impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, RefUnsafeSQLHDESC<'conn, DT, SQL_OV_ODBC3_80>, DT, A, SQL_OV_ODBC3_80> for T
 where
     T: DescField<
-        'buf,
-        RefUnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            RefUnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, RefUnsafeSQLHDESC<'conn, DT, SQL_OV_ODBC4>, DT, A, SQL_OV_ODBC4> for T
 where
     T: DescField<
-        'buf,
-        RefUnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            RefUnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, RefUnsafeSQLHDESC<'conn, DT, SQL_OV_ODBC3_80>, DT, A, SQL_OV_ODBC3_80> for [T]
 where
     [T]: DescField<
-        'buf,
-        RefUnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            RefUnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, T: Scalar>
     DescField<'buf, RefUnsafeSQLHDESC<'conn, DT, SQL_OV_ODBC4>, DT, A, SQL_OV_ODBC4> for [T]
 where
     [T]: DescField<
-        'buf,
-        RefUnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            RefUnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, CH: OdbcChar>
@@ -329,24 +327,24 @@ impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, CH: OdbcChar>
     for OdbcStr<CH>
 where
     OdbcStr<CH>: DescField<
-        'buf,
-        RefUnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            RefUnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 impl<'conn, 'buf, DT: DescType<'buf>, A: Ident, CH: OdbcChar>
     DescField<'buf, RefUnsafeSQLHDESC<'conn, DT, SQL_OV_ODBC4>, DT, A, SQL_OV_ODBC4> for OdbcStr<CH>
 where
     OdbcStr<CH>: DescField<
-        'buf,
-        RefUnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
-        DT,
-        A,
-        <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
-    >,
+            'buf,
+            RefUnsafeSQLHDESC<'conn, DT, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>,
+            DT,
+            A,
+            <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion,
+        >,
 {
 }
 
@@ -403,7 +401,7 @@ where
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 1099)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_ALLOC_TYPE;
 // This is read-only attribute
 unsafe impl Attr<SQL_DESC_ALLOC_TYPE> for AllocType {
@@ -417,7 +415,7 @@ unsafe impl AttrGet<SQL_DESC_ALLOC_TYPE> for AllocType {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 20)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_ARRAY_SIZE;
 unsafe impl Attr<SQL_DESC_ARRAY_SIZE> for SQLULEN {
     type DefinedBy = OdbcDefined;
@@ -431,7 +429,7 @@ unsafe impl AttrSet<SQL_DESC_ARRAY_SIZE> for SQLULEN {}
 
 //#[derive(Ident)]
 //#[identifier(SQLSMALLINT, 21)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_DESC_ARRAY_STATUS_PTR;
 //unsafe impl Attr<SQL_DESC_ARRAY_STATUS_PTR> for [UnsafeCell<>] {
 //    type DefinedBy = OdbcDefined;
@@ -446,7 +444,7 @@ unsafe impl AttrSet<SQL_DESC_ARRAY_SIZE> for SQLULEN {}
 
 //#[derive(Ident)]
 //#[identifier(SQLSMALLINT, 24)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_DESC_BIND_OFFSET_PTR;
 //unsafe impl Attr<SQL_DESC_BIND_OFFSET_PTR> for UnsafeCell<SQLLEN> {
 //    type DefinedBy = OdbcDefined;
@@ -462,7 +460,7 @@ unsafe impl AttrSet<SQL_DESC_ARRAY_SIZE> for SQLULEN {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 25)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_BIND_TYPE;
 unsafe impl Attr<SQL_DESC_BIND_TYPE> for BindType {
     type DefinedBy = OdbcDefined;
@@ -476,7 +474,7 @@ unsafe impl AttrSet<SQL_DESC_BIND_TYPE> for BindType {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 1001)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_COUNT;
 unsafe impl Attr<SQL_DESC_COUNT> for SQLSMALLINT {
     type DefinedBy = OdbcDefined;
@@ -490,7 +488,7 @@ unsafe impl AttrSet<SQL_DESC_COUNT> for SQLSMALLINT {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 34)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_ROWS_PROCESSED_PTR;
 unsafe impl Attr<SQL_DESC_ROWS_PROCESSED_PTR> for [UnsafeCell<SQLUINTEGER>] {
     type DefinedBy = OdbcDefined;
@@ -498,7 +496,7 @@ unsafe impl Attr<SQL_DESC_ROWS_PROCESSED_PTR> for [UnsafeCell<SQLUINTEGER>] {
 unsafe impl Attr<SQL_DESC_ROWS_PROCESSED_PTR> for [UnsafeCell<SQLULEN>] {
     type DefinedBy = OdbcDefined;
 }
-impl<'conn, 'buf, D: Descriptor<'buf, IRD, SQL_OV_ODBC3>>
+impl<'buf, D: Descriptor<'buf, IRD, SQL_OV_ODBC3>>
     DescField<'buf, D, IRD, SQL_DESC_ROWS_PROCESSED_PTR, SQL_OV_ODBC3> for [UnsafeCell<SQLULEN>]
 {
     #[cfg(feature = "odbc_debug")]
@@ -526,7 +524,7 @@ unsafe impl AttrSet<SQL_DESC_ROWS_PROCESSED_PTR> for &[UnsafeCell<SQLULEN>] {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 11)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_DESC_AUTO_UNIQUE_VALUE;
 unsafe impl Attr<SQL_DESC_AUTO_UNIQUE_VALUE> for OdbcBool {
@@ -540,7 +538,7 @@ unsafe impl AttrGet<SQL_DESC_AUTO_UNIQUE_VALUE> for OdbcBool {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 22)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_DESC_BASE_COLUMN_NAME;
 unsafe impl<CH: OdbcChar> Attr<SQL_DESC_BASE_COLUMN_NAME> for OdbcStr<CH> {
@@ -554,7 +552,7 @@ unsafe impl<CH: OdbcChar> AttrGet<SQL_DESC_BASE_COLUMN_NAME> for OdbcStr<CH> {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 23)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_DESC_BASE_TABLE_NAME;
 unsafe impl<CH: OdbcChar> Attr<SQL_DESC_BASE_TABLE_NAME> for OdbcStr<CH> {
@@ -568,7 +566,7 @@ unsafe impl<CH: OdbcChar> AttrGet<SQL_DESC_BASE_TABLE_NAME> for OdbcStr<CH> {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 12)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_DESC_CASE_SENSITIVE;
 unsafe impl Attr<SQL_DESC_CASE_SENSITIVE> for OdbcBool {
@@ -582,7 +580,7 @@ unsafe impl AttrGet<SQL_DESC_CASE_SENSITIVE> for OdbcBool {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 17)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_DESC_CATALOG_NAME;
 unsafe impl<CH: OdbcChar> Attr<SQL_DESC_CATALOG_NAME> for OdbcStr<CH> {
@@ -597,7 +595,7 @@ unsafe impl<CH: OdbcChar> AttrGet<SQL_DESC_CATALOG_NAME> for OdbcStr<CH> {}
 // TODO:
 //#[derive(Ident)]
 //#[identifier(SQLSMALLINT, 2)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_DESC_CONCISE_TYPE;
 //unsafe impl Attr<SQL_DESC_CONCISE_TYPE> for SqlType {
 //    type DefinedBy = OdbcDefined;
@@ -608,7 +606,7 @@ unsafe impl<CH: OdbcChar> AttrGet<SQL_DESC_CATALOG_NAME> for OdbcStr<CH> {}
 
 //#[derive(Ident)]
 //#[identifier(SQLSMALLINT, 1007)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_DESC_DATETIME_INTERVAL_CODE;
 //unsafe impl Attr<SQL_DESC_DATETIME_INTERVAL_CODE> for DatetimeIntervalCode {
 //    type DefinedBy = OdbcDefined;
@@ -619,12 +617,12 @@ unsafe impl<CH: OdbcChar> AttrGet<SQL_DESC_CATALOG_NAME> for OdbcStr<CH> {}
 
 //#[derive(Ident)]
 //#[identifier(SQLSMALLINT, 26)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_DESC_DATETIME_INTERVAL_PRECISION;
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 1010)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_DATA_PTR;
 unsafe impl<T> Attr<SQL_DESC_DATA_PTR> for UnsafeCell<T> {
     type DefinedBy = OdbcDefined;
@@ -652,7 +650,7 @@ unsafe impl<T> AttrSet<SQL_DESC_DATA_PTR> for &[UnsafeCell<T>] {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 6)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_DESC_DISPLAY_SIZE;
 unsafe impl Attr<SQL_DESC_DISPLAY_SIZE> for SQLINTEGER {
@@ -666,7 +664,7 @@ unsafe impl AttrGet<SQL_DESC_DISPLAY_SIZE> for SQLINTEGER {}
 
 //#[derive(Ident)]
 //#[identifier(SQLSMALLINT, 1009)]
-//#[allow(non_camel_case_types)]
+//#[expect(non_camel_case_types)]
 //pub struct SQL_DESC_INDICATOR_PTR;
 //unsafe impl Attr<SQL_DESC_DISPLAY_SIZE> for {
 //    type DefinedBy = OdbcDefined;
@@ -676,7 +674,7 @@ unsafe impl AttrGet<SQL_DESC_DISPLAY_SIZE> for SQLINTEGER {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 9)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 // This is read-only attribute
 pub struct SQL_DESC_FIXED_PREC_SCALE;
 unsafe impl Attr<SQL_DESC_FIXED_PREC_SCALE> for OdbcBool {
@@ -695,58 +693,58 @@ unsafe impl AttrGet<SQL_DESC_FIXED_PREC_SCALE> for OdbcBool {}
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 1004)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_OCTET_LENGTH_PTR;
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 33)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_PARAMETER_TYPE;
 
 #[cfg(feature = "v3_5")]
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 35)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_ROWVER;
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 1012)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_UNNAMED;
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 1002)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_TYPE;
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 1003)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_LENGTH;
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 1005)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_PRECISION;
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 1006)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_SCALE;
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 1008)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_NULLABLE;
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 1011)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_NAME;
 
 #[derive(Ident)]
 #[identifier(SQLSMALLINT, 1013)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 pub struct SQL_DESC_OCTET_LENGTH;
 unsafe impl Attr<SQL_DESC_OCTET_LENGTH> for OdbcBool {
     type DefinedBy = OdbcDefined;

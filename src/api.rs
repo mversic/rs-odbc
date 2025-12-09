@@ -1,10 +1,14 @@
 use crate::handle::*;
 use crate::{
+    BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion, FreeStmtOption,
+    FunctionId, IOType, Ident, IdentifierType, LockType, NullAllowed, Operation, RETCODE, Ref,
+    Reserved, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN,
+    SQLUSMALLINT, SQLWCHAR, Scope, StrLenOrInd, Unique,
     attr::{AttrGet, AttrSet, StrLen},
     c_types::CData,
     c_types::DeferredBuf,
     col::ColAttr,
-    conn::{BrowseConnect, ConnAttr, ConnState, Disconnect, C2, C3, C4},
+    conn::{BrowseConnect, C2, C3, C4, ConnAttr, ConnState, Disconnect},
     convert::{
         AsMutPtr, AsMutRawSlice, AsMutSQLPOINTER, AsRawSlice, AsSQLHANDLE, AsSQLPOINTER,
         IntoSQLPOINTER,
@@ -12,16 +16,12 @@ use crate::{
     desc::{AppDesc, DescField, DescType, IPD, IRD},
     diag::{DiagField, SQLSTATE},
     env::{EnvAttr, OdbcVersion, SQL_OV_ODBC3_80, SQL_OV_ODBC4},
-    handle::{RefSQLHDESC, UnsafeSQLHSTMT, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT, SQL_HANDLE_STMT},
+    handle::{RefSQLHDESC, SQL_HANDLE_STMT, SQLHDBC, SQLHDESC, SQLHENV, SQLHSTMT, UnsafeSQLHSTMT},
     info::InfoType,
     sql_types::SqlType,
-    sqlreturn::{SQLRETURN, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_SUCCEEDED},
-    stmt::{private::BaseStmtAttr, StmtAttr},
+    sqlreturn::{SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_SUCCEEDED, SQLRETURN},
+    stmt::{StmtAttr, private::BaseStmtAttr},
     str::{Ansi, OdbcStr, Unicode},
-    BulkOperation, CompletionType, DatetimeIntervalCode, DriverCompletion, FreeStmtOption,
-    FunctionId, IOType, Ident, IdentifierType, LockType, NullAllowed, Operation, Ref, Reserved,
-    Scope, StrLenOrInd, Unique, RETCODE, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW,
-    SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
 };
 use core::{cell::UnsafeCell, mem::MaybeUninit, ptr};
 #[cfg(test)]
@@ -34,7 +34,7 @@ pub trait Handle: AsSQLHANDLE + Sized {
     type Ident: Ident<Type = SQLSMALLINT>;
 }
 
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 pub trait Allocate<'src, SRC: AsSQLHANDLE>: Handle {
     /// Creates handle from a raw pointer
     ///
@@ -80,7 +80,7 @@ pub trait Allocate<'src, SRC: AsSQLHANDLE>: Handle {
     fn SQLFreeHandle(self) {}
 }
 
-#[allow(non_snake_case, unused_variables)]
+#[expect(non_snake_case)]
 pub trait Diagnostics: Handle {
     /// Returns the current value of a field of a record of the diagnostic data structure (associated with a specified handle) that contains error, warning, and status information.
     ///
@@ -89,16 +89,18 @@ pub trait Diagnostics: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_NO_DATA.
     #[inline]
-    fn SQLGetDiagFieldA<A: Ident<Type = SQLSMALLINT>, T: DiagField<Self, A>>(
+    fn SQLGetDiagFieldA<
+        A: Ident<Type = SQLSMALLINT>,
+        T: DiagField<Self, A> + AttrGet<A> + Ansi + ?Sized,
+    >(
         &self,
         // TODO: Use NoneZeroI16?
         RecNumber: core::num::NonZeroI16,
-        DiagIdentifier: A,
+        #[expect(unused_variables)] DiagIdentifier: A,
         DiagInfoPtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Ansi + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
         let DiagInfoPtr = DiagInfoPtr.map_or((ptr::null_mut(), 0), |DiagInfoPtr| {
@@ -129,16 +131,18 @@ pub trait Diagnostics: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_NO_DATA.
     #[inline]
-    fn SQLGetDiagFieldW<A: Ident<Type = SQLSMALLINT>, T: DiagField<Self, A>>(
+    fn SQLGetDiagFieldW<
+        A: Ident<Type = SQLSMALLINT>,
+        T: DiagField<Self, A> + AttrGet<A> + Unicode + ?Sized,
+    >(
         &self,
         // TODO: Use NoneZeroI16?
         RecNumber: core::num::NonZeroI16,
-        DiagIdentifier: A,
+        #[expect(unused_variables)] DiagIdentifier: A,
         DiagInfoPtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Unicode + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
         let DiagInfoPtr = DiagInfoPtr.map_or((ptr::null_mut(), 0), |DiagInfoPtr| {
@@ -227,7 +231,7 @@ pub trait Diagnostics: Handle {
     }
 }
 
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     type ARD: Descriptor<'buf, AppDesc<'buf>, V>;
     type APD: Descriptor<'buf, AppDesc<'buf>, V>;
@@ -237,16 +241,14 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     type ExplicitARD: Descriptor<'buf, AppDesc<'buf>, V>;
     type ExplicitAPD: Descriptor<'buf, AppDesc<'buf>, V>;
 
-    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(
+    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V> + ?Sized>(
         &self,
         TargetValuePtr: Option<&'buf B>,
-    ) where
-        B: ?Sized;
-    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(
+    );
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V> + ?Sized>(
         &self,
         TargetValuePtr: Option<&'buf B>,
-    ) where
-        B: ?Sized;
+    );
     fn bind_strlen_or_ind(&self, StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>);
 
     /// Binds application data buffers to columns in the result set.
@@ -256,17 +258,13 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
-    fn SQLBindCol<TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<Self::ARD, TT, V>>(
+    fn SQLBindCol<TT: Ident<Type = SQLSMALLINT>, B: DeferredBuf<Self::ARD, TT, V> + ?Sized>(
         &self,
         ColumnNumber: SQLUSMALLINT,
-        TargetType: TT,
+        #[expect(unused_variables)] TargetType: TT,
         TargetValuePtr: Option<&'buf B>,
         StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
-    ) -> SQLRETURN
-    where
-        B: ?Sized,
-    {
+    ) -> SQLRETURN {
         let sql_return = unsafe {
             let TargetValuePtr = TargetValuePtr.map_or((ptr::null_mut(), 0), |TargetValuePtr| {
                 (TargetValuePtr.as_SQLPOINTER(), TargetValuePtr.len())
@@ -299,26 +297,23 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
+    #[expect(clippy::too_many_arguments)]
     fn SQLBindParameter<
         TT: Ident<Type = SQLSMALLINT>,
         // TODO: Check which type is used for ParameterType
         ST: SqlType<V>,
-        B: DeferredBuf<Self::APD, TT, V>,
+        B: DeferredBuf<Self::APD, TT, V> + ?Sized,
     >(
         &self,
         ParameterNumber: SQLUSMALLINT,
         InputOutputType: IOType,
-        ValueType: TT,
+        #[expect(unused_variables)] ValueType: TT,
         ParameterType: ST,
         ColumnSize: SQLULEN,
         DecimalDigits: SQLSMALLINT,
         ParameterValuePtr: Option<&'buf B>,
         StrLen_or_IndPtr: Option<&'buf UnsafeCell<StrLenOrInd>>,
-    ) -> SQLRETURN
-    where
-        B: ?Sized,
-    {
+    ) -> SQLRETURN {
         let sql_return = unsafe {
             let ParameterValuePtr = ParameterValuePtr
                 .map_or((ptr::null_mut(), 0), |ParameterValuePtr| {
@@ -377,17 +372,18 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
-    fn SQLColAttributeA<A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
+    fn SQLColAttributeA<
+        A: Ident<Type = SQLUSMALLINT>,
+        T: ColAttr<A, V> + AttrGet<A> + Ansi + ?Sized,
+    >(
         &self,
         ColumnNumber: SQLUSMALLINT,
-        FieldIdentifier: A,
+        #[expect(unused_variables)] FieldIdentifier: A,
         CharacterAttributePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
         NumericAttributePtr: &mut impl AsMutPtr<SQLLEN>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Ansi + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
         // TODO: With MaybeUninit it's not possible to check that value is zeroed
@@ -423,17 +419,18 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
-    fn SQLColAttributeW<A: Ident<Type = SQLUSMALLINT>, T: ColAttr<A, V>>(
+    fn SQLColAttributeW<
+        A: Ident<Type = SQLUSMALLINT>,
+        T: ColAttr<A, V> + AttrGet<A> + Unicode + ?Sized,
+    >(
         &self,
         ColumnNumber: SQLUSMALLINT,
-        FieldIdentifier: A,
+        #[expect(unused_variables)] FieldIdentifier: A,
         CharacterAttributePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
         NumericAttributePtr: &mut impl AsMutPtr<SQLLEN>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Unicode + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
         // TODO: With MaybeUninit it's not possible to check that value is zeroed
@@ -605,6 +602,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
+    #[expect(clippy::too_many_arguments)]
     fn SQLDescribeColA(
         &self,
         ColumnNumber: SQLUSMALLINT,
@@ -639,6 +637,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
+    #[expect(clippy::too_many_arguments)]
     fn SQLDescribeColW(
         &self,
         ColumnNumber: SQLUSMALLINT,
@@ -853,17 +852,15 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
     // TODO: This function must be unsafe if SQL_ARD_TYPE and SQL_APD_TYPE are allowed to be used
-    fn SQLGetData<TT: Ident<Type = SQLSMALLINT>, B: CData<TT, V>>(
+    fn SQLGetData<TT: Ident<Type = SQLSMALLINT>, B: CData<TT, V> + AsMutSQLPOINTER + ?Sized>(
         &self,
         Col_or_Param_Num: SQLUSMALLINT,
-        TargetType: TT,
+        #[expect(unused_variables)] TargetType: TT,
         TargetValuePtr: &mut B,
         StrLen_or_IndPtr: Option<&mut MaybeUninit<StrLenOrInd>>,
     ) -> SQLRETURN
     where
-        B: AsMutSQLPOINTER + ?Sized,
         MaybeUninit<StrLenOrInd>: StrLen<SQLLEN>,
     {
         unsafe {
@@ -885,14 +882,17 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    fn SQLGetStmtAttrA<'stmt, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, Self, A, V>>(
+    fn SQLGetStmtAttrA<
+        'stmt,
+        A: Ident<Type = SQLINTEGER>,
+        T: StmtAttr<'desc, 'buf, Self, A, V> + AttrGet<A> + Ansi + Ref<'stmt> + ?Sized,
+    >(
         &'stmt self,
         Attribute: A,
         ValuePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Ansi + Ref<'stmt> + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
         SQLGetStmtAttrA(self, Attribute, ValuePtr, StringLengthPtr)
@@ -905,14 +905,17 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    fn SQLGetStmtAttrW<'stmt, A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, Self, A, V>>(
+    fn SQLGetStmtAttrW<
+        'stmt,
+        A: Ident<Type = SQLINTEGER>,
+        T: StmtAttr<'desc, 'buf, Self, A, V> + AttrGet<A> + Unicode + Ref<'stmt> + ?Sized,
+    >(
         &'stmt self,
         Attribute: A,
         ValuePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Unicode + Ref<'stmt> + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
         SQLGetStmtAttrW(self, Attribute, ValuePtr, StringLengthPtr)
@@ -1207,15 +1210,15 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
     // TODO: Is it unsafe if odbc_debug is used?
-    unsafe fn SQLPutData<TT: Ident, B: CData<TT, V>>(&self, DataPtr: Option<&B>) -> SQLRETURN
-    where
-        B: AsSQLPOINTER + ?Sized,
-    {
+    unsafe fn SQLPutData<TT: Ident, B: CData<TT, V> + AsSQLPOINTER + ?Sized>(
+        &self,
+        DataPtr: Option<&B>,
+    ) -> SQLRETURN {
         let DataPtr = DataPtr.map_or((ptr::null_mut(), 0), |DataPtr| {
             (DataPtr.as_SQLPOINTER(), DataPtr.len())
         });
 
-        ffi::SQLPutData(self.as_SQLHANDLE(), DataPtr.0, DataPtr.1)
+        unsafe { ffi::SQLPutData(self.as_SQLHANDLE(), DataPtr.0, DataPtr.1) }
     }
 
     /// Returns the number of rows affected by an **UPDATE**, **INSERT**, or **DELETE** statement; an SQL_ADD, SQL_UPDATE_BY_BOOKMARK, or SQL_DELETE_BY_BOOKMARK operation in **SQLBulkOperations**; or an SQL_UPDATE or SQL_DELETE operation in **SQLSetPos**.
@@ -1262,14 +1265,14 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    fn SQLSetStmtAttrA<A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, Self, A, V>>(
+    fn SQLSetStmtAttrA<
+        A: Ident<Type = SQLINTEGER>,
+        T: StmtAttr<'desc, 'buf, Self, A, V> + AttrSet<A> + Ansi,
+    >(
         &self,
         Attribute: A,
         ValuePtr: T,
-    ) -> SQLRETURN
-    where
-        T: AttrSet<A> + Ansi,
-    {
+    ) -> SQLRETURN {
         SQLSetStmtAttrA(self, Attribute, ValuePtr)
     }
 
@@ -1280,14 +1283,14 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    fn SQLSetStmtAttrW<A: Ident<Type = SQLINTEGER>, T: StmtAttr<'desc, 'buf, Self, A, V>>(
+    fn SQLSetStmtAttrW<
+        A: Ident<Type = SQLINTEGER>,
+        T: StmtAttr<'desc, 'buf, Self, A, V> + AttrSet<A> + Unicode,
+    >(
         &self,
         Attribute: A,
         ValuePtr: T,
-    ) -> SQLRETURN
-    where
-        T: AttrSet<A> + Unicode,
-    {
+    ) -> SQLRETURN {
         SQLSetStmtAttrW(self, Attribute, ValuePtr)
     }
 
@@ -1545,6 +1548,8 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
         TableName: &OdbcStr<SQLWCHAR>,
         TableType: &OdbcStr<SQLWCHAR>,
     ) -> SQLRETURN {
+        let StatementHandle = self.as_SQLHANDLE();
+
         let CatalogName = CatalogName.as_raw_slice();
         let SchemaName = SchemaName.as_raw_slice();
         let TableName = TableName.as_raw_slice();
@@ -1552,7 +1557,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
 
         unsafe {
             ffi::SQLTablesW(
-                self.as_SQLHANDLE(),
+                StatementHandle,
                 CatalogName.0,
                 CatalogName.1,
                 SchemaName.0,
@@ -1566,7 +1571,7 @@ pub trait Statement<'desc, 'buf, V: OdbcVersion>: Handle {
     }
 }
 
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// Copies descriptor information from one descriptor handle to another.
     ///
@@ -1579,7 +1584,9 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     // TODO: Do they have to have the same version?
     // TODO: Is lifetime the same?
     fn SQLCopyDesc<DT2: DescType<'buf>>(&self, TargetDescHandle: &SQLHDESC<DT2, V>) -> SQLRETURN {
-        unsafe { ffi::SQLCopyDesc(self.as_SQLHANDLE(), TargetDescHandle.as_SQLHANDLE()) }
+        let SourceDescHandle = self.as_SQLHANDLE();
+        let TargetDescHandle = TargetDescHandle.as_SQLHANDLE();
+        unsafe { ffi::SQLCopyDesc(SourceDescHandle, TargetDescHandle) }
     }
 
     /// Returns the current setting or value of a single field of a descriptor record.
@@ -1589,18 +1596,21 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
-    fn SQLGetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, Self, DT, A, V>>(
+    fn SQLGetDescFieldA<
+        A: Ident<Type = SQLSMALLINT>,
+        T: DescField<'buf, Self, DT, A, V> + AttrGet<A> + Ansi + ?Sized,
+    >(
         &self,
         RecNumber: SQLSMALLINT,
-        FieldIdentifier: A,
+        #[expect(unused_variables)] FieldIdentifier: A,
         ValuePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Ansi + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
+        let DescriptorHandle = self.as_SQLHANDLE();
+
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
             if cfg!(feature = "odbc_debug") {
                 ValuePtr.assert_zeroed();
@@ -1611,7 +1621,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
 
         unsafe {
             ffi::SQLGetDescFieldA(
-                self.as_SQLHANDLE(),
+                DescriptorHandle,
                 RecNumber,
                 A::IDENTIFIER,
                 ValuePtr.0,
@@ -1628,18 +1638,20 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
-    fn SQLGetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, Self, DT, A, V>>(
+    fn SQLGetDescFieldW<
+        A: Ident<Type = SQLSMALLINT>,
+        T: DescField<'buf, Self, DT, A, V> + AttrGet<A> + Unicode + ?Sized,
+    >(
         &self,
         RecNumber: SQLSMALLINT,
-        FieldIdentifier: A,
+        #[expect(unused_variables)] FieldIdentifier: A,
         ValuePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Unicode + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
+        let DescriptorHandle = self.as_SQLHANDLE();
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
             if cfg!(feature = "odbc_debug") {
                 ValuePtr.assert_zeroed();
@@ -1650,7 +1662,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
 
         unsafe {
             ffi::SQLGetDescFieldW(
-                self.as_SQLHANDLE(),
+                DescriptorHandle,
                 RecNumber,
                 A::IDENTIFIER,
                 ValuePtr.0,
@@ -1667,6 +1679,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
     #[inline]
+    #[expect(clippy::too_many_arguments)]
     fn SQLGetDescRecA<ST: SqlType<V>>(
         &self,
         RecNumber: SQLSMALLINT,
@@ -1679,11 +1692,12 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
         ScalePtr: &mut impl AsMutPtr<SQLSMALLINT>,
         NullablePtr: &mut impl AsMutPtr<NullAllowed>,
     ) -> SQLRETURN {
+        let DescriptorHandle = self.as_SQLHANDLE();
         let Name = Name.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
         unsafe {
             ffi::SQLGetDescRecA(
-                self.as_SQLHANDLE(),
+                DescriptorHandle,
                 RecNumber,
                 Name.0,
                 Name.1,
@@ -1705,6 +1719,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_NO_DATA, or SQL_INVALID_HANDLE.
     #[inline]
+    #[expect(clippy::too_many_arguments)]
     fn SQLGetDescRecW<ST: SqlType<V>>(
         &self,
         RecNumber: SQLSMALLINT,
@@ -1717,11 +1732,12 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
         ScalePtr: &mut impl AsMutPtr<SQLSMALLINT>,
         NullablePtr: &mut impl AsMutPtr<NullAllowed>,
     ) -> SQLRETURN {
+        let DescriptorHandle = self.as_SQLHANDLE();
         let Name = Name.map_or((ptr::null_mut(), 0), AsMutRawSlice::as_mut_raw_slice);
 
         unsafe {
             ffi::SQLGetDescRecW(
-                self.as_SQLHANDLE(),
+                DescriptorHandle,
                 RecNumber,
                 Name.0,
                 Name.1,
@@ -1743,16 +1759,15 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
-    fn SQLSetDescFieldA<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, Self, DT, A, V>>(
+    fn SQLSetDescFieldA<
+        A: Ident<Type = SQLSMALLINT>,
+        T: DescField<'buf, Self, DT, A, V> + AttrSet<A> + Ansi,
+    >(
         &self,
         RecNumber: SQLSMALLINT,
-        FieldIdentifier: A,
+        #[expect(unused_variables)] FieldIdentifier: A,
         ValuePtr: Option<T>,
-    ) -> SQLRETURN
-    where
-        T: AttrSet<A> + Ansi,
-    {
+    ) -> SQLRETURN {
         let sql_return = unsafe {
             let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
                 (ValuePtr.into_SQLPOINTER(), ValuePtr.len())
@@ -1767,8 +1782,10 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
             )
         };
 
-        if SQL_SUCCEEDED(sql_return) {
-            ValuePtr.map(|v| v.update_handle(self));
+        if SQL_SUCCEEDED(sql_return)
+            && let Some(v) = ValuePtr
+        {
+            v.update_handle(self);
         }
 
         sql_return
@@ -1781,16 +1798,15 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
-    fn SQLSetDescFieldW<A: Ident<Type = SQLSMALLINT>, T: DescField<'buf, Self, DT, A, V>>(
+    fn SQLSetDescFieldW<
+        A: Ident<Type = SQLSMALLINT>,
+        T: DescField<'buf, Self, DT, A, V> + AttrSet<A> + Unicode,
+    >(
         &self,
         RecNumber: SQLSMALLINT,
-        FieldIdentifier: A,
+        #[expect(unused_variables)] FieldIdentifier: A,
         ValuePtr: Option<T>,
-    ) -> SQLRETURN
-    where
-        T: AttrSet<A> + Unicode,
-    {
+    ) -> SQLRETURN {
         let sql_return = unsafe {
             let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
                 (ValuePtr.into_SQLPOINTER(), ValuePtr.len())
@@ -1805,8 +1821,10 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
             )
         };
 
-        if SQL_SUCCEEDED(sql_return) {
-            ValuePtr.map(|v| v.update_handle(self));
+        if SQL_SUCCEEDED(sql_return)
+            && let Some(v) = ValuePtr
+        {
+            v.update_handle(self);
         }
 
         sql_return
@@ -1819,6 +1837,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
+    #[expect(clippy::too_many_arguments)]
     // TODO: Must not be allowed for IRD. Handle here or with DescField
     fn SQLSetDescRec<ST: SqlType<V>, PTR>(
         &self,
@@ -1854,7 +1873,7 @@ pub trait Descriptor<'buf, DT, V: OdbcVersion>: Handle {
     }
 }
 
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 pub trait Cancel<V: OdbcVersion>: Handle {
     /// Cancels the processing on a statement.
     /// To cancel processing on a connection or statement, use SQLCancelHandle Function.
@@ -1883,7 +1902,7 @@ pub trait Cancel<V: OdbcVersion>: Handle {
     }
 }
 
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 pub trait Async<V: OdbcVersion>: Handle {
     /// Can be used to determine when an asynchronous function is complete using either notification- or polling-based processing. For more information about asynchronous operations, see Asynchronous Execution.
     /// **SQLCompleteAsync** is only implemented in the ODBC Driver Manager.
@@ -1907,7 +1926,7 @@ pub trait Async<V: OdbcVersion>: Handle {
     }
 }
 
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 impl<V: OdbcVersion> SQLHENV<V> {
     /// Returns information about a data source. This function is implemented only by the Driver Manager.
     ///
@@ -2044,15 +2063,13 @@ impl<V: OdbcVersion> SQLHENV<V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
-    pub fn SQLGetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>>(
+    pub fn SQLGetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V> + AttrGet<A> + ?Sized>(
         &self,
-        Attribute: A,
+        #[expect(unused_variables)] Attribute: A,
         ValuePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -2077,17 +2094,13 @@ impl<V: OdbcVersion> SQLHENV<V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
-    pub fn SQLSetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V>>(
+    pub fn SQLSetEnvAttr<A: Ident<Type = SQLINTEGER>, T: EnvAttr<A, V> + AttrSet<A>>(
         // Reference to SQLHENV is mutable to make it impossible to have a connection
         // handle allocated on the environment handle when calling this function
         &mut self,
-        Attribute: A,
+        #[expect(unused_variables)] Attribute: A,
         ValuePtr: T,
-    ) -> SQLRETURN
-    where
-        T: AttrSet<A>,
-    {
+    ) -> SQLRETURN {
         unsafe {
             ffi::SQLSetEnvAttr(
                 self.as_SQLHANDLE(),
@@ -2099,7 +2112,7 @@ impl<V: OdbcVersion> SQLHENV<V> {
     }
 }
 
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// Supports an iterative method of discovering and enumerating the attributes and attribute values required to connect to a data source. Each call to **SQLBrowseConnect** returns successive levels of attributes and attribute values. When all levels have been enumerated, a connection to the data source is completed and a complete connection string is returned by **SQLBrowseConnect**. A return code of SQL_SUCCESS or SQL_SUCCESS_WITH_INFO indicates that all connection information has been specified and the application is now connected to the data source.
     ///
@@ -2108,7 +2121,6 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
     #[inline]
-    #[allow(unused_variables)]
     pub fn SQLBrowseConnectA(
         self,
         InConnectionString: &OdbcStr<SQLCHAR>,
@@ -2219,16 +2231,17 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
-    pub fn SQLGetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<C, A, V>>(
+    pub fn SQLGetConnectAttrA<
+        A: Ident<Type = SQLINTEGER>,
+        T: ConnAttr<C, A, V> + AttrGet<A> + Ansi + ?Sized,
+    >(
         // TODO: Not sure whether attributes should be checked when getting them with SQLGetConnectAttr
         &self,
-        Attribute: A,
+        #[expect(unused_variables)] Attribute: A,
         ValuePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Ansi + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -2257,16 +2270,17 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
-    pub fn SQLGetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<C, A, V>>(
+    pub fn SQLGetConnectAttrW<
+        A: Ident<Type = SQLINTEGER>,
+        T: ConnAttr<C, A, V> + AttrGet<A> + Unicode + ?Sized,
+    >(
         // TODO: Not really sure whether attributes should be checked when getting them with SQLGetConnectAttr
         &self,
-        Attribute: A,
+        #[expect(unused_variables)] Attribute: A,
         ValuePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Unicode + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
     {
         let ValuePtr = ValuePtr.map_or((ptr::null_mut(), 0), |ValuePtr| {
@@ -2295,18 +2309,18 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
     #[inline]
-    #[allow(unused_variables)]
-    pub fn SQLSetConnectAttrA<A: Ident<Type = SQLINTEGER>, T: ConnAttr<C, A, V>>(
+    pub fn SQLSetConnectAttrA<
+        A: Ident<Type = SQLINTEGER>,
+        T: ConnAttr<C, A, V> + AttrSet<A> + Ansi,
+    >(
         &self,
-        Attribute: A,
+        #[expect(unused_variables)] Attribute: A,
         ValuePtr: T,
-    ) -> SQLRETURN
-    where
-        T: AttrSet<A> + Ansi,
-    {
+    ) -> SQLRETURN {
+        let conn_handle = self.as_SQLHANDLE();
         unsafe {
             ffi::SQLSetConnectAttrA(
-                self.as_SQLHANDLE(),
+                conn_handle,
                 A::IDENTIFIER,
                 ValuePtr.into_SQLPOINTER(),
                 ValuePtr.len(),
@@ -2321,15 +2335,14 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
     #[inline]
-    #[allow(unused_variables)]
-    pub fn SQLSetConnectAttrW<A: Ident<Type = SQLINTEGER>, T: ConnAttr<C, A, V>>(
+    pub fn SQLSetConnectAttrW<
+        A: Ident<Type = SQLINTEGER>,
+        T: ConnAttr<C, A, V> + AttrSet<A> + Unicode,
+    >(
         &self,
-        Attribute: A,
+        #[expect(unused_variables)] Attribute: A,
         ValuePtr: T,
-    ) -> SQLRETURN
-    where
-        T: AttrSet<A> + Unicode,
-    {
+    ) -> SQLRETURN {
         unsafe {
             ffi::SQLSetConnectAttrW(
                 self.as_SQLHANDLE(),
@@ -2341,7 +2354,7 @@ impl<'env, C: ConnState, V: OdbcVersion> SQLHDBC<'env, C, V> {
     }
 }
 
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 impl<'env, V: OdbcVersion> SQLHDBC<'env, C2, V> {
     /// Establishes connections to a driver and a data source. The connection handle references storage of all information about the connection to the data source, including status, transaction state, and error information.
     ///
@@ -2508,7 +2521,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C2, V> {
     }
 }
 
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     /// Returns information about whether a driver supports a specific ODBC function. This function is implemented in the Driver Manager; it can also be implemented in drivers. If a driver implements **SQLGetFunctions**, the Driver Manager calls the function in the driver. Otherwise, it executes the function itself.
     ///
@@ -2538,16 +2551,17 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
-    pub fn SQLGetInfoA<A: Ident<Type = SQLUSMALLINT>, T: InfoType<A, V>>(
+    pub fn SQLGetInfoA<
+        A: Ident<Type = SQLUSMALLINT>,
+        T: InfoType<A, V> + AttrGet<A> + Ansi + ?Sized,
+    >(
         // TODO: SQL_ODBC_VER can be called on connection that is not open
         &self,
-        InfoType: A,
+        #[expect(unused_variables)] InfoType: A,
         InfoValuePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Ansi + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
         let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
@@ -2572,16 +2586,17 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     /// # Returns
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
-    #[allow(unused_variables)]
-    pub fn SQLGetInfoW<A: Ident<Type = SQLUSMALLINT>, T: InfoType<A, V>>(
+    pub fn SQLGetInfoW<
+        A: Ident<Type = SQLUSMALLINT>,
+        T: InfoType<A, V> + AttrGet<A> + Unicode + ?Sized,
+    >(
         // TODO: SQL_ODBC_VER can be called on connection that is not open
         &self,
-        InfoType: A,
+        #[expect(unused_variables)] InfoType: A,
         InfoValuePtr: Option<&mut T>,
         StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
     ) -> SQLRETURN
     where
-        T: AttrGet<A> + Unicode + ?Sized,
         MaybeUninit<T::StrLen>: StrLen<SQLSMALLINT>,
     {
         let InfoValuePtr = InfoValuePtr.map_or((ptr::null_mut(), 0), |InfoValuePtr| {
@@ -2676,7 +2691,7 @@ impl<'env, V: OdbcVersion> SQLHDBC<'env, C4, V> {
     }
 }
 
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
     ///
@@ -2761,7 +2776,7 @@ impl<'desc, 'buf, V: OdbcVersion> SQLHSTMT<'_, 'desc, 'buf, V> {
     }
 }
 
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
     ///
@@ -2771,9 +2786,9 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
     #[inline]
     pub unsafe fn SQLExecDirectA(&self, StatementText: &OdbcStr<SQLCHAR>) -> SQLRETURN {
+        let sql_handle = self.as_SQLHANDLE();
         let StatementText = StatementText.as_raw_slice();
-
-        ffi::SQLExecDirectA(self.as_SQLHANDLE(), StatementText.0, StatementText.1)
+        unsafe { ffi::SQLExecDirectA(sql_handle, StatementText.0, StatementText.1) }
     }
 
     /// Executes a preparable statement, using the current values of the parameter marker variables if any parameters exist in the statement. **SQLExecDirect** is the fastest way to submit an SQL statement for one-time execution.
@@ -2784,9 +2799,9 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
     #[inline]
     pub unsafe fn SQLExecDirectW(&self, StatementText: &OdbcStr<SQLWCHAR>) -> SQLRETURN {
+        let sql_handle = self.as_SQLHANDLE();
         let StatementText = StatementText.as_raw_slice();
-
-        ffi::SQLExecDirectW(self.as_SQLHANDLE(), StatementText.0, StatementText.1)
+        unsafe { ffi::SQLExecDirectW(sql_handle, StatementText.0, StatementText.1) }
     }
 
     /// Executes a prepared statement, using the current values of the parameter marker variables if any parameter markers exist in the statement.
@@ -2797,7 +2812,8 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, SQL_NO_DATA, SQL_INVALID_HANDLE, or SQL_PARAM_DATA_AVAILABLE.
     #[inline]
     pub unsafe fn SQLExecute(&self) -> SQLRETURN {
-        ffi::SQLExecute(self.as_SQLHANDLE())
+        let sql_handle = self.as_SQLHANDLE();
+        unsafe { ffi::SQLExecute(sql_handle) }
     }
 
     /// Fetches the next rowset of data from the result set and returns data for all bound columns.
@@ -2808,7 +2824,8 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
     /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NO_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
     #[inline]
     pub unsafe fn SQLFetch(&self) -> SQLRETURN {
-        ffi::SQLFetch(self.as_SQLHANDLE())
+        let sql_handle = self.as_SQLHANDLE();
+        unsafe { ffi::SQLFetch(sql_handle) }
     }
 
     /// Fetches the specified rowset of data from the result set and returns data for all bound columns. Rowsets can be specified at an absolute or relative position or by bookmark.
@@ -2823,7 +2840,8 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
         FetchOrientation: SQLSMALLINT,
         FetchOffset: SQLLEN,
     ) -> SQLRETURN {
-        ffi::SQLFetchScroll(self.as_SQLHANDLE(), FetchOrientation, FetchOffset)
+        let sql_handle = self.as_SQLHANDLE();
+        unsafe { ffi::SQLFetchScroll(sql_handle, FetchOrientation, FetchOffset) }
     }
 
     /// Sets the cursor position in a rowset and allows an application to refresh data in the rowset or to update or delete data in the result set.
@@ -2839,16 +2857,20 @@ impl<'desc, 'buf, V: OdbcVersion> UnsafeSQLHSTMT<'_, 'desc, 'buf, V> {
         Operation: Operation,
         LockType: LockType,
     ) -> SQLRETURN {
-        ffi::SQLSetPos(
-            self.as_SQLHANDLE(),
-            RowNumber,
-            Operation as SQLUSMALLINT,
-            LockType as SQLUSMALLINT,
-        )
+        let sql_handle = self.as_SQLHANDLE();
+
+        unsafe {
+            ffi::SQLSetPos(
+                sql_handle,
+                RowNumber,
+                Operation as SQLUSMALLINT,
+                LockType as SQLUSMALLINT,
+            )
+        }
     }
 }
 
-#[allow(non_snake_case)]
+#[expect(non_snake_case)]
 impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
     for SQLHSTMT<'conn, 'desc, 'buf, V>
 {
@@ -2862,18 +2884,12 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
     type ExplicitARD = SQLHDESC<'conn, AppDesc<'buf>, V>;
     type ExplicitAPD = SQLHDESC<'conn, AppDesc<'buf>, V>;
 
-    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, _: Option<&'buf B>)
-    where
-        B: ?Sized,
-    {
+    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V> + ?Sized>(&self, _: Option<&'buf B>) {
         //TODO:
         //self.0.bind_col(TargetValuePtr)
     }
 
-    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(&self, _: Option<&'buf B>)
-    where
-        B: ?Sized,
-    {
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V> + ?Sized>(&self, _: Option<&'buf B>) {
         // TODO:
         //self.0.bind_param(TargetValuePtr)
     }
@@ -2899,25 +2915,15 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
 
     // TODO: Don't bind (SQLPOINTER, SQLLEN) fat pointer when using raw_api
     #[cfg(not(feature = "odbc_debug"))]
-    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, _: Option<&'buf B>)
-    where
-        B: ?Sized,
-    {
-    }
+    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V> + ?Sized>(&self, _: Option<&'buf B>) {}
     #[cfg(not(feature = "odbc_debug"))]
-    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(&self, _: Option<&'buf B>)
-    where
-        B: ?Sized,
-    {
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V> + ?Sized>(&self, _: Option<&'buf B>) {
     }
     #[cfg(not(feature = "odbc_debug"))]
     fn bind_strlen_or_ind(&self, _: Option<&'buf UnsafeCell<StrLenOrInd>>) {}
 
     #[cfg(feature = "odbc_debug")]
-    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V>>(&self, _: Option<&'buf B>)
-    where
-        B: ?Sized,
-    {
+    fn bind_col<TT: Ident, B: DeferredBuf<Self::ARD, TT, V> + ?Sized>(&self, _: Option<&'buf B>) {
         if let Some(explicit_ard) = self.explicit_ard.get() {
             // TODO:
             //explicit_ard.bind_col(TargetValuePtr);
@@ -2927,12 +2933,10 @@ impl<'conn, 'desc, 'buf, V: OdbcVersion> Statement<'desc, 'buf, V>
         }
     }
     #[cfg(feature = "odbc_debug")]
-    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V>>(
+    fn bind_param<TT: Ident, B: DeferredBuf<Self::APD, TT, V> + ?Sized>(
         &self,
         TargetValuePtr: Option<&'buf B>,
-    ) where
-        B: ?Sized,
-    {
+    ) {
         if let Some(explicit_apd) = self.explicit_apd.get() {
             // TODO:
             //explicit_apd.bind_param(TargetValuePtr);
@@ -2977,23 +2981,22 @@ impl<'desc, 'buf, S: Statement<'desc, 'buf, SQL_OV_ODBC4>> Cancel<SQL_OV_ODBC4> 
 impl<'desc, 'buf, S: Statement<'desc, 'buf, SQL_OV_ODBC3_80>> Async<SQL_OV_ODBC3_80> for S {}
 impl<'desc, 'buf, S: Statement<'desc, 'buf, SQL_OV_ODBC4>> Async<SQL_OV_ODBC4> for S {}
 
-#[allow(non_snake_case, unused_variables)]
+#[expect(non_snake_case)]
 fn SQLGetStmtAttrA<
     'stmt,
     'desc,
     'buf,
     S: Statement<'desc, 'buf, V>,
     A: Ident<Type = SQLINTEGER>,
-    T: BaseStmtAttr<'desc, 'buf, S, A, V>,
+    T: BaseStmtAttr<'desc, 'buf, S, A, V> + AttrGet<A> + Ansi + Ref<'stmt> + ?Sized,
     V: OdbcVersion,
 >(
     Handle: &'stmt S,
-    Attribute: A,
+    #[expect(unused_variables)] Attribute: A,
     ValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrGet<A> + Ansi + Ref<'stmt> + ?Sized,
     MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
 {
     if let Some(ValuePtr) = ValuePtr {
@@ -3015,23 +3018,22 @@ where
     }
 }
 
-#[allow(non_snake_case, unused_variables)]
+#[expect(non_snake_case)]
 fn SQLGetStmtAttrW<
     'stmt,
     'desc,
     'buf,
     S: Statement<'desc, 'buf, V>,
     A: Ident<Type = SQLINTEGER>,
-    T: BaseStmtAttr<'desc, 'buf, S, A, V>,
+    T: BaseStmtAttr<'desc, 'buf, S, A, V> + AttrGet<A> + Unicode + Ref<'stmt> + ?Sized,
     V: OdbcVersion,
 >(
     Handle: &'stmt S,
-    Attribute: A,
+    #[expect(unused_variables)] Attribute: A,
     ValuePtr: Option<&mut T>,
     StringLengthPtr: Option<&mut MaybeUninit<T::StrLen>>,
 ) -> SQLRETURN
 where
-    T: AttrGet<A> + Unicode + Ref<'stmt> + ?Sized,
     MaybeUninit<T::StrLen>: StrLen<SQLINTEGER>,
 {
     if let Some(ValuePtr) = ValuePtr {
@@ -3053,22 +3055,19 @@ where
     }
 }
 
-#[allow(non_snake_case, unused_variables)]
+#[expect(non_snake_case)]
 fn SQLSetStmtAttrA<
     'desc,
     'buf,
     S: Statement<'desc, 'buf, V>,
     A: Ident<Type = SQLINTEGER>,
-    T: BaseStmtAttr<'desc, 'buf, S, A, V>,
+    T: BaseStmtAttr<'desc, 'buf, S, A, V> + AttrSet<A> + Ansi,
     V: OdbcVersion,
 >(
     Handle: &S,
-    Attribute: A,
+    #[expect(unused_variables)] Attribute: A,
     ValuePtr: T,
-) -> SQLRETURN
-where
-    T: AttrSet<A> + Ansi,
-{
+) -> SQLRETURN {
     let sql_return = unsafe {
         ffi::SQLSetStmtAttrA(
             Handle.as_SQLHANDLE(),
@@ -3085,22 +3084,19 @@ where
     sql_return
 }
 
-#[allow(non_snake_case, unused_variables)]
+#[expect(non_snake_case)]
 fn SQLSetStmtAttrW<
     'desc,
     'buf,
     S: Statement<'desc, 'buf, V>,
     A: Ident<Type = SQLINTEGER>,
-    T: BaseStmtAttr<'desc, 'buf, S, A, V>,
+    T: BaseStmtAttr<'desc, 'buf, S, A, V> + AttrSet<A> + Unicode,
     V: OdbcVersion,
 >(
     Handle: &S,
-    Attribute: A,
+    #[expect(unused_variables)] Attribute: A,
     ValuePtr: T,
-) -> SQLRETURN
-where
-    T: AttrSet<A> + Unicode,
-{
+) -> SQLRETURN {
     let sql_return = unsafe {
         ffi::SQLSetStmtAttrW(
             Handle.as_SQLHANDLE(),
@@ -3121,13 +3117,17 @@ where
 pub(crate) mod ffi {
     use crate::handle::SQLHWND;
     use crate::{
-        diag::SQLSTATE_SIZE, handle::SQLHANDLE, sqlreturn::SQLRETURN, RETCODE, SQLCHAR, SQLINTEGER,
-        SQLLEN, SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN, SQLUSMALLINT, SQLWCHAR,
+        RETCODE, SQLCHAR, SQLINTEGER, SQLLEN, SQLPOINTER, SQLSETPOSIROW, SQLSMALLINT, SQLULEN,
+        SQLUSMALLINT, SQLWCHAR, diag::SQLSTATE_SIZE, handle::SQLHANDLE, sqlreturn::SQLRETURN,
     };
 
+    #[expect(clippy::upper_case_acronyms)]
     type HENV = SQLHANDLE;
+    #[expect(clippy::upper_case_acronyms)]
     type HDBC = SQLHANDLE;
+    #[expect(clippy::upper_case_acronyms)]
     type HSTMT = SQLHANDLE;
+    #[expect(clippy::upper_case_acronyms)]
     type HDESC = SQLHANDLE;
 
     type ConstSQLPOINTER = *const core::ffi::c_void;
@@ -3143,7 +3143,7 @@ pub(crate) mod ffi {
         all(not(windows), not(feature = "static")),
         link(name = "odbc", kind = "dylib")
     )]
-    extern "system" {
+    unsafe extern "system" {
         #[allow(non_snake_case)]
         pub fn SQLAllocHandle(
             HandleType: SQLSMALLINT,

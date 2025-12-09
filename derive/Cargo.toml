@@ -5,7 +5,7 @@ authors = ["Marin Veršić <marin.versic101@gmail.com>"]
 description = "Proc macros for rs-odbc crate"
 repository="https://github.com/mversic/rs-odbc/rs-odbc_derive"
 license = "Apache-2.0"
-edition = "2021"
+edition = "2024"
 
 [lib]
 proc-macro = true
@@ -13,4 +13,4 @@ proc-macro = true
 [dependencies]
 proc-macro2 = "^1"
 quote = "^1"
-syn = "^1"
+syn = "^2"

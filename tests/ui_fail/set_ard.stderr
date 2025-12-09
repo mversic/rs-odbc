@@ -1,6 +1,9 @@
 error[E0597]: `desc` does not live long enough
   --> tests/ui_fail/set_ard.rs:37:54
    |
+35 |     let desc = desc.unwrap();
+   |         ---- binding `desc` declared here
+36 |
 37 |     stmt.SQLSetStmtAttrA(SQL_ATTR_APP_ROW_DESC, Some(&desc));
    |                                                      ^^^^^ borrowed value does not live long enough
 ...
@@ -15,6 +18,9 @@ error[E0597]: `desc` does not live long enough
 error[E0505]: cannot move out of `desc` because it is borrowed
   --> tests/ui_fail/set_ard.rs:39:5
    |
+35 |     let desc = desc.unwrap();
+   |         ---- binding `desc` declared here
+36 |
 37 |     stmt.SQLSetStmtAttrA(SQL_ATTR_APP_ROW_DESC, Some(&desc));
    |                                                      ----- borrow of `desc` occurs here
 38 |
