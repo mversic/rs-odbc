@@ -183,10 +183,12 @@ use rs_odbc::env::{self, SQL_ATTR_CONNECTION_POOLING, SQL_OV_ODBC3_80};
 use rs_odbc::handle::{SQLHENV, SQL_NULL_HANDLE};
 
 fn main() {
+  let mut value = env::SQL_CP_ONE_PER_HENV;     // Initialized to default value
+  let _ = SQL_NULL_HANDLE.SQLSetEnvAttr(SQL_ATTR_CONNECTION_POOLING, Some(&mut value), None);
+
   let (env, _) = SQLHENV::SQLAllocHandle(&SQL_NULL_HANDLE);
   let env: SQLHENV<SQL_OV_ODBC3_80> = env.unwrap();
 
-  let mut value = env::SQL_CP_ONE_PER_HENV;     // Initialized to default value
   let _ = env.SQLGetEnvAttr(SQL_ATTR_CONNECTION_POOLING, Some(&mut value), None);
 
   // Confirm value was modified by the driver

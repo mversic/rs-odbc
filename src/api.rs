@@ -3133,16 +3133,24 @@ pub(crate) mod ffi {
     type ConstSQLPOINTER = *const core::ffi::c_void;
     type MutSQLPOINTER = *mut core::ffi::c_void;
 
-    // TODO: static linking is not supported for windows
+    #[cfg(all(windows, feature = "static"))]
+    compile_error!("feature \"static\" is not supported for Windows");
+
     #[cfg_attr(windows, link(name = "odbc32", kind = "dylib"))]
     #[cfg_attr(
         all(not(windows), feature = "static"),
         link(name = "odbc", kind = "static")
     )]
     #[cfg_attr(
+        all(not(windows), feature = "static"),
+        link(name = "ltdl", kind = "static")
+    )]
+    #[cfg_attr(
         all(not(windows), not(feature = "static")),
         link(name = "odbc", kind = "dylib")
     )]
+    unsafe extern "system" {}
+
     unsafe extern "system" {
         #[allow(non_snake_case)]
         pub fn SQLAllocHandle(
