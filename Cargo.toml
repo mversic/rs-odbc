@@ -9,7 +9,7 @@ edition = "2024"
 
 [dev-dependencies]
 trybuild = "1.0.114"
-mockall = "0.14.0"
+mockall = "0.15.0"
 # TODO: use miri eventually
 
 [dependencies]
