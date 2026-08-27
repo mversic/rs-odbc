@@ -1,64 +1,71 @@
 use core::{cell::UnsafeCell, mem::MaybeUninit};
-use rs_odbc::api::{Allocate, Statement};
-use rs_odbc::c_types::{SQL_C_CHAR, SQL_C_SSHORT};
-use rs_odbc::env::SQL_OV_ODBC3_80;
-use rs_odbc::handle::{SQL_NULL_HANDLE, SQLHDBC, SQLHENV, SQLHSTMT};
-use rs_odbc::sqlreturn::{SQL_NO_DATA, SQL_SUCCEEDED, SQL_SUCCESS};
-use rs_odbc::{SQL_DRIVER_COMPLETE, SQLCHAR};
+
+use rs_odbc::{
+    c_type,
+    conn::DriverCompletion,
+    data::CHAR,
+    env::OV_ODBC3_80,
+    handle::{HDBC, HENV, HSTMT},
+    sqlreturn::{RETURN, SUCCEEDED},
+    str::OdbcStr,
+};
 
 fn main() {
-    let (henv, res) = SQLHENV::<SQL_OV_ODBC3_80>::SQLAllocHandle(&SQL_NULL_HANDLE);
-    assert_eq!(res, SQL_SUCCESS);
-    let henv = henv.unwrap();
+    let henv = HENV::<OV_ODBC3_80>::alloc_handle().unwrap();
 
-    let (hdbc, res) = SQLHDBC::SQLAllocHandle(&henv);
-    assert_eq!(res, SQL_SUCCESS);
-    let hdbc = hdbc.unwrap();
+    let hdbc = HDBC::alloc_handle(&henv).unwrap();
 
     let conn_string = "DSN=MariaDB;Database=rs_odbc_test;";
-    let mut outstrlen = MaybeUninit::zeroed();
-    let (hdbc, res) = hdbc.SQLDriverConnectA(
+    let outcome = hdbc.driver_connect(
         None,
         conn_string.as_ref(),
         None,
-        &mut outstrlen,
-        SQL_DRIVER_COMPLETE,
+        None,
+        DriverCompletion::DRIVER_COMPLETE,
     );
-    assert_eq!(res, SQL_SUCCESS);
-    let hdbc = hdbc.unwrap();
+    let hdbc = outcome.unwrap();
 
-    // At the moment all bound columns must be wrapped into UnsafeCell.
-    // This limitation might be relaxed in one of the future releases
-    let id_buffer = UnsafeCell::new(18);
-    let name_buffer: &UnsafeCell<[SQLCHAR]> = &UnsafeCell::new([0; 24]);
+    // Keep a valid fallback because SQLFetch may leave the target untouched for NULL data.
+    let id_buffer = UnsafeCell::new(MaybeUninit::new(0_i16));
+    let mut name_storage = [MaybeUninit::new(0); 24];
 
-    let (hstmt, res) = SQLHSTMT::SQLAllocHandle(&hdbc);
-    assert_eq!(res, SQL_SUCCESS);
-    let hstmt = hstmt.unwrap();
+    let mut hstmt = HSTMT::alloc_handle(&hdbc).unwrap();
 
     // It is assumed that table Registry(id smallint, name varchar(20)) already exists
-    // in the database, otherwise SQLExecDirect will return SQL_ERROR when called
-    let res = hstmt.SQLExecDirectA("SELECT id, name from Registry".as_ref());
-    assert_eq!(res, SQL_SUCCESS);
+    // in the database, otherwise SQLExecDirect will return ERROR when called
+    let res = hstmt.exec_direct("SELECT id, name from Registry".as_ref());
+    assert!(SUCCEEDED(res));
 
-    let res = hstmt.SQLBindCol(1, SQL_C_SSHORT, Some(&id_buffer), None);
-    assert_eq!(res, SQL_SUCCESS);
-    let res = hstmt.SQLBindCol(2, SQL_C_CHAR, Some(name_buffer.as_ref()), None);
-    assert_eq!(res, SQL_SUCCESS);
+    let res = hstmt.bind_col::<c_type::SSHORT>(1, Some(&id_buffer), None);
+    assert!(SUCCEEDED(res));
+    let name_buffer: &mut OdbcStr<MaybeUninit<CHAR>> = name_storage.as_mut().as_mut();
+    let name_buffer = UnsafeCell::from_mut(name_buffer);
+    // FIXME: Re-enable once co3 can encode a persistent
+    // `&UnsafeCell<OdbcStr<MaybeUninit<CHAR>>>` binding.
+    // let res = hstmt.bind_col::<c_type::CHAR>(2, Some(name_buffer), None);
+    // assert!(SUCCEEDED(res));
 
     let res = loop {
-        let res = hstmt.SQLFetch();
+        let res = hstmt.fetch();
 
-        if SQL_SUCCEEDED(res) {
-            let name_buffer = unsafe { name_buffer.get().as_ref().expect("Non null") };
-            let name: &str = core::str::from_utf8(name_buffer).expect("Valid");
-            println!("Id: {}, Name: {}", unsafe { *id_buffer.get() }, name);
+        if SUCCEEDED(res) {
+            let name = unsafe { &*name_buffer.get() }
+                .iter()
+                .map(|character| unsafe { character.assume_init() })
+                .take_while(|&character| character != 0)
+                .collect::<Vec<_>>();
+            let name = core::str::from_utf8(&name).expect("Valid UTF-8");
+            println!(
+                "Id: {}, Name: {}",
+                unsafe { (*id_buffer.get()).assume_init() },
+                name
+            );
         } else {
             break res;
         }
     };
 
-    if res != SQL_NO_DATA {
+    if res != RETURN::NO_DATA {
         println!("Failed to fetch result set: {:?}", res);
     }
 }

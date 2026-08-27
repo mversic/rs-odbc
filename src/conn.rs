@@ -1,34 +1,62 @@
-use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
-use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
-use crate::handle::SQLHDBC;
-use crate::str::{OdbcChar, OdbcStr};
+use co3::ReprC;
+use rust_spec::RustSpec;
+
 use crate::{
-    Ident, OdbcBool, OdbcDefined, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR, Scalar,
+    Defined,
+    attr::{impl_odbc_scalar_attr_unpack, *},
+    env::{OV_ODBC3, OV_ODBC3_80, OV_ODBC4},
     info::TxnIsolation,
 };
-use core::mem::MaybeUninit;
-use rs_odbc_derive::{Ident, odbc_type};
 
-pub trait ConnState: private::ConnState {}
-
-/// C3 is not a valid state for setting or getting attributes
-pub trait ConnAttr<C: ConnState, A: Ident, V: OdbcVersion>:
-    Attr<A> + AttrLen<Self::DefinedBy, SQLINTEGER>
-{
-    // TODO: Attributes for which the value wasn't set with SQLSetConnectAttr
-    // cannot be used in SQLGetConnectAttr except for:
-    // SQL_ATTR_ACCESS_MODE, SQL_ATTR_AUTOCOMMIT, SQL_ATTR_LOGIN_TIMEOUT,
-    // SQL_ATTR_ODBC_CURSORS, SQL_ATTR_TRACE, or SQL_ATTR_TRACEFILE
-    // which have defined default values by the ODBC specification
-    // Check: https://docs.microsoft.com/en-us/sql/odbc/reference/appendixes/connection-transitions?view=sql-server-ver15#sqlbrowseconnect
-
-    // TODO: Track active statements in debug mode because SQL_ATTR_ASYNC_ENABLE
-    // can only be set when there are no active statements
+#[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+#[expect(non_camel_case_types)]
+#[repr(u16)]
+pub enum DriverCompletion {
+    DRIVER_NOPROMPT = 0,
+    DRIVER_COMPLETE = 1,
+    DRIVER_PROMPT = 2,
+    DRIVER_COMPLETE_REQUIRED = 3,
 }
 
-// TODO: Where to keep these two traits? here in api.rs or handle.rs?
-pub trait BrowseConnect {}
-pub trait Disconnect {}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+#[repr(i16)]
+pub enum CompletionType {
+    COMMIT = 0,
+    ROLLBACK = 1,
+}
+
+/// Marks a connection attribute whose value can be retrieved while the connection is in `S`.
+///
+/// # Safety
+/// `Buffer` must have the representation and initialization requirements prescribed by ODBC or
+/// by the driver specification.
+pub unsafe trait ConnAttrGet<V: crate::env::OdbcVersion, S: ConnState>: Defined {
+    type Buffer<C: crate::str::OdbcChar>: ?Sized;
+}
+
+/// Marks a connection attribute whose value can be supplied while the connection is in `S`.
+///
+/// # Safety
+/// `Value` must lower to the representation prescribed by ODBC or by the driver specification.
+pub unsafe trait ConnAttrSet<V: crate::env::OdbcVersion, S: ConnState>: Defined {
+    type Value<'a, C: crate::str::OdbcChar + 'a>;
+}
+
+inherit_attr!(get ConnAttrGet, OV_ODBC3 => OV_ODBC3_80, state);
+inherit_attr!(get ConnAttrGet, OV_ODBC3_80 => OV_ODBC4, state);
+inherit_attr!(set ConnAttrSet, OV_ODBC3 => OV_ODBC3_80, state);
+inherit_attr!(set ConnAttrSet, OV_ODBC3_80 => OV_ODBC4, state);
+
+/// Sealed marker for the connection states supported by this crate.
+#[sealed::sealed]
+pub trait ConnState {}
+
+/// Sealed marker for states in which browsing is valid.
+#[sealed::sealed]
+pub trait BrowseConnect: ConnState {}
+/// Sealed marker for states in which disconnection is valid.
+#[sealed::sealed]
+pub trait Disconnect: ConnState {}
 
 /// Allocated
 #[derive(Debug)]
@@ -42,336 +70,102 @@ pub enum C3 {}
 #[derive(Debug)]
 pub enum C4 {}
 
+#[sealed::sealed]
 impl ConnState for C2 {}
+#[sealed::sealed]
 impl ConnState for C3 {}
+#[sealed::sealed]
 impl ConnState for C4 {}
 
-// Implement ConnAttr for all versions of connection attributes
-impl<C: ConnState, A: Ident, T: Scalar> ConnAttr<C, A, SQL_OV_ODBC3_80> for T where
-    T: ConnAttr<C, A, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
-{
-}
-impl<C: ConnState, A: Ident, T: Scalar> ConnAttr<C, A, SQL_OV_ODBC4> for T where
-    T: ConnAttr<C, A, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
-{
-}
-impl<C: ConnState, A: Ident, T: Scalar> ConnAttr<C, A, SQL_OV_ODBC3_80> for [T] where
-    [T]: ConnAttr<C, A, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
-{
-}
-impl<C: ConnState, A: Ident, T: Scalar> ConnAttr<C, A, SQL_OV_ODBC4> for [T] where
-    [T]: ConnAttr<C, A, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
-{
-}
-impl<C: ConnState, A: Ident, CH: OdbcChar> ConnAttr<C, A, SQL_OV_ODBC3_80> for OdbcStr<CH> where
-    OdbcStr<CH>: ConnAttr<C, A, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
-{
-}
-impl<C: ConnState, A: Ident, CH: OdbcChar> ConnAttr<C, A, SQL_OV_ODBC4> for OdbcStr<CH> where
-    OdbcStr<CH>: ConnAttr<C, A, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
-{
-}
+#[sealed::sealed]
+impl BrowseConnect for C2 {}
+#[sealed::sealed]
+impl BrowseConnect for C3 {}
 
-// Implement ConnAttr for uninitialized connection attributes
-impl<C: ConnState, A: Ident, T: Scalar, V: OdbcVersion> ConnAttr<C, A, V> for MaybeUninit<T>
-where
-    T: ConnAttr<C, A, V> + AttrGet<A>,
-    Self: AttrLen<Self::DefinedBy, SQLINTEGER>,
-{
-}
-impl<C: ConnState, A: Ident, T: Scalar, V: OdbcVersion> ConnAttr<C, A, V> for [MaybeUninit<T>]
-where
-    [T]: ConnAttr<C, A, V> + AttrGet<A>,
-    Self: AttrLen<Self::DefinedBy, SQLINTEGER>,
-{
-}
-impl<C: ConnState, A: Ident, V: OdbcVersion> ConnAttr<C, A, V> for OdbcStr<MaybeUninit<SQLCHAR>> where
-    OdbcStr<SQLCHAR>: ConnAttr<C, A, V> + AttrGet<A>
-{
-}
-impl<C: ConnState, A: Ident, V: OdbcVersion> ConnAttr<C, A, V> for OdbcStr<MaybeUninit<SQLWCHAR>> where
-    OdbcStr<SQLWCHAR>: ConnAttr<C, A, V> + AttrGet<A>
-{
-}
+#[sealed::sealed]
+impl Disconnect for C3 {}
+#[sealed::sealed]
+impl Disconnect for C4 {}
 
-// Implement ConnAttr for references to unsized types (used by AttrSet)
-impl<C: ConnState, A: Ident, T: Scalar, V: OdbcVersion> ConnAttr<C, A, V> for &[T]
-where
-    [T]: ConnAttr<C, A, V>,
-    Self: AttrSet<A>,
-{
-}
-impl<C: ConnState, A: Ident, CH: OdbcChar, V: OdbcVersion> ConnAttr<C, A, V> for &OdbcStr<CH>
-where
-    OdbcStr<CH>: ConnAttr<C, A, V>,
-    Self: AttrSet<A>,
-{
-}
-
-impl<V: OdbcVersion> BrowseConnect for SQLHDBC<'_, C2, V> {}
-impl<V: OdbcVersion> BrowseConnect for SQLHDBC<'_, C3, V> {}
-impl<V: OdbcVersion> Disconnect for SQLHDBC<'_, C3, V> {}
-impl<V: OdbcVersion> Disconnect for SQLHDBC<'_, C4, V> {}
-
-mod private {
-    use super::{C2, C3, C4};
-    #[double]
-    use crate::api::ffi;
-    use crate::convert::AsSQLHANDLE;
-    use crate::handle::SQLHDBC;
-    use crate::{env, sqlreturn};
-    use core::any;
-    use mockall_double::double;
-
-    pub trait ConnState {
-        // TODO: If drop impl specialization is allowed this fn will not be required
-        // Related to https://github.com/rust-lang/rust/issues/20400
-        fn disconnect<V: env::OdbcVersion>(handle: &mut SQLHDBC<Self, V>)
-        where
-            Self: super::ConnState + Sized,
-        {
-            let sql_return = unsafe { ffi::SQLDisconnect(handle.as_SQLHANDLE()) };
-
-            #[cfg(feature = "std")]
-            if std::thread::panicking() {
-                return;
-            }
-
-            if sql_return != sqlreturn::SQL_SUCCESS {
-                panic!(
-                    "{}: SQLDisconnect returned {:?}",
-                    any::type_name::<Self>(),
-                    sql_return
-                )
-            }
+macro_rules! impl_conn_attr_set_state {
+    ($version:ty, $attr:ty, $value:ty; $($state:ty),+ $(,)?) => {$(
+        unsafe impl ConnAttrSet<$version, $state> for $attr {
+            type Value<'a, C: crate::str::OdbcChar + 'a> = $value;
         }
-    }
+    )+};
+}
 
-    impl ConnState for C2 {
-        fn disconnect<V: env::OdbcVersion>(_: &mut SQLHDBC<Self, V>) {}
-    }
-    impl ConnState for C3 {}
-    impl ConnState for C4 {}
+macro_rules! impl_conn_attr_get_states {
+    ($version:ty, $attr:ty, $value:ty; $($state:ty),+ $(,)?) => {
+        impl Defined for $attr {
+            type By = crate::OdbcDefined;
+        }
+        $(unsafe impl ConnAttrGet<$version, $state> for $attr {
+            type Buffer<C: crate::str::OdbcChar> = core::mem::MaybeUninit<$value>;
+        })+
+    };
+}
+
+macro_rules! impl_conn_string_attr_get_states {
+    ($version:ty, $attr:ty; $($state:ty),+ $(,)?) => {
+        impl Defined for $attr {
+            type By = crate::OdbcDefined;
+        }
+        $(unsafe impl ConnAttrGet<$version, $state> for $attr {
+            type Buffer<C: crate::str::OdbcChar> =
+                crate::str::OdbcStr<core::mem::MaybeUninit<C>>;
+        })+
+    };
+}
+
+macro_rules! impl_conn_string_attr_set_state {
+    ($version:ty, $attr:ty; $($state:ty),+ $(,)?) => {$(
+        unsafe impl ConnAttrSet<$version, $state> for $attr {
+            type Value<'a, C: crate::str::OdbcChar + 'a> = &'a crate::str::OdbcStr<C>;
+        }
+    )+};
 }
 
 //=====================================================================================//
 //-------------------------------------Attributes--------------------------------------//
 
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 101)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ATTR_ACCESS_MODE;
-unsafe impl Attr<SQL_ATTR_ACCESS_MODE> for AccessMode {
-    type DefinedBy = OdbcDefined;
-}
-impl ConnAttr<C2, SQL_ATTR_ACCESS_MODE, SQL_OV_ODBC3> for AccessMode {}
-impl ConnAttr<C4, SQL_ATTR_ACCESS_MODE, SQL_OV_ODBC3> for AccessMode {}
-unsafe impl AttrGet<SQL_ATTR_ACCESS_MODE> for AccessMode {}
-unsafe impl AttrSet<SQL_ATTR_ACCESS_MODE> for AccessMode {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 102)]
-#[expect(non_camel_case_types)]
-// TODO: Implement in type system
-pub struct SQL_ATTR_AUTOCOMMIT;
-unsafe impl Attr<SQL_ATTR_AUTOCOMMIT> for AutoCommit {
-    type DefinedBy = OdbcDefined;
-}
-impl ConnAttr<C2, SQL_ATTR_AUTOCOMMIT, SQL_OV_ODBC3> for AutoCommit {}
-impl ConnAttr<C4, SQL_ATTR_AUTOCOMMIT, SQL_OV_ODBC3> for AutoCommit {}
-unsafe impl AttrGet<SQL_ATTR_AUTOCOMMIT> for AutoCommit {}
-unsafe impl AttrSet<SQL_ATTR_AUTOCOMMIT> for AutoCommit {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 113)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ATTR_CONNECTION_TIMEOUT;
-unsafe impl Attr<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {
-    type DefinedBy = OdbcDefined;
-}
-impl ConnAttr<C2, SQL_ATTR_CONNECTION_TIMEOUT, SQL_OV_ODBC3> for SQLUINTEGER {}
-impl ConnAttr<C4, SQL_ATTR_CONNECTION_TIMEOUT, SQL_OV_ODBC3> for SQLUINTEGER {}
-unsafe impl AttrGet<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {}
-unsafe impl AttrSet<SQL_ATTR_CONNECTION_TIMEOUT> for SQLUINTEGER {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 109)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ATTR_CURRENT_CATALOG;
-unsafe impl<CH: OdbcChar> Attr<SQL_ATTR_CURRENT_CATALOG> for OdbcStr<CH> {
-    type DefinedBy = OdbcDefined;
-}
-impl<CH: OdbcChar> ConnAttr<C2, SQL_ATTR_CURRENT_CATALOG, SQL_OV_ODBC3> for OdbcStr<CH> {}
-impl<CH: OdbcChar> ConnAttr<C4, SQL_ATTR_CURRENT_CATALOG, SQL_OV_ODBC3> for OdbcStr<CH> {}
-unsafe impl<CH: OdbcChar> AttrGet<SQL_ATTR_CURRENT_CATALOG> for OdbcStr<CH> {}
-unsafe impl<CH: OdbcChar> AttrSet<SQL_ATTR_CURRENT_CATALOG> for &OdbcStr<CH> {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 103)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ATTR_LOGIN_TIMEOUT;
-unsafe impl Attr<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {
-    type DefinedBy = OdbcDefined;
-}
-impl ConnAttr<C2, SQL_ATTR_LOGIN_TIMEOUT, SQL_OV_ODBC3> for SQLUINTEGER {}
-unsafe impl AttrGet<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
-unsafe impl AttrSet<SQL_ATTR_LOGIN_TIMEOUT> for SQLUINTEGER {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 112)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ATTR_PACKET_SIZE;
-unsafe impl Attr<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {
-    type DefinedBy = OdbcDefined;
-}
-impl ConnAttr<C2, SQL_ATTR_PACKET_SIZE, SQL_OV_ODBC3> for SQLUINTEGER {}
-unsafe impl AttrGet<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
-unsafe impl AttrSet<SQL_ATTR_PACKET_SIZE> for SQLUINTEGER {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 104)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ATTR_TRACE;
-unsafe impl Attr<SQL_ATTR_TRACE> for Trace {
-    type DefinedBy = OdbcDefined;
-}
-impl ConnAttr<C2, SQL_ATTR_TRACE, SQL_OV_ODBC3> for Trace {}
-impl ConnAttr<C4, SQL_ATTR_TRACE, SQL_OV_ODBC3> for Trace {}
-unsafe impl AttrGet<SQL_ATTR_TRACE> for Trace {}
-unsafe impl AttrSet<SQL_ATTR_TRACE> for Trace {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 105)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ATTR_TRACEFILE;
-unsafe impl<CH: OdbcChar> Attr<SQL_ATTR_TRACEFILE> for OdbcStr<CH> {
-    type DefinedBy = OdbcDefined;
-}
-impl<CH: OdbcChar> ConnAttr<C2, SQL_ATTR_TRACEFILE, SQL_OV_ODBC3> for OdbcStr<CH> {}
-impl<CH: OdbcChar> ConnAttr<C4, SQL_ATTR_TRACEFILE, SQL_OV_ODBC3> for OdbcStr<CH> {}
-unsafe impl<CH: OdbcChar> AttrGet<SQL_ATTR_TRACEFILE> for OdbcStr<CH> {}
-unsafe impl<CH: OdbcChar> AttrSet<SQL_ATTR_TRACEFILE> for &OdbcStr<CH> {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 106)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ATTR_TRANSLATE_LIB;
-unsafe impl<CH: OdbcChar> Attr<SQL_ATTR_TRANSLATE_LIB> for OdbcStr<CH> {
-    type DefinedBy = OdbcDefined;
-}
-impl<CH: OdbcChar> ConnAttr<C4, SQL_ATTR_TRANSLATE_LIB, SQL_OV_ODBC3> for OdbcStr<CH> {}
-unsafe impl<CH: OdbcChar> AttrGet<SQL_ATTR_TRANSLATE_LIB> for OdbcStr<CH> {}
-unsafe impl<CH: OdbcChar> AttrSet<SQL_ATTR_TRANSLATE_LIB> for &OdbcStr<CH> {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 10001)]
-#[expect(non_camel_case_types)]
-// This is read-only attribute
-pub struct SQL_ATTR_AUTO_IPD;
-unsafe impl Attr<SQL_ATTR_AUTO_IPD> for OdbcBool {
-    type DefinedBy = OdbcDefined;
-}
-impl ConnAttr<C2, SQL_ATTR_AUTO_IPD, SQL_OV_ODBC3> for OdbcBool {}
-impl ConnAttr<C4, SQL_ATTR_AUTO_IPD, SQL_OV_ODBC3> for OdbcBool {}
-unsafe impl AttrGet<SQL_ATTR_AUTO_IPD> for OdbcBool {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 117)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE;
-unsafe impl Attr<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {
-    type DefinedBy = OdbcDefined;
-}
-impl ConnAttr<C2, SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE, SQL_OV_ODBC3_80>
-    for AsyncDbcFunctionsEnable
-{
-}
-impl ConnAttr<C4, SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE, SQL_OV_ODBC3_80>
-    for AsyncDbcFunctionsEnable
-{
-}
-unsafe impl AttrGet<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {}
-unsafe impl AttrSet<SQL_ATTR_ASYNC_DBC_FUNCTIONS_ENABLE> for AsyncDbcFunctionsEnable {}
-
 // TODO: Spec says this is 3.5, but it is not 3.5 in implementation ???
 // but it says that drivers conforming to earlier versions can support this field
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 1209)]
-#[expect(non_camel_case_types)]
-// This is read-only attribute
-pub struct SQL_ATTR_CONNECTION_DEAD;
-unsafe impl Attr<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {
-    type DefinedBy = OdbcDefined;
-}
-impl ConnAttr<C4, SQL_ATTR_CONNECTION_DEAD, SQL_OV_ODBC3_80> for ConnectionDead {}
-unsafe impl AttrGet<SQL_ATTR_CONNECTION_DEAD> for ConnectionDead {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 108)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ATTR_TXN_ISOLATION;
-unsafe impl Attr<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {
-    type DefinedBy = OdbcDefined;
-}
-// TODO: Check for open transaction
-impl ConnAttr<C2, SQL_ATTR_TXN_ISOLATION, SQL_OV_ODBC3> for TxnIsolation {}
-impl ConnAttr<C4, SQL_ATTR_TXN_ISOLATION, SQL_OV_ODBC3> for TxnIsolation {}
-unsafe impl AttrGet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
-unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
-
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, 107)]
+//#[derive(Tag)]
+//#[tag(i32, unsafe(107))]
 //#[expect(non_camel_case_types)]
 //pub struct SQL_ATTR_TRANSLATE_OPTION;
-//unsafe impl Attr<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {
-//    type DefinedBy = OdbcDefined;
-//}
-//impl ConnAttr<C, SQL_ATTR_TRANSLATE_OPTION, SQL_OV_ODBC3> for SQLUINTEGER {
 //    #[cfg(feature = "odbc_debug")]
-//    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3>) {
+//    fn check_attr(&self, ConnectionHandle: &OwnedHDBC<SQL_OV_ODBC3>) {
 //        ConnectionHandle.assert_connected();
 //    }
 //}
-//unsafe impl AttrGet<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
-//unsafe impl AttrSet<SQL_ATTR_TRANSLATE_OPTION> for SQLUINTEGER {}
 
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, 118)]
+//#[derive(Tag)]
+//#[tag(i32, unsafe(118))]
 //// This is set-only attribute
 //pub struct SQL_ATTR_DBC_INFO_TOKEN;
-//unsafe impl Attr<SQL_ATTR_DBC_INFO_TOKEN> for SQLPOINTER {
-//    type DefinedBy = OdbcDefined;
-//}
-//impl ConnAttr<C, SQL_ATTR_DBC_INFO_TOKEN, SQL_OV_ODBC3_80> for SQLPOINTER {
 //    #[cfg(feature = "odbc_debug")]
-//    fn check_attr(&self, ConnectionHandle: &SQLHDBC<SQL_OV_ODBC3_80>) {
+//    fn check_attr(&self, ConnectionHandle: &OwnedHDBC<SQL_OV_ODBC3_80>) {
 //        assert_connected(ConnectionHandle);
 //    }
-//impl AttrSet<SQL_ATTR_DBC_INFO_TOKEN> for SQLPOINTER {}
 
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, 119)]
+//#[derive(Tag)]
+//#[tag(i32, unsafe(119))]
 //pub struct SQL_ATTR_ASYNC_DBC_EVENT;
 //// TODO: It's an Event handle. Should probably implement event handle
-//unsafe impl Attr<SQL_ATTR_ASYNC_DBC_EVENT> for SQLPOINTER {
-//    type DefinedBy = OdbcDefined;
-//}
-//impl ConnAttr<C, SQL_ATTR_ASYNC_DBC_EVENT, SQL_OV_ODBC3_80> for SQLPOINTER {}
-//impl AttrGet<SQL_ATTR_ASYNC_DBC_EVENT> for SQLPOINTER {}
 
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, 111)]
+//#[derive(Tag)]
+//#[tag(i32, unsafe(111))]
 //#[expect(non_camel_case_types)]
 //pub struct SQL_ATTR_QUIET_MODE;
-//impl ConnAttr<C, SQL_ATTR_QUIET_MODE, SQL_OV_ODBC3> for {}
 
 // TODO: Not found in documentation, only in implementation
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, 114)]
+//#[derive(Tag)]
+//#[tag(i32, unsafe(114))]
 //#[expect(non_camel_case_types)]
 //pub struct SQL_ATTR_DISCONNECT_BEHAVIOR;
 
-//#[derive(odbc_type)]
 //#[expect(non_camel_case_types)]
 //pub struct DisconnectBehavior;
 //pub const SQL_DB_RETURN_TO_POOL: DisconnectBehavior = DisconnectBehavior(0);
@@ -384,113 +178,245 @@ unsafe impl AttrSet<SQL_ATTR_TXN_ISOLATION> for TxnIsolation {}
 //    This attribute was introduced because some unicode driver's some APIs may
 //    need to behave differently on ANSI or Unicode applications. A unicode
 //    driver, which  has same behavior for both ANSI or Unicode applications,
-//    should return SQL_ERROR when the driver manager sets this connection
-//    attribute. When a unicode driver returns SQL_SUCCESS on this attribute,
+//    should return ERROR when the driver manager sets this connection
+//    attribute. When a unicode driver returns SUCCESS on this attribute,
 //    the driver manager treates ANSI and Unicode connections differently in
 //    connection pooling.
 //*/
 //// TODO: These 4 are not in Documentation??
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, 115)]
+//#[derive(Tag)]
+//#[tag(i32, unsafe(115))]
 //#[expect(non_camel_case_types)]
 //pub struct SQL_ATTR_ANSI_APP;
-//impl ConnAttr<SQL_OV_ODBC3_51, SQL_ATTR_ANSI_APP>, for AnsiApp {}
-//impl AttrGet<SQL_ATTR_ANSI_APP>> for AnsiApp {}
-//impl AttrSet<SQL_ATTR_ANSI_APP> for AnsiApp {}
 
 //pub enum AnsiApp {
 //    SQL_AA_TRUE = 1,  /* the application is an ANSI app */
 //    SQL_AA_FALSE = 0,  /* the application is a Unicode app */
 //}
 
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, 116)]
+//#[derive(Tag)]
+//#[tag(i32, unsafe(116))]
 //#[expect(non_camel_case_types)]
 //pub struct SQL_ATTR_RESET_CONNECTION;
-//impl ConnAttr<SQL_OV_ODBC3_80, SQL_ATTR_RESET_CONNECTION> for ResetConnection {}
-//impl AttrGet<SQL_ATTR_RESET_CONNECTION>> for ResetConnection {}
-//impl AttrSet<SQL_ATTR_RESET_CONNECTION> for ResetConnection {}
 
 //#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 //pub enum ResetConnection {
 //    SQL_RESET_CONNECTION_YES = 1,
 //}
 
-//#[derive(Ident)]
-//#[identifier(SQLINTEGER, 122)]
+//#[derive(Tag)]
+//#[tag(i32, unsafe(122))]
 //#[expect(non_camel_case_types)]
 //pub struct SQL_ATTR_CREDENTIALS;
-//unsafe impl<CH: OdbcChar> Attr<SQL_ATTR_CREDENTIALS> for OdbcStr<CH> {
-//    type DefinedBy = OdbcDefined;
-//}
-//impl<CH: OdbcChar> ConnAttr<SQL_OV_ODBC4, SQL_ATTR_CREDENTIALS> for OdbcStr<CH> {}
-//unsafe impl<CH: OdbcChar> AttrGet<SQL_ATTR_CREDENTIALS> for OdbcStr<CH> {}
-//unsafe impl<CH: OdbcChar> AttrSet<SQL_ATTR_CREDENTIALS> for OdbcStr<CH> {}
 
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 123)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ATTR_REFRESH_CONNECTION;
-unsafe impl Attr<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {
-    type DefinedBy = OdbcDefined;
+impl_conn_attr_get_states!(OV_ODBC3, ACCESS_MODE, AccessMode; C2, C4);
+impl_conn_attr_set_state!(OV_ODBC3, ACCESS_MODE, AccessMode; C2, C4);
+impl_conn_attr_get_states!(OV_ODBC3, AUTOCOMMIT, AutoCommit; C2, C4);
+impl_conn_attr_set_state!(OV_ODBC3, AUTOCOMMIT, AutoCommit; C2, C4);
+impl_conn_attr_get_states!(OV_ODBC3, CONNECTION_TIMEOUT, u32; C2, C4);
+impl_conn_attr_set_state!(OV_ODBC3, CONNECTION_TIMEOUT, u32; C2, C4);
+impl_conn_string_attr_get_states!(OV_ODBC3, CURRENT_CATALOG; C2, C4);
+impl_conn_string_attr_set_state!(OV_ODBC3, CURRENT_CATALOG; C2, C4);
+impl_conn_attr_get_states!(OV_ODBC3, LOGIN_TIMEOUT, u32; C2, C4);
+impl_conn_attr_set_state!(OV_ODBC3, LOGIN_TIMEOUT, u32; C2);
+impl_conn_attr_get_states!(OV_ODBC3, PACKET_SIZE, u32; C2, C4);
+impl_conn_attr_set_state!(OV_ODBC3, PACKET_SIZE, u32; C2);
+impl_conn_attr_get_states!(OV_ODBC3, TRACE, Trace; C2, C4);
+impl_conn_attr_set_state!(OV_ODBC3, TRACE, Trace; C2, C4);
+impl_conn_string_attr_get_states!(OV_ODBC3, TRACEFILE; C2, C4);
+impl_conn_string_attr_set_state!(OV_ODBC3, TRACEFILE; C2, C4);
+impl_conn_string_attr_get_states!(OV_ODBC3, TRANSLATE_LIB; C4);
+impl_conn_string_attr_set_state!(OV_ODBC3, TRANSLATE_LIB; C4);
+impl_conn_attr_get_states!(OV_ODBC3, TRANSLATE_OPTION, u32; C4);
+impl_conn_attr_set_state!(OV_ODBC3, TRANSLATE_OPTION, u32; C4);
+impl_conn_attr_get_states!(OV_ODBC3, AUTO_IPD, AutoIpd; C4);
+impl_conn_attr_get_states!(
+    OV_ODBC3_80,
+    ASYNC_DBC_FUNCTIONS_ENABLE,
+    AsyncDbcFunctionsEnable;
+    C2,
+    C4
+);
+impl_conn_attr_set_state!(
+    OV_ODBC3_80,
+    ASYNC_DBC_FUNCTIONS_ENABLE,
+    AsyncDbcFunctionsEnable;
+    C2,
+    C4
+);
+impl_conn_attr_get_states!(OV_ODBC3_80, CONNECTION_DEAD, ConnectionDead; C4);
+unsafe impl ConnAttrGet<OV_ODBC3, C2> for METADATA_ID {
+    type Buffer<C: crate::str::OdbcChar> = core::mem::MaybeUninit<MetadataId>;
 }
-impl ConnAttr<C2, SQL_ATTR_REFRESH_CONNECTION, SQL_OV_ODBC4> for RefreshConnection {}
-impl ConnAttr<C4, SQL_ATTR_REFRESH_CONNECTION, SQL_OV_ODBC4> for RefreshConnection {}
-unsafe impl AttrGet<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {}
-unsafe impl AttrSet<SQL_ATTR_REFRESH_CONNECTION> for RefreshConnection {}
+unsafe impl ConnAttrGet<OV_ODBC3, C4> for METADATA_ID {
+    type Buffer<C: crate::str::OdbcChar> = core::mem::MaybeUninit<MetadataId>;
+}
+unsafe impl ConnAttrSet<OV_ODBC3, C2> for METADATA_ID {
+    type Value<'a, C: crate::str::OdbcChar + 'a> = MetadataId;
+}
+unsafe impl ConnAttrSet<OV_ODBC3, C4> for METADATA_ID {
+    type Value<'a, C: crate::str::OdbcChar + 'a> = MetadataId;
+}
 
-// Re-exported as connection attributes
-pub use crate::stmt::SQL_ATTR_ASYNC_ENABLE;
-impl<C: ConnState> ConnAttr<C, SQL_ATTR_ASYNC_ENABLE, SQL_OV_ODBC3> for crate::stmt::AsyncEnable {}
+macro_rules! conn_bool {
+    ($($name:ident),+ $(,)?) => {$(
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+        #[repr(u32)]
+        pub enum $name {
+            FALSE = 0,
+            TRUE = 1,
+        }
 
-pub use crate::stmt::SQL_ATTR_METADATA_ID;
-impl<C: ConnState> ConnAttr<C, SQL_ATTR_METADATA_ID, SQL_OV_ODBC3> for OdbcBool {}
+        impl From<bool> for $name {
+            fn from(value: bool) -> Self {
+                if value { Self::TRUE } else { Self::FALSE }
+            }
+        }
+
+        impl From<$name> for bool {
+            fn from(value: $name) -> Self {
+                value == $name::TRUE
+            }
+        }
+
+        impl_odbc_scalar_attr_unpack!($name => u32);
+    )+};
+}
+
+conn_bool!(AutoIpd, MetadataId);
+
+unsafe impl ConnAttrGet<OV_ODBC3, C2> for ASYNC_ENABLE {
+    type Buffer<C: crate::str::OdbcChar> = core::mem::MaybeUninit<crate::stmt::AsyncEnable>;
+}
+unsafe impl ConnAttrGet<OV_ODBC3, C4> for ASYNC_ENABLE {
+    type Buffer<C: crate::str::OdbcChar> = core::mem::MaybeUninit<crate::stmt::AsyncEnable>;
+}
+unsafe impl ConnAttrSet<OV_ODBC3, C2> for ASYNC_ENABLE {
+    type Value<'a, C: crate::str::OdbcChar + 'a> = crate::stmt::AsyncEnable;
+}
+unsafe impl ConnAttrSet<OV_ODBC3, C4> for ASYNC_ENABLE {
+    type Value<'a, C: crate::str::OdbcChar + 'a> = crate::stmt::AsyncEnable;
+}
+impl Defined for TXN_ISOLATION {
+    type By = crate::OdbcDefined;
+}
+unsafe impl ConnAttrGet<OV_ODBC3, C4> for TXN_ISOLATION {
+    type Buffer<C: crate::str::OdbcChar> = core::mem::MaybeUninit<Option<TxnIsolation>>;
+}
+impl_conn_attr_set_state!(OV_ODBC3, TXN_ISOLATION, TxnIsolation; C4);
+unsafe impl ConnAttrGet<OV_ODBC4, C4> for REFRESH_CONNECTION {
+    type Buffer<C: crate::str::OdbcChar> = core::mem::MaybeUninit<RefreshConnection>;
+}
+impl Defined for REFRESH_CONNECTION {
+    type By = crate::OdbcDefined;
+}
+impl_conn_attr_set_state!(OV_ODBC4, REFRESH_CONNECTION, RefreshConnection; C4);
+// impl_conn_string_attr_get_states!(OV_ODBC4, CREDENTIALS; C2, C4);
+// impl_conn_string_attr_set_state!(OV_ODBC4, CREDENTIALS; C2);
 
 //=====================================================================================//
 
-#[odbc_type(SQLUINTEGER)]
-pub struct AccessMode;
-pub const SQL_MODE_READ_WRITE: AccessMode = AccessMode(0);
-pub const SQL_MODE_READ_ONLY: AccessMode = AccessMode(1);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+#[expect(non_camel_case_types)]
+#[repr(u32)]
+pub enum AccessMode {
+    MODE_READ_WRITE,
+    MODE_READ_ONLY,
+}
 
-#[odbc_type(SQLUINTEGER)]
-pub struct AutoCommit;
-pub const SQL_AUTOCOMMIT_OFF: AutoCommit = AutoCommit(0);
-pub const SQL_AUTOCOMMIT_ON: AutoCommit = AutoCommit(1);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+#[expect(non_camel_case_types)]
+#[repr(u32)]
+pub enum AutoCommit {
+    AUTOCOMMIT_OFF,
+    AUTOCOMMIT_ON,
+}
 
-#[odbc_type(SQLUINTEGER)]
-pub struct Trace;
-pub const SQL_OPT_TRACE_OFF: Trace = Trace(0);
-pub const SQL_OPT_TRACE_ON: Trace = Trace(1);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+#[expect(non_camel_case_types)]
+#[repr(u32)]
+pub enum Trace {
+    OPT_TRACE_OFF,
+    OPT_TRACE_ON,
+}
 
-#[odbc_type(SQLUINTEGER)]
-pub struct AsyncDbcFunctionsEnable;
-pub const SQL_ASYNC_DBC_ENABLE_OFF: AsyncDbcFunctionsEnable = AsyncDbcFunctionsEnable(0);
-pub const SQL_ASYNC_DBC_ENABLE_ON: AsyncDbcFunctionsEnable = AsyncDbcFunctionsEnable(1);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+#[expect(non_camel_case_types)]
+#[repr(u32)]
+pub enum AsyncDbcFunctionsEnable {
+    ASYNC_DBC_ENABLE_OFF,
+    ASYNC_DBC_ENABLE_ON,
+}
 
-#[odbc_type(SQLUINTEGER)]
-pub struct ConnectionDead;
-pub const SQL_CD_FALSE: ConnectionDead = ConnectionDead(0);
-pub const SQL_CD_TRUE: ConnectionDead = ConnectionDead(1);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+#[expect(non_camel_case_types)]
+#[repr(u32)]
+pub enum ConnectionDead {
+    CD_FALSE,
+    CD_TRUE,
+}
 
-#[odbc_type(SQLINTEGER)]
-pub struct RefreshConnection;
-pub const SQL_REFRESH_NOW: RefreshConnection = RefreshConnection(-1);
-pub const SQL_REFRESH_AUTO: RefreshConnection = RefreshConnection(0);
-pub const SQL_REFRESH_MANUAL: RefreshConnection = RefreshConnection(1);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+#[expect(non_camel_case_types)]
+#[repr(i32)]
+pub enum RefreshConnection {
+    REFRESH_NOW = -1,
+    REFRESH_AUTO = 0,
+    REFRESH_MANUAL = 1,
+}
+
+impl_odbc_scalar_attr_unpack!(
+    AccessMode => u32,
+    AutoCommit => u32,
+    Trace => u32,
+    AsyncDbcFunctionsEnable => u32,
+    ConnectionDead => u32,
+    RefreshConnection => i32,
+);
 
 #[cfg(test)]
 mod test {
     #![allow(non_snake_case)]
 
-    //use super::*;
-    //use crate::SQL_TRUE;
-    //use crate::api::Allocate;
-    //use crate::api::mock_ffi as ffi;
-    //use crate::env::SQL_OV_ODBC3_80;
-    //use crate::handle::SQLHANDLE;
-    //use crate::sqlreturn::SQL_SUCCESS;
-    //use crate::stmt::SQL_ASYNC_ENABLE_OFF;
+    use super::*;
+
+    fn assert_get<V, S, A>()
+    where
+        V: crate::env::OdbcVersion,
+        S: ConnState,
+        A: ConnAttrGet<V, S>,
+    {
+    }
+
+    fn assert_set<V, S, A>()
+    where
+        V: crate::env::OdbcVersion,
+        S: ConnState,
+        A: ConnAttrSet<V, S>,
+    {
+    }
+
+    #[test]
+    fn connection_attribute_states_and_versions_are_composable() {
+        // Before-only setters.
+        assert_set::<OV_ODBC3, C2, LOGIN_TIMEOUT>();
+        assert_set::<OV_ODBC3_80, C2, PACKET_SIZE>();
+
+        // Connected-only access.
+        assert_get::<OV_ODBC3, C4, AUTO_IPD>();
+        assert_get::<OV_ODBC3_80, C4, CONNECTION_DEAD>();
+        assert_set::<OV_ODBC4, C4, REFRESH_CONNECTION>();
+
+        // Attributes valid on both sides of connecting.
+        assert_get::<OV_ODBC3, C2, AUTOCOMMIT>();
+        assert_get::<OV_ODBC3, C4, AUTOCOMMIT>();
+        assert_set::<OV_ODBC3, C2, AUTOCOMMIT>();
+        assert_set::<OV_ODBC3, C4, AUTOCOMMIT>();
+
+        // State-aware implementations still inherit into newer ODBC versions.
+        assert_get::<OV_ODBC4, C2, ACCESS_MODE>();
+        assert_set::<OV_ODBC4, C4, ACCESS_MODE>();
+    }
 
     //#[test]
     //fn test_SQL_ATTR_METADATA_ID_is_ConnAttr() {

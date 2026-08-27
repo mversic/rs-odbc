@@ -1,45 +1,43 @@
 use core::mem::MaybeUninit;
-use rs_odbc::SQL_DRIVER_COMPLETE;
-use rs_odbc::api::{Allocate, Statement};
-use rs_odbc::env::SQL_OV_ODBC3_80;
-use rs_odbc::handle::{SQL_NULL_HANDLE, SQLHDBC, SQLHENV, SQLHSTMT};
-use rs_odbc::sqlreturn::SQL_SUCCESS;
+
+use rs_odbc::{
+    conn::DriverCompletion,
+    env::OV_ODBC3_80,
+    handle::{HDBC, HENV, HSTMT},
+    sqlreturn::SUCCEEDED,
+};
 
 fn main() {
     let statement = "SELECT id, first_name, last_name FROM People ORDER BY 1, 3, 2;";
 
-    let (henv, res) = SQLHENV::<SQL_OV_ODBC3_80>::SQLAllocHandle(&SQL_NULL_HANDLE);
-    assert_eq!(res, SQL_SUCCESS);
-    let henv = henv.unwrap();
+    let henv = HENV::<OV_ODBC3_80>::alloc_handle().unwrap();
 
-    let (hdbc, res) = SQLHDBC::SQLAllocHandle(&henv);
-    assert_eq!(res, SQL_SUCCESS);
-    let hdbc = hdbc.unwrap();
+    let hdbc = HDBC::alloc_handle(&henv).unwrap();
 
     let conn_string = "DSN=MariaDB;Database=rs_odbc_test;";
-    let mut outstrlen = MaybeUninit::zeroed();
-    let (hdbc, res) = hdbc.SQLDriverConnectA(
+    let outcome = hdbc.driver_connect(
         None,
         conn_string.as_ref(),
         None,
-        &mut outstrlen,
-        SQL_DRIVER_COMPLETE,
+        None,
+        DriverCompletion::DRIVER_COMPLETE,
     );
-    assert_eq!(res, SQL_SUCCESS);
-    let hdbc = hdbc.unwrap();
+    let hdbc = outcome.unwrap();
 
-    let (hstmt, res) = SQLHSTMT::SQLAllocHandle(&hdbc);
-    assert_eq!(res, SQL_SUCCESS);
-    let hstmt = hstmt.unwrap();
+    let mut hstmt = HSTMT::alloc_handle(&hdbc).unwrap();
 
-    let res = hstmt.SQLPrepareA(statement.as_ref());
-    assert_eq!(res, SQL_SUCCESS);
+    let res = hstmt.prepare(statement.as_ref());
+    assert!(SUCCEEDED(res));
 
     // Retrieve number of columns
-    let mut num_cols = MaybeUninit::zeroed();
-    let res = hstmt.SQLNumResultCols(&mut num_cols);
-    assert_eq!(res, SQL_SUCCESS);
+    let mut num_cols = MaybeUninit::new(i16::default());
+    let res = hstmt.num_result_cols(&mut num_cols);
+    assert!(SUCCEEDED(res));
 
-    let num_cols = unsafe { num_cols.assume_init() };
-    println!("Number of Result Columns {}", num_cols);
+    println!("Number of Result Columns {}", unsafe {
+        num_cols.assume_init()
+    });
+
+    drop(hstmt);
+    let _hdbc = hdbc.disconnect().unwrap();
 }

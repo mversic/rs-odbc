@@ -1,17 +1,16 @@
-use rs_odbc::api::Allocate;
-use rs_odbc::env::SQL_OV_ODBC3_80;
-use rs_odbc::handle::{SQLHDBC, SQLHENV, SQL_NULL_HANDLE};
+use rs_odbc::{
+    env::OV_ODBC3_80,
+    handle::{HDBC, HENV, OwnedHENV},
+};
 
-fn get_env_handle() -> SQLHENV<SQL_OV_ODBC3_80> {
-    let (env, _) = SQLHENV::SQLAllocHandle(&SQL_NULL_HANDLE);
-    env.unwrap()
+fn get_env_handle() -> OwnedHENV<OV_ODBC3_80> {
+    HENV::<OV_ODBC3_80>::alloc_handle().unwrap()
 }
 
 fn main() {
     let env = get_env_handle();
-    let (conn, _) = SQLHDBC::SQLAllocHandle(&env);
-    let conn = conn.unwrap();
+    let conn = HDBC::alloc_handle(&env).unwrap();
 
-    env.SQLFreeHandle();
-    conn.SQLFreeHandle();
+    drop(env);
+    drop(conn);
 }

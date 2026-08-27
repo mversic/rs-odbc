@@ -1,35 +1,26 @@
-use core::mem::MaybeUninit;
-use rs_odbc::api::Allocate;
-use rs_odbc::conn::C4;
-use rs_odbc::env::SQL_OV_ODBC3_80;
-use rs_odbc::handle::{SQLHDBC, SQLHDESC, SQLHENV, SQL_NULL_HANDLE};
-use rs_odbc::SQL_DRIVER_COMPLETE;
+use rs_odbc::{
+    conn::{C4, DriverCompletion::DRIVER_COMPLETE},
+    env::OV_ODBC3_80,
+    handle::{HDBC, HDESC, HENV, OwnedHDBC, OwnedHENV},
+};
 
-fn get_env_handle() -> SQLHENV<SQL_OV_ODBC3_80> {
-    let (env, _) = SQLHENV::SQLAllocHandle(&SQL_NULL_HANDLE);
-    env.unwrap()
+fn get_env_handle() -> OwnedHENV<OV_ODBC3_80> {
+    HENV::<OV_ODBC3_80>::alloc_handle().unwrap()
 }
 
-fn connect_to_test_db<'env>(
-    env: &'env SQLHENV<SQL_OV_ODBC3_80>,
-) -> SQLHDBC<'env, C4, SQL_OV_ODBC3_80> {
-    let (conn, _) = SQLHDBC::SQLAllocHandle(env);
-    let conn = conn.unwrap();
-    let mut outstrlen = MaybeUninit::uninit();
-
-    let (conn, _) =
-        conn.SQLDriverConnectA(None, "".as_ref(), None, &mut outstrlen, SQL_DRIVER_COMPLETE);
-
-    conn.unwrap()
+fn connect_to_test_db<'env>(env: &'env OwnedHENV<OV_ODBC3_80>) -> OwnedHDBC<'env, OV_ODBC3_80, C4> {
+    HDBC::alloc_handle(env)
+        .unwrap()
+        .driver_connect(None, "".as_ref(), None, None, DRIVER_COMPLETE)
+        .unwrap()
 }
 
 fn main() {
     let env = get_env_handle();
     let conn = connect_to_test_db(&env);
 
-    let (desc, _) = SQLHDESC::SQLAllocHandle(&conn);
-    let desc = desc.unwrap();
+    let desc = HDESC::alloc_handle(&conn).unwrap();
 
-    conn.SQLDisconnect();
-    desc.SQLFreeHandle();
+    drop(conn);
+    drop(desc);
 }
