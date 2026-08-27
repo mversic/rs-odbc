@@ -4,23 +4,25 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use crate::{
-    Ident, SQLCHAR, SQLWCHAR,
-    env::OdbcVersion,
-    handle::{RefSQLHDESC, RefUnsafeSQLHDESC, SQLHDESC, UnsafeSQLHDESC},
-};
+use co3::ReprC;
+use rust_spec::RustSpec;
 
-pub trait OdbcChar {}
+use crate::data::{CHAR, WCHAR};
 
+#[sealed::sealed]
+pub trait OdbcChar:
+    RustSpec<Layout = rust_spec::Stable> + co3::transmute::CheckedTransmute<CType: Sized>
+{
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, RustSpec, ReprC)]
 #[repr(transparent)]
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct OdbcStr<T>([T]);
 
-pub trait Ansi {}
-pub trait Unicode {}
-
-impl OdbcChar for SQLCHAR {}
-impl OdbcChar for SQLWCHAR {}
+#[sealed::sealed]
+impl OdbcChar for CHAR {}
+#[sealed::sealed]
+impl OdbcChar for WCHAR {}
 
 impl<T> Deref for OdbcStr<T> {
     type Target = [T];
@@ -34,97 +36,68 @@ impl<T> DerefMut for OdbcStr<T> {
         &mut self.0
     }
 }
-impl AsRef<OdbcStr<SQLCHAR>> for str {
-    fn as_ref(&self) -> &OdbcStr<SQLCHAR> {
+impl AsRef<OdbcStr<CHAR>> for str {
+    fn as_ref(&self) -> &OdbcStr<CHAR> {
         self.as_bytes().as_ref()
     }
 }
-impl AsMut<OdbcStr<SQLCHAR>> for str {
-    fn as_mut(&mut self) -> &mut OdbcStr<SQLCHAR> {
+impl AsMut<OdbcStr<CHAR>> for str {
+    fn as_mut(&mut self) -> &mut OdbcStr<CHAR> {
         unsafe { self.as_bytes_mut().as_mut() }
     }
 }
-impl AsRef<OdbcStr<SQLCHAR>> for [SQLCHAR] {
-    fn as_ref(&self) -> &OdbcStr<SQLCHAR> {
-        unsafe { &*(self as *const [SQLCHAR] as *const OdbcStr<SQLCHAR>) }
+impl AsRef<OdbcStr<CHAR>> for [CHAR] {
+    fn as_ref(&self) -> &OdbcStr<CHAR> {
+        unsafe { &*(self as *const [CHAR] as *const OdbcStr<CHAR>) }
     }
 }
-impl AsMut<OdbcStr<SQLCHAR>> for [SQLCHAR] {
-    fn as_mut(&mut self) -> &mut OdbcStr<SQLCHAR> {
-        unsafe { &mut *(self as *mut [SQLCHAR] as *mut OdbcStr<SQLCHAR>) }
+impl AsMut<OdbcStr<CHAR>> for [CHAR] {
+    fn as_mut(&mut self) -> &mut OdbcStr<CHAR> {
+        unsafe { &mut *(self as *mut [CHAR] as *mut OdbcStr<CHAR>) }
     }
 }
-impl AsRef<OdbcStr<SQLWCHAR>> for [SQLWCHAR] {
-    fn as_ref(&self) -> &OdbcStr<SQLWCHAR> {
-        unsafe { &*(self as *const [SQLWCHAR] as *const OdbcStr<SQLWCHAR>) }
+impl AsRef<OdbcStr<WCHAR>> for [WCHAR] {
+    fn as_ref(&self) -> &OdbcStr<WCHAR> {
+        unsafe { &*(self as *const [WCHAR] as *const OdbcStr<WCHAR>) }
     }
 }
-impl AsMut<OdbcStr<SQLWCHAR>> for [SQLWCHAR] {
-    fn as_mut(&mut self) -> &mut OdbcStr<SQLWCHAR> {
-        unsafe { &mut *(self as *mut [SQLWCHAR] as *mut OdbcStr<SQLWCHAR>) }
+impl AsMut<OdbcStr<WCHAR>> for [WCHAR] {
+    fn as_mut(&mut self) -> &mut OdbcStr<WCHAR> {
+        unsafe { &mut *(self as *mut [WCHAR] as *mut OdbcStr<WCHAR>) }
     }
 }
-impl AsRef<OdbcStr<UnsafeCell<SQLCHAR>>> for UnsafeCell<str> {
-    fn as_ref(&self) -> &OdbcStr<UnsafeCell<SQLCHAR>> {
+impl AsRef<OdbcStr<UnsafeCell<CHAR>>> for UnsafeCell<str> {
+    fn as_ref(&self) -> &OdbcStr<UnsafeCell<CHAR>> {
         // FIXME: Relies on the implicit assumption that str is transmutable into [u8]
         // SAFETY: Types are transparent
         unsafe { core::mem::transmute(self) }
     }
 }
-impl AsRef<OdbcStr<UnsafeCell<SQLCHAR>>> for UnsafeCell<[SQLCHAR]> {
-    fn as_ref(&self) -> &OdbcStr<UnsafeCell<SQLCHAR>> {
+impl AsRef<OdbcStr<UnsafeCell<CHAR>>> for UnsafeCell<[CHAR]> {
+    fn as_ref(&self) -> &OdbcStr<UnsafeCell<CHAR>> {
         // SAFETY: Types are transparent
         unsafe { core::mem::transmute(self) }
     }
 }
-impl AsRef<OdbcStr<UnsafeCell<SQLWCHAR>>> for UnsafeCell<[SQLWCHAR]> {
-    fn as_ref(&self) -> &OdbcStr<UnsafeCell<SQLWCHAR>> {
+impl AsRef<OdbcStr<UnsafeCell<WCHAR>>> for UnsafeCell<[WCHAR]> {
+    fn as_ref(&self) -> &OdbcStr<UnsafeCell<WCHAR>> {
         // SAFETY: Types are transparent
         unsafe { core::mem::transmute(self) }
     }
 }
-impl AsMut<OdbcStr<MaybeUninit<SQLCHAR>>> for [MaybeUninit<SQLCHAR>]
+impl AsMut<OdbcStr<MaybeUninit<CHAR>>> for [MaybeUninit<CHAR>]
 where
-    [SQLCHAR]: AsMut<OdbcStr<SQLCHAR>>,
+    [CHAR]: AsMut<OdbcStr<CHAR>>,
 {
-    fn as_mut(&mut self) -> &mut OdbcStr<MaybeUninit<SQLCHAR>> {
-        unsafe { &mut *(self as *mut [MaybeUninit<SQLCHAR>] as *mut OdbcStr<MaybeUninit<SQLCHAR>>) }
+    fn as_mut(&mut self) -> &mut OdbcStr<MaybeUninit<CHAR>> {
+        unsafe { &mut *(self as *mut [MaybeUninit<CHAR>] as *mut OdbcStr<MaybeUninit<CHAR>>) }
     }
 }
-impl AsMut<OdbcStr<MaybeUninit<SQLWCHAR>>> for [MaybeUninit<SQLWCHAR>]
+impl AsMut<OdbcStr<MaybeUninit<WCHAR>>> for [MaybeUninit<WCHAR>]
 where
-    [SQLWCHAR]: AsMut<OdbcStr<SQLWCHAR>>,
+    [WCHAR]: AsMut<OdbcStr<WCHAR>>,
 {
-    fn as_mut(&mut self) -> &mut OdbcStr<MaybeUninit<SQLWCHAR>> {
-        unsafe {
-            &mut *(self as *mut [MaybeUninit<SQLWCHAR>] as *mut OdbcStr<MaybeUninit<SQLWCHAR>>)
-        }
+    fn as_mut(&mut self) -> &mut OdbcStr<MaybeUninit<WCHAR>> {
+        unsafe { &mut *(self as *mut [MaybeUninit<WCHAR>] as *mut OdbcStr<MaybeUninit<WCHAR>>) }
     }
 }
-
-impl<T: Ident> Ansi for T {} // TODO: This coincidentally implements it for SQLWCHAR as well. May not be a problem?
-impl<T: Ident> Unicode for T {} // TODO: This coincidentally implements it for SQLWCHAR as well. May not be a problem?
-
-impl<T: Ident> Ansi for MaybeUninit<T> where T: Ansi {}
-impl<T: Ident> Unicode for MaybeUninit<T> where T: Unicode {}
-
-impl Ansi for OdbcStr<SQLCHAR> {}
-impl Unicode for OdbcStr<SQLWCHAR> {}
-
-impl Ansi for OdbcStr<MaybeUninit<SQLCHAR>> {}
-impl Unicode for OdbcStr<MaybeUninit<SQLWCHAR>> {}
-
-impl<CH: OdbcChar> Ansi for &OdbcStr<CH> where OdbcStr<CH>: Ansi {}
-impl<CH: OdbcChar> Unicode for &OdbcStr<CH> where OdbcStr<CH>: Unicode {}
-
-impl<DT, V: OdbcVersion> Ansi for MaybeUninit<RefSQLHDESC<'_, DT, V>> {}
-impl<DT, V: OdbcVersion> Unicode for MaybeUninit<RefSQLHDESC<'_, DT, V>> {}
-
-impl<DT, V: OdbcVersion> Ansi for MaybeUninit<RefUnsafeSQLHDESC<'_, DT, V>> {}
-impl<DT, V: OdbcVersion> Unicode for MaybeUninit<RefUnsafeSQLHDESC<'_, DT, V>> {}
-
-impl<DT, V: OdbcVersion> Ansi for Option<&SQLHDESC<'_, DT, V>> {}
-impl<DT, V: OdbcVersion> Unicode for Option<&SQLHDESC<'_, DT, V>> {}
-
-impl<DT, V: OdbcVersion> Ansi for Option<&UnsafeSQLHDESC<'_, DT, V>> {}
-impl<DT, V: OdbcVersion> Unicode for Option<&UnsafeSQLHDESC<'_, DT, V>> {}

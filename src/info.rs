@@ -1,2861 +1,1857 @@
-use crate::attr::{Attr, AttrGet, AttrLen};
-use crate::env::{OdbcVersion, SQL_OV_ODBC3, SQL_OV_ODBC3_80, SQL_OV_ODBC4};
-use crate::str::{OdbcChar, OdbcStr};
-use crate::{
-    Ident, OdbcDefined, SQLCHAR, SQLSMALLINT, SQLUINTEGER, SQLUSMALLINT, SQLWCHAR, Scalar,
-};
+#![expect(non_camel_case_types)]
+
 use core::mem::MaybeUninit;
-use rs_odbc_derive::{Ident, odbc_bitmask, odbc_type};
 
-pub trait InfoType<I: Ident, V: OdbcVersion>:
-    Attr<I> + AttrLen<Self::DefinedBy, SQLSMALLINT>
-{
-}
+use co3::{ReprC, Tag};
+use rust_spec::RustSpec;
 
-// Implement InfoType for all versions of info type attributes
-impl<I: Ident, T: Scalar> InfoType<I, SQL_OV_ODBC3_80> for T where
-    T: InfoType<I, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
-{
-}
-impl<I: Ident, T: Scalar> InfoType<I, SQL_OV_ODBC4> for T where
-    T: InfoType<I, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
-{
-}
-impl<I: Ident, T: Scalar> InfoType<I, SQL_OV_ODBC3_80> for [T] where
-    [T]: InfoType<I, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
-{
-}
-impl<I: Ident, T: Scalar> InfoType<I, SQL_OV_ODBC4> for [T] where
-    [T]: InfoType<I, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
-{
-}
-impl<I: Ident, CH: OdbcChar> InfoType<I, SQL_OV_ODBC3_80> for OdbcStr<CH> where
-    OdbcStr<CH>: InfoType<I, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
-{
-}
-impl<I: Ident, CH: OdbcChar> InfoType<I, SQL_OV_ODBC4> for OdbcStr<CH> where
-    OdbcStr<CH>: InfoType<I, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
-{
+use crate::{
+    env::{OV_ODBC3, OV_ODBC3_80, OV_ODBC4, OdbcVersion},
+    str::{OdbcChar, OdbcStr},
+};
+
+/// Marker for identifiers accepted by `SQLGetInfo`.
+///
+/// # Safety
+///
+/// The identifier and buffer must match the representation and size prescribed for the
+/// information type by ODBC or by the driver specification.
+pub unsafe trait InfoType<V: OdbcVersion>: crate::Defined {
+    /// Buffer argument accepted by `SQLGetInfo` for this identifier.
+    type Buffer<C: OdbcChar>: ?Sized;
 }
 
-// Implement InfoType for uninitialized info type attributes
-impl<I: Ident, T: Scalar, V: OdbcVersion> InfoType<I, V> for MaybeUninit<T>
-where
-    T: InfoType<I, V> + AttrGet<I>,
-    Self: AttrLen<Self::DefinedBy, SQLSMALLINT>,
-{
+unsafe impl<T: InfoType<OV_ODBC3>> InfoType<OV_ODBC3_80> for T {
+    type Buffer<C: OdbcChar> = <T as InfoType<OV_ODBC3>>::Buffer<C>;
 }
-impl<I: Ident, T: Scalar, V: OdbcVersion> InfoType<I, V> for [MaybeUninit<T>]
-where
-    [T]: InfoType<I, V> + AttrGet<I>,
-    Self: AttrLen<Self::DefinedBy, SQLSMALLINT>,
-{
+
+unsafe impl<T: InfoType<OV_ODBC3_80>> InfoType<OV_ODBC4> for T {
+    type Buffer<C: OdbcChar> = <T as InfoType<OV_ODBC3_80>>::Buffer<C>;
 }
-impl<I: Ident, V: OdbcVersion> InfoType<I, V> for OdbcStr<MaybeUninit<SQLCHAR>> where
-    OdbcStr<SQLCHAR>: InfoType<I, V> + AttrGet<I>
-{
+
+macro_rules! impl_info_type {
+    ($version:ty, $info:ty => OdbcStr<C>) => {
+        impl crate::Defined for $info {
+            type By = crate::OdbcDefined;
+        }
+        unsafe impl InfoType<$version> for $info {
+            type Buffer<C: OdbcChar> = OdbcStr<MaybeUninit<C>>;
+        }
+    };
+    ($version:ty, $info:ty => $value:ty) => {
+        impl crate::Defined for $info {
+            type By = crate::OdbcDefined;
+        }
+        unsafe impl InfoType<$version> for $info {
+            type Buffer<C: OdbcChar> = MaybeUninit<$value>;
+        }
+    };
 }
-impl<I: Ident, V: OdbcVersion> InfoType<I, V> for OdbcStr<MaybeUninit<SQLWCHAR>> where
-    OdbcStr<SQLWCHAR>: InfoType<I, V> + AttrGet<I>
-{
+
+macro_rules! odbc_bitmask_impl {
+    ($vis:vis struct $name:ident, $rust:ty) => {
+        #[derive(Debug, Clone, Copy, RustSpec, ReprC)]
+        #[reprC(identity)]
+        #[repr(transparent)]
+        $vis struct $name($rust);
+
+        impl core::ops::BitAnd<$name> for $name {
+            type Output = $rust;
+
+            fn bitand(self, other: $name) -> Self::Output {
+                self.0 & other.0
+            }
+        }
+    };
+}
+
+macro_rules! odbc_bitmask {
+    (INTEGER, $vis:vis struct $name:ident) => {
+        odbc_bitmask_impl!($vis struct $name, i32);
+    };
+    (UINTEGER, $vis:vis struct $name:ident) => {
+        odbc_bitmask_impl!($vis struct $name, u32);
+    };
+    (SMALLINT, $vis:vis struct $name:ident) => {
+        odbc_bitmask_impl!($vis struct $name, i16);
+    };
+    (USMALLINT, $vis:vis struct $name:ident) => {
+        odbc_bitmask_impl!($vis struct $name, u16);
+    };
+    (LEN, $vis:vis struct $name:ident) => {
+        odbc_bitmask_impl!($vis struct $name, isize);
+    };
+    (ULEN, $vis:vis struct $name:ident) => {
+        odbc_bitmask_impl!($vis struct $name, usize);
+    };
 }
 
 //=====================================================================================//
 //-------------------------------------Attributes--------------------------------------//
 
-// These aliases include extensions of abbreviations
-pub use SQL_MAX_CATALOG_NAME_LEN as SQL_MAXIMUM_CATALOG_NAME_LENGTH;
-pub use SQL_MAX_COLUMN_NAME_LEN as SQL_MAXIMUM_COLUMN_NAME_LENGTH;
-pub use SQL_MAX_COLUMNS_IN_GROUP_BY as SQL_MAXIMUM_COLUMNS_IN_GROUP_BY;
-pub use SQL_MAX_COLUMNS_IN_ORDER_BY as SQL_MAXIMUM_COLUMNS_IN_ORDER_BY;
-pub use SQL_MAX_COLUMNS_IN_SELECT as SQL_MAXIMUM_COLUMNS_IN_SELECT;
-pub use SQL_MAX_COLUMNS_IN_TABLE as SQL_MAXIMUM_COLUMNS_IN_TABLE;
-pub use SQL_MAX_CONCURRENT_ACTIVITIES as SQL_MAXIMUM_CONCURRENT_ACTIVITIES;
-pub use SQL_MAX_CURSOR_NAME_LEN as SQL_MAXIMUM_CURSOR_NAME_LENGTH;
-pub use SQL_MAX_DRIVER_CONNECTIONS as SQL_MAXIMUM_DRIVER_CONNECTIONS;
-pub use SQL_MAX_IDENTIFIER_LEN as SQL_MAXIMUM_IDENTIFIER_LENGTH;
-pub use SQL_MAX_SCHEMA_NAME_LEN as SQL_MAXIMUM_SCHEMA_NAME_LENGTH;
-pub use SQL_MAX_STATEMENT_LEN as SQL_MAXIMUM_STATEMENT_LENGTH;
-pub use SQL_MAX_TABLE_NAME_LEN as SQL_MAXIMUM_TABLE_NAME_LENGTH;
-pub use SQL_MAX_TABLES_IN_SELECT as SQL_MAXIMUM_TABLES_IN_SELECT;
-pub use SQL_MAX_USER_NAME_LEN as SQL_MAXIMUM_USER_NAME_LENGTH;
-pub use SQL_MULT_RESULT_SETS as SQL_MULTIPLE_RESULT_SETS;
-pub use SQL_OJ_CAPABILITIES as SQL_OUTER_JOIN_CAPABILITIES;
-pub use SQL_TXN_CAPABLE as SQL_TRANSACTION_CAPABLE;
-pub use SQL_TXN_ISOLATION_OPTION as SQL_TRANSACTION_ISOLATION_OPTION;
+#[derive(Tag)]
+#[tag(u16, unsafe(171))]
+pub struct DM_VER;
 
-// TODO: Not mentioned in the specification, only implementation
-pub use SQL_MAX_COLUMNS_IN_INDEX as SQL_MAXIMUM_COLUMNS_IN_INDEX;
-pub use SQL_MAX_INDEX_SIZE as SQL_MAXIMUM_INDEX_SIZE;
-pub use SQL_MAX_ROW_SIZE as SQL_MAXIMUM_ROW_SIZE;
+#[derive(Tag)]
+#[tag(u16, unsafe(10000))]
+pub struct XOPEN_CLI_YEAR;
 
-// TODO: Try to categorize all of the following items just like all the other attributes
+#[derive(Tag)]
+#[tag(u16, unsafe(134))]
+pub struct CREATE_VIEW;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 171)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DM_VER;
-impl InfoType<SQL_DM_VER, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_DM_VER> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DM_VER> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(155))]
+pub struct SQL92_DATETIME_FUNCTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 10000)]
-#[expect(non_camel_case_types)]
-pub struct SQL_XOPEN_CLI_YEAR;
-impl InfoType<SQL_XOPEN_CLI_YEAR, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_XOPEN_CLI_YEAR> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_XOPEN_CLI_YEAR> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(156))]
+pub struct SQL92_FOREIGN_KEY_DELETE_RULE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 134)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CREATE_VIEW;
-impl InfoType<SQL_CREATE_VIEW, SQL_OV_ODBC3> for CreateView {}
-unsafe impl Attr<SQL_CREATE_VIEW> for CreateView {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CREATE_VIEW> for CreateView {}
+#[derive(Tag)]
+#[tag(u16, unsafe(157))]
+pub struct SQL92_FOREIGN_KEY_UPDATE_RULE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 155)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SQL92_DATETIME_FUNCTIONS;
-impl InfoType<SQL_SQL92_DATETIME_FUNCTIONS, SQL_OV_ODBC3> for DatetimeFunctions {}
-unsafe impl Attr<SQL_SQL92_DATETIME_FUNCTIONS> for DatetimeFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SQL92_DATETIME_FUNCTIONS> for DatetimeFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(158))]
+pub struct SQL92_GRANT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 156)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SQL92_FOREIGN_KEY_DELETE_RULE;
-impl InfoType<SQL_SQL92_FOREIGN_KEY_DELETE_RULE, SQL_OV_ODBC3> for ForeignKeyDeleteRule {}
-unsafe impl Attr<SQL_SQL92_FOREIGN_KEY_DELETE_RULE> for ForeignKeyDeleteRule {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SQL92_FOREIGN_KEY_DELETE_RULE> for ForeignKeyDeleteRule {}
+#[derive(Tag)]
+#[tag(u16, unsafe(119))]
+pub struct DATETIME_LITERALS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 157)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SQL92_FOREIGN_KEY_UPDATE_RULE;
-impl InfoType<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE, SQL_OV_ODBC3> for ForeignKeyUpdateRule {}
-unsafe impl Attr<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE> for ForeignKeyUpdateRule {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SQL92_FOREIGN_KEY_UPDATE_RULE> for ForeignKeyUpdateRule {}
+#[derive(Tag)]
+#[tag(u16, unsafe(159))]
+pub struct SQL92_NUMERIC_VALUE_FUNCTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 158)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SQL92_GRANT;
-impl InfoType<SQL_SQL92_GRANT, SQL_OV_ODBC3> for Grant {}
-unsafe impl Attr<SQL_SQL92_GRANT> for Grant {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SQL92_GRANT> for Grant {}
+#[derive(Tag)]
+#[tag(u16, unsafe(160))]
+pub struct SQL92_PREDICATES;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 119)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DATETIME_LITERALS;
-impl InfoType<SQL_DATETIME_LITERALS, SQL_OV_ODBC3> for DatetimeLiterals {}
-unsafe impl Attr<SQL_DATETIME_LITERALS> for DatetimeLiterals {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DATETIME_LITERALS> for DatetimeLiterals {}
+#[derive(Tag)]
+#[tag(u16, unsafe(161))]
+pub struct SQL92_RELATIONAL_JOIN_OPERATORS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 159)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SQL92_NUMERIC_VALUE_FUNCTIONS;
-impl InfoType<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS, SQL_OV_ODBC3> for NumericValueFunctions {}
-unsafe impl Attr<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS> for NumericValueFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SQL92_NUMERIC_VALUE_FUNCTIONS> for NumericValueFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(162))]
+pub struct SQL92_REVOKE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 160)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SQL92_PREDICATES;
-impl InfoType<SQL_SQL92_PREDICATES, SQL_OV_ODBC3> for Predicates {}
-unsafe impl Attr<SQL_SQL92_PREDICATES> for Predicates {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SQL92_PREDICATES> for Predicates {}
+#[derive(Tag)]
+#[tag(u16, unsafe(163))]
+pub struct SQL92_ROW_VALUE_CONSTRUCTOR;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 161)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SQL92_RELATIONAL_JOIN_OPERATORS;
-impl InfoType<SQL_SQL92_RELATIONAL_JOIN_OPERATORS, SQL_OV_ODBC3> for RelationalJoinOperators {}
-unsafe impl Attr<SQL_SQL92_RELATIONAL_JOIN_OPERATORS> for RelationalJoinOperators {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SQL92_RELATIONAL_JOIN_OPERATORS> for RelationalJoinOperators {}
+#[derive(Tag)]
+#[tag(u16, unsafe(164))]
+pub struct SQL92_STRING_FUNCTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 162)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SQL92_REVOKE;
-impl InfoType<SQL_SQL92_REVOKE, SQL_OV_ODBC3> for Revoke {}
-unsafe impl Attr<SQL_SQL92_REVOKE> for Revoke {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SQL92_REVOKE> for Revoke {}
+#[derive(Tag)]
+#[tag(u16, unsafe(165))]
+pub struct SQL92_VALUE_EXPRESSIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 163)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SQL92_ROW_VALUE_CONSTRUCTOR;
-impl InfoType<SQL_SQL92_ROW_VALUE_CONSTRUCTOR, SQL_OV_ODBC3> for RowValueConstructor {}
-unsafe impl Attr<SQL_SQL92_ROW_VALUE_CONSTRUCTOR> for RowValueConstructor {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SQL92_ROW_VALUE_CONSTRUCTOR> for RowValueConstructor {}
+#[derive(Tag)]
+#[tag(u16, unsafe(166))]
+pub struct STANDARD_CLI_CONFORMANCE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 164)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SQL92_STRING_FUNCTIONS;
-impl InfoType<SQL_SQL92_STRING_FUNCTIONS, SQL_OV_ODBC3> for StringScalarFunctions {}
-unsafe impl Attr<SQL_SQL92_STRING_FUNCTIONS> for StringScalarFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SQL92_STRING_FUNCTIONS> for StringScalarFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(174))]
+pub struct SCHEMA_INFERENCE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 165)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SQL92_VALUE_EXPRESSIONS;
-impl InfoType<SQL_SQL92_VALUE_EXPRESSIONS, SQL_OV_ODBC3> for ValueExpressions {}
-unsafe impl Attr<SQL_SQL92_VALUE_EXPRESSIONS> for ValueExpressions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SQL92_VALUE_EXPRESSIONS> for ValueExpressions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(175))]
+pub struct BINARY_FUNCTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 166)]
-#[expect(non_camel_case_types)]
-pub struct SQL_STANDARD_CLI_CONFORMANCE;
-impl InfoType<SQL_STANDARD_CLI_CONFORMANCE, SQL_OV_ODBC3> for StandardCliConformance {}
-unsafe impl Attr<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_STANDARD_CLI_CONFORMANCE> for StandardCliConformance {}
+#[derive(Tag)]
+#[tag(u16, unsafe(176))]
+pub struct ISO_STRING_FUNCTIONS;
 
-// TODO: What about these
-//#[derive(Ident)]
-//#[identifier(SQLUSMALLINT, 0)]
-//#[expect(non_camel_case_types)]
-//pub struct SQL_INFO_FIRST;
-//impl InfoType<SQL_INFO_FIRST, SQL_OV_ODBC3> for {}
-//unsafe impl Attr<SQL_INFO_FIRST> for {
-//    type DefinedBy = OdbcDefined;
-//}
-//unsafe impl AttrGet<SQL_INFO_FIRST> for {}
+#[derive(Tag)]
+#[tag(u16, unsafe(177))]
+pub struct ISO_BINARY_FUNCTIONS;
 
-//#[derive(Ident)]
-//#[identifier(SQLUSMALLINT, 12)]
-//#[expect(non_camel_case_types)]
-//pub struct SQL_ODBC_SAG_CLI_CONFORMANCE;
-//impl InfoType<SQL_ODBC_SAG_CLI_CONFORMANCE, SQL_OV_ODBC3> for {}
-//unsafe impl Attr<SQL_ODBC_SAG_CLI_CONFORMANCE> for {
-//    type DefinedBy = OdbcDefined;
-//}
-//unsafe impl AttrGet<SQL_ODBC_SAG_CLI_CONFORMANCE> for {}
+#[derive(Tag)]
+#[tag(u16, unsafe(178))]
+pub struct LIMIT_ESCAPE_CLAUSE;
 
-//#[derive(Ident)]
-//#[identifier(SQLUSMALLINT, SQL_UNION)]
-//#[expect(non_camel_case_types)]
-//pub struct SQL_UNION_STATEMENT;
-//impl InfoType<SQL_UNION_STATEMENT, SQL_OV_ODBC3> for {}
-//unsafe impl Attr<SQL_UNION_STATEMENT> for {
-//    type DefinedBy = OdbcDefined;
-//}
-//unsafe impl AttrGet<SQL_UNION_STATEMENT> for {}
+#[derive(Tag)]
+#[tag(u16, unsafe(179))]
+pub struct NATIVE_ESCAPE_CLAUSE;
 
-//#[derive(Ident)]
-//#[identifier(SQLUSMALLINT, 174)]
-//#[expect(non_camel_case_types)]
-//pub struct SQL_SCHEMA_INFERENCE;
-//impl InfoType<SQL_SCHEMA_INFERENCE, SQL_OV_ODBC4> for {}
-//unsafe impl Attr<SQL_SCHEMA_INFERENCE> for {
-//    type DefinedBy = OdbcDefined;
-//}
-//unsafe impl AttrGet<SQL_SCHEMA_INFERENCE> for {}
+#[derive(Tag)]
+#[tag(u16, unsafe(180))]
+pub struct RETURN_ESCAPE_CLAUSE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 175)]
-#[expect(non_camel_case_types)]
-pub struct SQL_BINARY_FUNCTIONS;
-impl InfoType<SQL_BINARY_FUNCTIONS, SQL_OV_ODBC4> for BinaryFunctions {}
-unsafe impl Attr<SQL_BINARY_FUNCTIONS> for BinaryFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_BINARY_FUNCTIONS> for BinaryFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(181))]
+pub struct FORMAT_ESCAPE_CLAUSE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 176)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ISO_STRING_FUNCTIONS;
-impl InfoType<SQL_ISO_STRING_FUNCTIONS, SQL_OV_ODBC4> for StringScalarFunctions {}
-unsafe impl Attr<SQL_ISO_STRING_FUNCTIONS> for StringScalarFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ISO_STRING_FUNCTIONS> for StringScalarFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(155))]
+pub struct ISO_DATETIME_FUNCTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 177)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ISO_BINARY_FUNCTIONS;
-impl InfoType<SQL_ISO_BINARY_FUNCTIONS, SQL_OV_ODBC4> for IsoBinaryFunctions {}
-unsafe impl Attr<SQL_ISO_BINARY_FUNCTIONS> for IsoBinaryFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ISO_BINARY_FUNCTIONS> for IsoBinaryFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(156))]
+pub struct ISO_FOREIGN_KEY_DELETE_RULE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 178)]
-#[expect(non_camel_case_types)]
-pub struct SQL_LIMIT_ESCAPE_CLAUSE;
-impl InfoType<SQL_LIMIT_ESCAPE_CLAUSE, SQL_OV_ODBC4> for LimitEscapeClause {}
-unsafe impl Attr<SQL_LIMIT_ESCAPE_CLAUSE> for LimitEscapeClause {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_LIMIT_ESCAPE_CLAUSE> for LimitEscapeClause {}
+#[derive(Tag)]
+#[tag(u16, unsafe(157))]
+pub struct ISO_FOREIGN_KEY_UPDATE_RULE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 179)]
-#[expect(non_camel_case_types)]
-pub struct SQL_NATIVE_ESCAPE_CLAUSE;
-impl InfoType<SQL_NATIVE_ESCAPE_CLAUSE, SQL_OV_ODBC4> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_NATIVE_ESCAPE_CLAUSE> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_NATIVE_ESCAPE_CLAUSE> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(158))]
+pub struct ISO_GRANT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 180)]
-#[expect(non_camel_case_types)]
-pub struct SQL_RETURN_ESCAPE_CLAUSE;
-impl InfoType<SQL_RETURN_ESCAPE_CLAUSE, SQL_OV_ODBC4> for ReturnEscapeClause {}
-unsafe impl Attr<SQL_RETURN_ESCAPE_CLAUSE> for ReturnEscapeClause {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_RETURN_ESCAPE_CLAUSE> for ReturnEscapeClause {}
+#[derive(Tag)]
+#[tag(u16, unsafe(159))]
+pub struct ISO_NUMERIC_VALUE_FUNCTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 181)]
-#[expect(non_camel_case_types)]
-pub struct SQL_FORMAT_ESCAPE_CLAUSE;
-impl InfoType<SQL_FORMAT_ESCAPE_CLAUSE, SQL_OV_ODBC4> for FormatEscapeClause {}
-unsafe impl Attr<SQL_FORMAT_ESCAPE_CLAUSE> for FormatEscapeClause {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_FORMAT_ESCAPE_CLAUSE> for FormatEscapeClause {}
+#[derive(Tag)]
+#[tag(u16, unsafe(160))]
+pub struct ISO_PREDICATES;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 155)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ISO_DATETIME_FUNCTIONS;
-impl InfoType<SQL_ISO_DATETIME_FUNCTIONS, SQL_OV_ODBC4> for DatetimeFunctions {}
-unsafe impl Attr<SQL_ISO_DATETIME_FUNCTIONS> for DatetimeFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ISO_DATETIME_FUNCTIONS> for DatetimeFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(161))]
+pub struct ISO_RELATIONAL_JOIN_OPERATORS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 156)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ISO_FOREIGN_KEY_DELETE_RULE;
-impl InfoType<SQL_ISO_FOREIGN_KEY_DELETE_RULE, SQL_OV_ODBC4> for ForeignKeyDeleteRule {}
-unsafe impl Attr<SQL_ISO_FOREIGN_KEY_DELETE_RULE> for ForeignKeyDeleteRule {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ISO_FOREIGN_KEY_DELETE_RULE> for ForeignKeyDeleteRule {}
+#[derive(Tag)]
+#[tag(u16, unsafe(162))]
+pub struct ISO_REVOKE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 157)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ISO_FOREIGN_KEY_UPDATE_RULE;
-impl InfoType<SQL_ISO_FOREIGN_KEY_UPDATE_RULE, SQL_OV_ODBC4> for ForeignKeyUpdateRule {}
-unsafe impl Attr<SQL_ISO_FOREIGN_KEY_UPDATE_RULE> for ForeignKeyUpdateRule {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ISO_FOREIGN_KEY_UPDATE_RULE> for ForeignKeyUpdateRule {}
+#[derive(Tag)]
+#[tag(u16, unsafe(163))]
+pub struct ISO_ROW_VALUE_CONSTRUCTOR;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 158)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ISO_GRANT;
-impl InfoType<SQL_ISO_GRANT, SQL_OV_ODBC4> for Grant {}
-unsafe impl Attr<SQL_ISO_GRANT> for Grant {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ISO_GRANT> for Grant {}
-
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 159)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ISO_NUMERIC_VALUE_FUNCTIONS;
-impl InfoType<SQL_ISO_NUMERIC_VALUE_FUNCTIONS, SQL_OV_ODBC4> for NumericValueFunctions {}
-unsafe impl Attr<SQL_ISO_NUMERIC_VALUE_FUNCTIONS> for NumericValueFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ISO_NUMERIC_VALUE_FUNCTIONS> for NumericValueFunctions {}
-
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 160)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ISO_PREDICATES;
-impl InfoType<SQL_ISO_PREDICATES, SQL_OV_ODBC4> for Predicates {}
-unsafe impl Attr<SQL_ISO_PREDICATES> for Predicates {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ISO_PREDICATES> for Predicates {}
-
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 161)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ISO_RELATIONAL_JOIN_OPERATORS;
-impl InfoType<SQL_ISO_RELATIONAL_JOIN_OPERATORS, SQL_OV_ODBC4> for RelationalJoinOperators {}
-unsafe impl Attr<SQL_ISO_RELATIONAL_JOIN_OPERATORS> for RelationalJoinOperators {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ISO_RELATIONAL_JOIN_OPERATORS> for RelationalJoinOperators {}
-
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 162)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ISO_REVOKE;
-impl InfoType<SQL_ISO_REVOKE, SQL_OV_ODBC4> for Revoke {}
-unsafe impl Attr<SQL_ISO_REVOKE> for Revoke {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ISO_REVOKE> for Revoke {}
-
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 163)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ISO_ROW_VALUE_CONSTRUCTOR;
-impl InfoType<SQL_ISO_ROW_VALUE_CONSTRUCTOR, SQL_OV_ODBC4> for RowValueConstructor {}
-unsafe impl Attr<SQL_ISO_ROW_VALUE_CONSTRUCTOR> for RowValueConstructor {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ISO_ROW_VALUE_CONSTRUCTOR> for RowValueConstructor {}
-
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 165)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ISO_VALUE_EXPRESSIONS;
-impl InfoType<SQL_ISO_VALUE_EXPRESSIONS, SQL_OV_ODBC4> for ValueExpressions {}
-unsafe impl Attr<SQL_ISO_VALUE_EXPRESSIONS> for ValueExpressions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ISO_VALUE_EXPRESSIONS> for ValueExpressions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(165))]
+pub struct ISO_VALUE_EXPRESSIONS;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////// Driver Information ///////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 116)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ACTIVE_ENVIRONMENTS;
-impl InfoType<SQL_ACTIVE_ENVIRONMENTS, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_ACTIVE_ENVIRONMENTS> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ACTIVE_ENVIRONMENTS> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(116))]
+pub struct ACTIVE_ENVIRONMENTS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 10023)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ASYNC_DBC_FUNCTIONS;
-impl InfoType<SQL_ASYNC_DBC_FUNCTIONS, SQL_OV_ODBC3_80> for AsyncDbcFunctions {}
-unsafe impl Attr<SQL_ASYNC_DBC_FUNCTIONS> for AsyncDbcFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ASYNC_DBC_FUNCTIONS> for AsyncDbcFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(10023))]
+pub struct ASYNC_DBC_FUNCTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 10021)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ASYNC_MODE;
-impl InfoType<SQL_ASYNC_MODE, SQL_OV_ODBC3> for AsyncMode {}
-unsafe impl Attr<SQL_ASYNC_MODE> for AsyncMode {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ASYNC_MODE> for AsyncMode {}
+#[derive(Tag)]
+#[tag(u16, unsafe(10021))]
+pub struct ASYNC_MODE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 10025)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ASYNC_NOTIFICATION;
-impl InfoType<SQL_ASYNC_NOTIFICATION, SQL_OV_ODBC3_80> for AsyncNotification {}
-unsafe impl Attr<SQL_ASYNC_NOTIFICATION> for AsyncNotification {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ASYNC_NOTIFICATION> for AsyncNotification {}
+#[derive(Tag)]
+#[tag(u16, unsafe(10025))]
+pub struct ASYNC_NOTIFICATION;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 120)]
-#[expect(non_camel_case_types)]
-pub struct SQL_BATCH_ROW_COUNT;
-impl InfoType<SQL_BATCH_ROW_COUNT, SQL_OV_ODBC3> for BatchRowCount {}
-unsafe impl Attr<SQL_BATCH_ROW_COUNT> for BatchRowCount {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_BATCH_ROW_COUNT> for BatchRowCount {}
+#[derive(Tag)]
+#[tag(u16, unsafe(120))]
+pub struct BATCH_ROW_COUNT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 121)]
-#[expect(non_camel_case_types)]
-pub struct SQL_BATCH_SUPPORT;
-impl InfoType<SQL_BATCH_SUPPORT, SQL_OV_ODBC3> for BatchSupport {}
-unsafe impl Attr<SQL_BATCH_SUPPORT> for BatchSupport {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_BATCH_SUPPORT> for BatchSupport {}
+#[derive(Tag)]
+#[tag(u16, unsafe(121))]
+pub struct BATCH_SUPPORT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 2)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DATA_SOURCE_NAME;
-impl InfoType<SQL_DATA_SOURCE_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_DATA_SOURCE_NAME> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DATA_SOURCE_NAME> for OdbcStr<SQLCHAR> {}
-
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 10024)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DRIVER_AWARE_POOLING_SUPPORTED;
-impl InfoType<SQL_DRIVER_AWARE_POOLING_SUPPORTED, SQL_OV_ODBC3_80> for DriverAwarePoolingSupported {}
-unsafe impl Attr<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSupported {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DRIVER_AWARE_POOLING_SUPPORTED> for DriverAwarePoolingSupported {}
-
-// TODO: How are these handles used?
-//#[derive(Ident)]
-//#[identifier(SQLUSMALLINT, 3)]
-//#[expect(non_camel_case_types)]
-//pub struct SQL_DRIVER_HDBC;
-//impl InfoType<SQL_DRIVER_HDBC, SQL_OV_ODBC3> for {}
-//unsafe impl Attr<SQL_DRIVER_HDBC> for {
-//    type DefinedBy = OdbcDefined;
-//}
-//unsafe impl AttrGet<SQL_DRIVER_HDBC> for {}
+#[derive(Tag)]
+#[tag(u16, unsafe(10024))]
+pub struct DRIVER_AWARE_POOLING_SUPPORTED;
 //
-//#[derive(Ident)]
-//#[identifier(SQLUSMALLINT, 135)]
-//#[expect(non_camel_case_types)]
-//pub struct SQL_DRIVER_HDESC;
-//impl InfoType<SQL_DRIVER_HDESC, SQL_OV_ODBC3> for {}
-//unsafe impl Attr<SQL_DRIVER_HDESC> for {
-//    type DefinedBy = OdbcDefined;
-//}
-//unsafe impl AttrGet<SQL_DRIVER_HDESC> for {}
-//
-//#[derive(Ident)]
-//#[identifier(SQLUSMALLINT, 4)]
-//#[expect(non_camel_case_types)]
-//pub struct SQL_DRIVER_HENV;
-//impl InfoType<SQL_DRIVER_HENV, SQL_OV_ODBC3> for {}
-//unsafe impl Attr<SQL_DRIVER_HENV> for {
-//    type DefinedBy = OdbcDefined;
-//}
-//unsafe impl AttrGet<SQL_DRIVER_HENV> for {}
-//
-//#[derive(Ident)]
-//#[identifier(SQLUSMALLINT, 76)]
-//#[expect(non_camel_case_types)]
-//pub struct SQL_DRIVER_HLIB;
-//impl InfoType<SQL_DRIVER_HLIB, SQL_OV_ODBC3> for {}
-//unsafe impl Attr<SQL_DRIVER_HLIB> for {
-//    type DefinedBy = OdbcDefined;
-//}
-//unsafe impl AttrGet<SQL_DRIVER_HLIB> for {}
-//
-//#[derive(Ident)]
-//#[identifier(SQLUSMALLINT, 5)]
-//#[expect(non_camel_case_types)]
-//pub struct SQL_DRIVER_HSTMT;
-//impl InfoType<SQL_DRIVER_HSTMT, SQL_OV_ODBC3> for {}
-//unsafe impl Attr<SQL_DRIVER_HSTMT> for {
-//    type DefinedBy = OdbcDefined;
-//}
-//unsafe impl AttrGet<SQL_DRIVER_HSTMT> for {}
+#[derive(Tag)]
+#[tag(u16, unsafe(135))]
+pub struct DRIVER_HDESC;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 6)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DRIVER_NAME;
-impl InfoType<SQL_DRIVER_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_DRIVER_NAME> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DRIVER_NAME> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(2))]
+pub struct DATA_SOURCE_NAME;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 77)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DRIVER_ODBC_VER;
-impl InfoType<SQL_DRIVER_ODBC_VER, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_DRIVER_ODBC_VER> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DRIVER_ODBC_VER> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(3))]
+pub struct DRIVER_HDBC;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 7)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DRIVER_VER;
-impl InfoType<SQL_DRIVER_VER, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_DRIVER_VER> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DRIVER_VER> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(4))]
+pub struct DRIVER_HENV;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 144)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DYNAMIC_CURSOR_ATTRIBUTES1;
-impl InfoType<SQL_DYNAMIC_CURSOR_ATTRIBUTES1, SQL_OV_ODBC3> for CursorAttributes1 {}
-unsafe impl Attr<SQL_DYNAMIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DYNAMIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
+#[derive(Tag)]
+#[tag(u16, unsafe(5))]
+pub struct DRIVER_HSTMT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 145)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DYNAMIC_CURSOR_ATTRIBUTES2;
-impl InfoType<SQL_DYNAMIC_CURSOR_ATTRIBUTES2, SQL_OV_ODBC3> for CursorAttributes2 {}
-unsafe impl Attr<SQL_DYNAMIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DYNAMIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
+#[derive(Tag)]
+#[tag(u16, unsafe(6))]
+pub struct DRIVER_NAME;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 146)]
-#[expect(non_camel_case_types)]
-pub struct SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1;
-impl InfoType<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1, SQL_OV_ODBC3> for CursorAttributes1 {}
-unsafe impl Attr<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
+#[derive(Tag)]
+#[tag(u16, unsafe(7))]
+pub struct DRIVER_VER;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 147)]
-#[expect(non_camel_case_types)]
-pub struct SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2;
-impl InfoType<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2, SQL_OV_ODBC3> for CursorAttributes2 {}
-unsafe impl Attr<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
+#[derive(Tag)]
+#[tag(u16, unsafe(76))]
+pub struct DRIVER_HLIB;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 84)]
-#[expect(non_camel_case_types)]
-pub struct SQL_FILE_USAGE;
-impl InfoType<SQL_FILE_USAGE, SQL_OV_ODBC3> for FileUsage {}
-unsafe impl Attr<SQL_FILE_USAGE> for FileUsage {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_FILE_USAGE> for FileUsage {}
+#[derive(Tag)]
+#[tag(u16, unsafe(77))]
+pub struct DRIVER_ODBC_VER;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 81)]
-#[expect(non_camel_case_types)]
-pub struct SQL_GETDATA_EXTENSIONS;
-impl InfoType<SQL_GETDATA_EXTENSIONS, SQL_OV_ODBC3> for GetdataExtensions {}
-unsafe impl Attr<SQL_GETDATA_EXTENSIONS> for GetdataExtensions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_GETDATA_EXTENSIONS> for GetdataExtensions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(144))]
+pub struct DYNAMIC_CURSOR_ATTRIBUTES1;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 149)]
-#[expect(non_camel_case_types)]
-pub struct SQL_INFO_SCHEMA_VIEWS;
-impl InfoType<SQL_INFO_SCHEMA_VIEWS, SQL_OV_ODBC3> for InfoSchemaViews {}
-unsafe impl Attr<SQL_INFO_SCHEMA_VIEWS> for InfoSchemaViews {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_INFO_SCHEMA_VIEWS> for InfoSchemaViews {}
+#[derive(Tag)]
+#[tag(u16, unsafe(145))]
+pub struct DYNAMIC_CURSOR_ATTRIBUTES2;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 150)]
-#[expect(non_camel_case_types)]
-pub struct SQL_KEYSET_CURSOR_ATTRIBUTES1;
-impl InfoType<SQL_KEYSET_CURSOR_ATTRIBUTES1, SQL_OV_ODBC3> for CursorAttributes1 {}
-unsafe impl Attr<SQL_KEYSET_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_KEYSET_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
+#[derive(Tag)]
+#[tag(u16, unsafe(146))]
+pub struct FORWARD_ONLY_CURSOR_ATTRIBUTES1;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 151)]
-#[expect(non_camel_case_types)]
-pub struct SQL_KEYSET_CURSOR_ATTRIBUTES2;
-impl InfoType<SQL_KEYSET_CURSOR_ATTRIBUTES2, SQL_OV_ODBC3> for CursorAttributes2 {}
-unsafe impl Attr<SQL_KEYSET_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_KEYSET_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
+#[derive(Tag)]
+#[tag(u16, unsafe(147))]
+pub struct FORWARD_ONLY_CURSOR_ATTRIBUTES2;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 10022)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_ASYNC_CONCURRENT_STATEMENTS;
-impl InfoType<SQL_MAX_ASYNC_CONCURRENT_STATEMENTS, SQL_OV_ODBC3> for SQLUINTEGER {}
-unsafe impl Attr<SQL_MAX_ASYNC_CONCURRENT_STATEMENTS> for SQLUINTEGER {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_ASYNC_CONCURRENT_STATEMENTS> for SQLUINTEGER {}
+#[derive(Tag)]
+#[tag(u16, unsafe(84))]
+pub struct FILE_USAGE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 1)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_CONCURRENT_ACTIVITIES;
-impl InfoType<SQL_MAX_CONCURRENT_ACTIVITIES, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_CONCURRENT_ACTIVITIES> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_CONCURRENT_ACTIVITIES> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(81))]
+pub struct GETDATA_EXTENSIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 0)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_DRIVER_CONNECTIONS;
-impl InfoType<SQL_MAX_DRIVER_CONNECTIONS, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_DRIVER_CONNECTIONS> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_DRIVER_CONNECTIONS> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(149))]
+pub struct INFO_SCHEMA_VIEWS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 152)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ODBC_INTERFACE_CONFORMANCE;
-impl InfoType<SQL_ODBC_INTERFACE_CONFORMANCE, SQL_OV_ODBC3> for OdbcInterfaceConformance {}
-unsafe impl Attr<SQL_ODBC_INTERFACE_CONFORMANCE> for OdbcInterfaceConformance {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ODBC_INTERFACE_CONFORMANCE> for OdbcInterfaceConformance {}
+#[derive(Tag)]
+#[tag(u16, unsafe(150))]
+pub struct KEYSET_CURSOR_ATTRIBUTES1;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 10)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ODBC_VER;
-impl InfoType<SQL_ODBC_VER, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_ODBC_VER> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ODBC_VER> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(151))]
+pub struct KEYSET_CURSOR_ATTRIBUTES2;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 153)]
-#[expect(non_camel_case_types)]
-pub struct SQL_PARAM_ARRAY_ROW_COUNTS;
-impl InfoType<SQL_PARAM_ARRAY_ROW_COUNTS, SQL_OV_ODBC3> for ParamArrayRowCounts {}
-unsafe impl Attr<SQL_PARAM_ARRAY_ROW_COUNTS> for ParamArrayRowCounts {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_PARAM_ARRAY_ROW_COUNTS> for ParamArrayRowCounts {}
+#[derive(Tag)]
+#[tag(u16, unsafe(10022))]
+pub struct MAX_ASYNC_CONCURRENT_STATEMENTS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 154)]
-#[expect(non_camel_case_types)]
-pub struct SQL_PARAM_ARRAY_SELECTS;
-impl InfoType<SQL_PARAM_ARRAY_SELECTS, SQL_OV_ODBC3> for ParamArraySelects {}
-unsafe impl Attr<SQL_PARAM_ARRAY_SELECTS> for ParamArraySelects {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_PARAM_ARRAY_SELECTS> for ParamArraySelects {}
+#[derive(Tag)]
+#[tag(u16, unsafe(1))]
+pub struct MAX_CONCURRENT_ACTIVITIES;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 11)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ROW_UPDATES;
-impl InfoType<SQL_ROW_UPDATES, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_ROW_UPDATES> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ROW_UPDATES> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(0))]
+pub struct MAX_DRIVER_CONNECTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 14)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SEARCH_PATTERN_ESCAPE;
-impl InfoType<SQL_SEARCH_PATTERN_ESCAPE, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_SEARCH_PATTERN_ESCAPE> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SEARCH_PATTERN_ESCAPE> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(152))]
+pub struct ODBC_INTERFACE_CONFORMANCE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 13)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SERVER_NAME;
-impl InfoType<SQL_SERVER_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_SERVER_NAME> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SERVER_NAME> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(10))]
+pub struct ODBC_VER;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 167)]
-#[expect(non_camel_case_types)]
-pub struct SQL_STATIC_CURSOR_ATTRIBUTES1;
-impl InfoType<SQL_STATIC_CURSOR_ATTRIBUTES1, SQL_OV_ODBC3> for CursorAttributes1 {}
-unsafe impl Attr<SQL_STATIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_STATIC_CURSOR_ATTRIBUTES1> for CursorAttributes1 {}
+#[derive(Tag)]
+#[tag(u16, unsafe(153))]
+pub struct PARAM_ARRAY_ROW_COUNTS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 168)]
-#[expect(non_camel_case_types)]
-pub struct SQL_STATIC_CURSOR_ATTRIBUTES2;
-impl InfoType<SQL_STATIC_CURSOR_ATTRIBUTES2, SQL_OV_ODBC3> for CursorAttributes2 {}
-unsafe impl Attr<SQL_STATIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_STATIC_CURSOR_ATTRIBUTES2> for CursorAttributes2 {}
+#[derive(Tag)]
+#[tag(u16, unsafe(154))]
+pub struct PARAM_ARRAY_SELECTS;
+
+#[derive(Tag)]
+#[tag(u16, unsafe(11))]
+pub struct ROW_UPDATES;
+
+#[derive(Tag)]
+#[tag(u16, unsafe(14))]
+pub struct SEARCH_PATTERN_ESCAPE;
+
+#[derive(Tag)]
+#[tag(u16, unsafe(13))]
+pub struct SERVER_NAME;
+
+#[derive(Tag)]
+#[tag(u16, unsafe(167))]
+pub struct STATIC_CURSOR_ATTRIBUTES1;
+
+#[derive(Tag)]
+#[tag(u16, unsafe(168))]
+pub struct STATIC_CURSOR_ATTRIBUTES2;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////// DBMS Product Information ////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 16)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DATABASE_NAME;
-impl InfoType<SQL_DATABASE_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_DATABASE_NAME> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DATABASE_NAME> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(16))]
+pub struct DATABASE_NAME;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 17)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DBMS_NAME;
-impl InfoType<SQL_DBMS_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_DBMS_NAME> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DBMS_NAME> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(17))]
+pub struct DBMS_NAME;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 18)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DBMS_VER;
-impl InfoType<SQL_DBMS_VER, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_DBMS_VER> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DBMS_VER> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(18))]
+pub struct DBMS_VER;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////// Data Source Information /////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 20)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ACCESSIBLE_PROCEDURES;
-impl InfoType<SQL_ACCESSIBLE_PROCEDURES, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_ACCESSIBLE_PROCEDURES> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ACCESSIBLE_PROCEDURES> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(20))]
+pub struct ACCESSIBLE_PROCEDURES;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 19)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ACCESSIBLE_TABLES;
-impl InfoType<SQL_ACCESSIBLE_TABLES, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_ACCESSIBLE_TABLES> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ACCESSIBLE_TABLES> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(19))]
+pub struct ACCESSIBLE_TABLES;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 82)]
-#[expect(non_camel_case_types)]
-pub struct SQL_BOOKMARK_PERSISTENCE;
-impl InfoType<SQL_BOOKMARK_PERSISTENCE, SQL_OV_ODBC3> for BookmarkPersistence {}
-unsafe impl Attr<SQL_BOOKMARK_PERSISTENCE> for BookmarkPersistence {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_BOOKMARK_PERSISTENCE> for BookmarkPersistence {}
+#[derive(Tag)]
+#[tag(u16, unsafe(82))]
+pub struct BOOKMARK_PERSISTENCE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 42)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CATALOG_TERM;
-impl InfoType<SQL_CATALOG_TERM, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_CATALOG_TERM> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CATALOG_TERM> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(42))]
+pub struct CATALOG_TERM;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 10004)]
-#[expect(non_camel_case_types)]
-pub struct SQL_COLLATION_SEQ;
-impl InfoType<SQL_COLLATION_SEQ, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_COLLATION_SEQ> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_COLLATION_SEQ> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(10004))]
+pub struct COLLATION_SEQ;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 22)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONCAT_NULL_BEHAVIOR;
-impl InfoType<SQL_CONCAT_NULL_BEHAVIOR, SQL_OV_ODBC3> for ConcatNullBehavior {}
-unsafe impl Attr<SQL_CONCAT_NULL_BEHAVIOR> for ConcatNullBehavior {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONCAT_NULL_BEHAVIOR> for ConcatNullBehavior {}
+#[derive(Tag)]
+#[tag(u16, unsafe(22))]
+pub struct CONCAT_NULL_BEHAVIOR;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 23)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CURSOR_COMMIT_BEHAVIOR;
-impl InfoType<SQL_CURSOR_COMMIT_BEHAVIOR, SQL_OV_ODBC3> for CursorBehavior {}
-unsafe impl Attr<SQL_CURSOR_COMMIT_BEHAVIOR> for CursorBehavior {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CURSOR_COMMIT_BEHAVIOR> for CursorBehavior {}
+#[derive(Tag)]
+#[tag(u16, unsafe(23))]
+pub struct CURSOR_COMMIT_BEHAVIOR;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 24)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CURSOR_ROLLBACK_BEHAVIOR;
-impl InfoType<SQL_CURSOR_ROLLBACK_BEHAVIOR, SQL_OV_ODBC3> for CursorBehavior {}
-unsafe impl Attr<SQL_CURSOR_ROLLBACK_BEHAVIOR> for CursorBehavior {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CURSOR_ROLLBACK_BEHAVIOR> for CursorBehavior {}
+#[derive(Tag)]
+#[tag(u16, unsafe(24))]
+pub struct CURSOR_ROLLBACK_BEHAVIOR;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 10001)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CURSOR_SENSITIVITY;
-impl InfoType<SQL_CURSOR_SENSITIVITY, SQL_OV_ODBC3> for CursorSensitivity {}
-unsafe impl Attr<SQL_CURSOR_SENSITIVITY> for CursorSensitivity {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CURSOR_SENSITIVITY> for CursorSensitivity {}
+#[derive(Tag)]
+#[tag(u16, unsafe(10001))]
+pub struct CURSOR_SENSITIVITY;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 25)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DATA_SOURCE_READ_ONLY;
-impl InfoType<SQL_DATA_SOURCE_READ_ONLY, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_DATA_SOURCE_READ_ONLY> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DATA_SOURCE_READ_ONLY> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(25))]
+pub struct DATA_SOURCE_READ_ONLY;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 26)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DEFAULT_TXN_ISOLATION;
-impl InfoType<SQL_DEFAULT_TXN_ISOLATION, SQL_OV_ODBC3> for TxnIsolation {}
-unsafe impl Attr<SQL_DEFAULT_TXN_ISOLATION> for TxnIsolation {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DEFAULT_TXN_ISOLATION> for TxnIsolation {}
+#[derive(Tag)]
+#[tag(u16, unsafe(26))]
+pub struct DEFAULT_TXN_ISOLATION;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 10002)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DESCRIBE_PARAMETER;
-impl InfoType<SQL_DESCRIBE_PARAMETER, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_DESCRIBE_PARAMETER> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DESCRIBE_PARAMETER> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(10002))]
+pub struct DESCRIBE_PARAMETER;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 36)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MULT_RESULT_SETS;
-impl InfoType<SQL_MULT_RESULT_SETS, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_MULT_RESULT_SETS> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MULT_RESULT_SETS> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(36))]
+pub struct MULT_RESULT_SETS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 37)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MULTIPLE_ACTIVE_TXN;
-impl InfoType<SQL_MULTIPLE_ACTIVE_TXN, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_MULTIPLE_ACTIVE_TXN> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MULTIPLE_ACTIVE_TXN> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(37))]
+pub struct MULTIPLE_ACTIVE_TXN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 111)]
-#[expect(non_camel_case_types)]
-pub struct SQL_NEED_LONG_DATA_LEN;
-impl InfoType<SQL_NEED_LONG_DATA_LEN, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_NEED_LONG_DATA_LEN> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_NEED_LONG_DATA_LEN> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(111))]
+pub struct NEED_LONG_DATA_LEN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 85)]
-#[expect(non_camel_case_types)]
-pub struct SQL_NULL_COLLATION;
-impl InfoType<SQL_NULL_COLLATION, SQL_OV_ODBC3> for NullCollation {}
-unsafe impl Attr<SQL_NULL_COLLATION> for NullCollation {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_NULL_COLLATION> for NullCollation {}
+#[derive(Tag)]
+#[tag(u16, unsafe(85))]
+pub struct NULL_COLLATION;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 40)]
-#[expect(non_camel_case_types)]
-pub struct SQL_PROCEDURE_TERM;
-impl InfoType<SQL_PROCEDURE_TERM, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_PROCEDURE_TERM> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_PROCEDURE_TERM> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(40))]
+pub struct PROCEDURE_TERM;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 39)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SCHEMA_TERM;
-impl InfoType<SQL_SCHEMA_TERM, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_SCHEMA_TERM> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SCHEMA_TERM> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(39))]
+pub struct SCHEMA_TERM;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 44)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SCROLL_OPTIONS;
-impl InfoType<SQL_SCROLL_OPTIONS, SQL_OV_ODBC3> for ScrollOptions {}
-unsafe impl Attr<SQL_SCROLL_OPTIONS> for ScrollOptions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SCROLL_OPTIONS> for ScrollOptions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(44))]
+pub struct SCROLL_OPTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 45)]
-#[expect(non_camel_case_types)]
-pub struct SQL_TABLE_TERM;
-impl InfoType<SQL_TABLE_TERM, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_TABLE_TERM> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_TABLE_TERM> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(45))]
+pub struct TABLE_TERM;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 46)]
-#[expect(non_camel_case_types)]
-pub struct SQL_TXN_CAPABLE;
-impl InfoType<SQL_TXN_CAPABLE, SQL_OV_ODBC3> for TxnCapable {}
-unsafe impl Attr<SQL_TXN_CAPABLE> for TxnCapable {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_TXN_CAPABLE> for TxnCapable {}
+#[derive(Tag)]
+#[tag(u16, unsafe(46))]
+pub struct TXN_CAPABLE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 72)]
-#[expect(non_camel_case_types)]
-pub struct SQL_TXN_ISOLATION_OPTION;
-impl InfoType<SQL_TXN_ISOLATION_OPTION, SQL_OV_ODBC3> for TxnIsolation {}
-unsafe impl Attr<SQL_TXN_ISOLATION_OPTION> for TxnIsolation {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_TXN_ISOLATION_OPTION> for TxnIsolation {}
+#[derive(Tag)]
+#[tag(u16, unsafe(72))]
+pub struct TXN_ISOLATION_OPTION;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 47)]
-#[expect(non_camel_case_types)]
-pub struct SQL_USER_NAME;
-impl InfoType<SQL_USER_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_USER_NAME> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_USER_NAME> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(47))]
+pub struct USER_NAME;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////// Supported SQL //////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 169)]
-#[expect(non_camel_case_types)]
-pub struct SQL_AGGREGATE_FUNCTIONS;
-impl InfoType<SQL_AGGREGATE_FUNCTIONS, SQL_OV_ODBC3> for AggregateFunctions {}
-unsafe impl Attr<SQL_AGGREGATE_FUNCTIONS> for AggregateFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_AGGREGATE_FUNCTIONS> for AggregateFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(169))]
+pub struct AGGREGATE_FUNCTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 117)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ALTER_DOMAIN;
-impl InfoType<SQL_ALTER_DOMAIN, SQL_OV_ODBC3> for AlterDomain {}
-unsafe impl Attr<SQL_ALTER_DOMAIN> for AlterDomain {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ALTER_DOMAIN> for AlterDomain {}
+#[derive(Tag)]
+#[tag(u16, unsafe(117))]
+pub struct ALTER_DOMAIN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 86)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ALTER_TABLE;
-impl InfoType<SQL_ALTER_TABLE, SQL_OV_ODBC3> for AlterTable {}
-unsafe impl Attr<SQL_ALTER_TABLE> for AlterTable {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ALTER_TABLE> for AlterTable {}
+#[derive(Tag)]
+#[tag(u16, unsafe(86))]
+pub struct ALTER_TABLE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 114)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CATALOG_LOCATION;
-impl InfoType<SQL_CATALOG_LOCATION, SQL_OV_ODBC3> for CatalogLocation {}
-unsafe impl Attr<SQL_CATALOG_LOCATION> for CatalogLocation {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CATALOG_LOCATION> for CatalogLocation {}
+#[derive(Tag)]
+#[tag(u16, unsafe(114))]
+pub struct CATALOG_LOCATION;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 10003)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CATALOG_NAME;
-impl InfoType<SQL_CATALOG_NAME, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_CATALOG_NAME> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CATALOG_NAME> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(10003))]
+pub struct CATALOG_NAME;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 41)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CATALOG_NAME_SEPARATOR;
-impl InfoType<SQL_CATALOG_NAME_SEPARATOR, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_CATALOG_NAME_SEPARATOR> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CATALOG_NAME_SEPARATOR> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(41))]
+pub struct CATALOG_NAME_SEPARATOR;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 92)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CATALOG_USAGE;
-impl InfoType<SQL_CATALOG_USAGE, SQL_OV_ODBC3> for CatalogUsage {}
-unsafe impl Attr<SQL_CATALOG_USAGE> for CatalogUsage {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CATALOG_USAGE> for CatalogUsage {}
+#[derive(Tag)]
+#[tag(u16, unsafe(92))]
+pub struct CATALOG_USAGE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 87)]
-#[expect(non_camel_case_types)]
-pub struct SQL_COLUMN_ALIAS;
-impl InfoType<SQL_COLUMN_ALIAS, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_COLUMN_ALIAS> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_COLUMN_ALIAS> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(87))]
+pub struct COLUMN_ALIAS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 74)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CORRELATION_NAME;
-impl InfoType<SQL_CORRELATION_NAME, SQL_OV_ODBC3> for CorrelationName {}
-unsafe impl Attr<SQL_CORRELATION_NAME> for CorrelationName {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CORRELATION_NAME> for CorrelationName {}
+#[derive(Tag)]
+#[tag(u16, unsafe(74))]
+pub struct CORRELATION_NAME;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 127)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CREATE_ASSERTION;
-impl InfoType<SQL_CREATE_ASSERTION, SQL_OV_ODBC3> for CreateAssertion {}
-unsafe impl Attr<SQL_CREATE_ASSERTION> for CreateAssertion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CREATE_ASSERTION> for CreateAssertion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(127))]
+pub struct CREATE_ASSERTION;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 128)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CREATE_CHARACTER_SET;
-impl InfoType<SQL_CREATE_CHARACTER_SET, SQL_OV_ODBC3> for CreateCharacterSet {}
-unsafe impl Attr<SQL_CREATE_CHARACTER_SET> for CreateCharacterSet {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CREATE_CHARACTER_SET> for CreateCharacterSet {}
+#[derive(Tag)]
+#[tag(u16, unsafe(128))]
+pub struct CREATE_CHARACTER_SET;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 129)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CREATE_COLLATION;
-impl InfoType<SQL_CREATE_COLLATION, SQL_OV_ODBC3> for CreateCollation {}
-unsafe impl Attr<SQL_CREATE_COLLATION> for CreateCollation {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CREATE_COLLATION> for CreateCollation {}
+#[derive(Tag)]
+#[tag(u16, unsafe(129))]
+pub struct CREATE_COLLATION;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 130)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CREATE_DOMAIN;
-impl InfoType<SQL_CREATE_DOMAIN, SQL_OV_ODBC3> for CreateDomain {}
-unsafe impl Attr<SQL_CREATE_DOMAIN> for CreateDomain {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CREATE_DOMAIN> for CreateDomain {}
+#[derive(Tag)]
+#[tag(u16, unsafe(130))]
+pub struct CREATE_DOMAIN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 131)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CREATE_SCHEMA;
-impl InfoType<SQL_CREATE_SCHEMA, SQL_OV_ODBC3> for CreateSchema {}
-unsafe impl Attr<SQL_CREATE_SCHEMA> for CreateSchema {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CREATE_SCHEMA> for CreateSchema {}
+#[derive(Tag)]
+#[tag(u16, unsafe(131))]
+pub struct CREATE_SCHEMA;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 132)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CREATE_TABLE;
-impl InfoType<SQL_CREATE_TABLE, SQL_OV_ODBC3> for CreateTable {}
-unsafe impl Attr<SQL_CREATE_TABLE> for CreateTable {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CREATE_TABLE> for CreateTable {}
+#[derive(Tag)]
+#[tag(u16, unsafe(132))]
+pub struct CREATE_TABLE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 133)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CREATE_TRANSLATION;
-impl InfoType<SQL_CREATE_TRANSLATION, SQL_OV_ODBC3> for CreateTranslation {}
-unsafe impl Attr<SQL_CREATE_TRANSLATION> for CreateTranslation {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CREATE_TRANSLATION> for CreateTranslation {}
+#[derive(Tag)]
+#[tag(u16, unsafe(133))]
+pub struct CREATE_TRANSLATION;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 170)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DDL_INDEX;
-impl InfoType<SQL_DDL_INDEX, SQL_OV_ODBC3> for DdlIndex {}
-unsafe impl Attr<SQL_DDL_INDEX> for DdlIndex {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DDL_INDEX> for DdlIndex {}
+#[derive(Tag)]
+#[tag(u16, unsafe(170))]
+pub struct DDL_INDEX;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 136)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DROP_ASSERTION;
-impl InfoType<SQL_DROP_ASSERTION, SQL_OV_ODBC3> for DropAssertion {}
-unsafe impl Attr<SQL_DROP_ASSERTION> for DropAssertion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DROP_ASSERTION> for DropAssertion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(136))]
+pub struct DROP_ASSERTION;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 137)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DROP_CHARACTER_SET;
-impl InfoType<SQL_DROP_CHARACTER_SET, SQL_OV_ODBC3> for DropCharacterSet {}
-unsafe impl Attr<SQL_DROP_CHARACTER_SET> for DropCharacterSet {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DROP_CHARACTER_SET> for DropCharacterSet {}
+#[derive(Tag)]
+#[tag(u16, unsafe(137))]
+pub struct DROP_CHARACTER_SET;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 138)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DROP_COLLATION;
-impl InfoType<SQL_DROP_COLLATION, SQL_OV_ODBC3> for DropCollation {}
-unsafe impl Attr<SQL_DROP_COLLATION> for DropCollation {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DROP_COLLATION> for DropCollation {}
+#[derive(Tag)]
+#[tag(u16, unsafe(138))]
+pub struct DROP_COLLATION;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 139)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DROP_DOMAIN;
-impl InfoType<SQL_DROP_DOMAIN, SQL_OV_ODBC3> for DropDomain {}
-unsafe impl Attr<SQL_DROP_DOMAIN> for DropDomain {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DROP_DOMAIN> for DropDomain {}
+#[derive(Tag)]
+#[tag(u16, unsafe(139))]
+pub struct DROP_DOMAIN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 140)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DROP_SCHEMA;
-impl InfoType<SQL_DROP_SCHEMA, SQL_OV_ODBC3> for DropSchema {}
-unsafe impl Attr<SQL_DROP_SCHEMA> for DropSchema {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DROP_SCHEMA> for DropSchema {}
+#[derive(Tag)]
+#[tag(u16, unsafe(140))]
+pub struct DROP_SCHEMA;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 141)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DROP_TABLE;
-impl InfoType<SQL_DROP_TABLE, SQL_OV_ODBC3> for DropTable {}
-unsafe impl Attr<SQL_DROP_TABLE> for DropTable {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DROP_TABLE> for DropTable {}
+#[derive(Tag)]
+#[tag(u16, unsafe(141))]
+pub struct DROP_TABLE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 142)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DROP_TRANSLATION;
-impl InfoType<SQL_DROP_TRANSLATION, SQL_OV_ODBC3> for DropTranslation {}
-unsafe impl Attr<SQL_DROP_TRANSLATION> for DropTranslation {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DROP_TRANSLATION> for DropTranslation {}
+#[derive(Tag)]
+#[tag(u16, unsafe(142))]
+pub struct DROP_TRANSLATION;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 143)]
-#[expect(non_camel_case_types)]
-pub struct SQL_DROP_VIEW;
-impl InfoType<SQL_DROP_VIEW, SQL_OV_ODBC3> for DropView {}
-unsafe impl Attr<SQL_DROP_VIEW> for DropView {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_DROP_VIEW> for DropView {}
+#[derive(Tag)]
+#[tag(u16, unsafe(143))]
+pub struct DROP_VIEW;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 27)]
-#[expect(non_camel_case_types)]
-pub struct SQL_EXPRESSIONS_IN_ORDERBY;
-impl InfoType<SQL_EXPRESSIONS_IN_ORDERBY, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_EXPRESSIONS_IN_ORDERBY> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_EXPRESSIONS_IN_ORDERBY> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(27))]
+pub struct EXPRESSIONS_IN_ORDERBY;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 88)]
-#[expect(non_camel_case_types)]
-pub struct SQL_GROUP_BY;
-impl InfoType<SQL_GROUP_BY, SQL_OV_ODBC3> for GroupBy {}
-unsafe impl Attr<SQL_GROUP_BY> for GroupBy {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_GROUP_BY> for GroupBy {}
+#[derive(Tag)]
+#[tag(u16, unsafe(88))]
+pub struct GROUP_BY;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 28)]
-#[expect(non_camel_case_types)]
-pub struct SQL_IDENTIFIER_CASE;
-impl InfoType<SQL_IDENTIFIER_CASE, SQL_OV_ODBC3> for IdentifierCase {}
-unsafe impl Attr<SQL_IDENTIFIER_CASE> for IdentifierCase {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_IDENTIFIER_CASE> for IdentifierCase {}
+#[derive(Tag)]
+#[tag(u16, unsafe(28))]
+pub struct IDENTIFIER_CASE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 29)]
-#[expect(non_camel_case_types)]
-pub struct SQL_IDENTIFIER_QUOTE_CHAR;
-impl InfoType<SQL_IDENTIFIER_QUOTE_CHAR, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_IDENTIFIER_QUOTE_CHAR> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_IDENTIFIER_QUOTE_CHAR> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(29))]
+pub struct IDENTIFIER_QUOTE_CHAR;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 148)]
-#[expect(non_camel_case_types)]
-pub struct SQL_INDEX_KEYWORDS;
-impl InfoType<SQL_INDEX_KEYWORDS, SQL_OV_ODBC3> for IndexKeywords {}
-unsafe impl Attr<SQL_INDEX_KEYWORDS> for IndexKeywords {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_INDEX_KEYWORDS> for IndexKeywords {}
+#[derive(Tag)]
+#[tag(u16, unsafe(148))]
+pub struct INDEX_KEYWORDS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 171)]
-#[expect(non_camel_case_types)]
-pub struct SQL_INSERT_STATEMENT;
-impl InfoType<SQL_INSERT_STATEMENT, SQL_OV_ODBC3> for InsertStatement {}
-unsafe impl Attr<SQL_INSERT_STATEMENT> for InsertStatement {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_INSERT_STATEMENT> for InsertStatement {}
+#[derive(Tag)]
+#[tag(u16, unsafe(172))]
+pub struct INSERT_STATEMENT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 73)]
-#[expect(non_camel_case_types)]
-pub struct SQL_INTEGRITY;
-impl InfoType<SQL_INTEGRITY, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_INTEGRITY> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_INTEGRITY> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(73))]
+pub struct INTEGRITY;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 89)]
-#[expect(non_camel_case_types)]
-pub struct SQL_KEYWORDS;
-impl InfoType<SQL_KEYWORDS, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_KEYWORDS> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_KEYWORDS> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(89))]
+pub struct KEYWORDS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 113)]
-#[expect(non_camel_case_types)]
-pub struct SQL_LIKE_ESCAPE_CLAUSE;
-impl InfoType<SQL_LIKE_ESCAPE_CLAUSE, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_LIKE_ESCAPE_CLAUSE> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_LIKE_ESCAPE_CLAUSE> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(113))]
+pub struct LIKE_ESCAPE_CLAUSE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 75)]
-#[expect(non_camel_case_types)]
-pub struct SQL_NON_NULLABLE_COLUMNS;
-impl InfoType<SQL_NON_NULLABLE_COLUMNS, SQL_OV_ODBC3> for NonNullableColumns {}
-unsafe impl Attr<SQL_NON_NULLABLE_COLUMNS> for NonNullableColumns {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_NON_NULLABLE_COLUMNS> for NonNullableColumns {}
+#[derive(Tag)]
+#[tag(u16, unsafe(75))]
+pub struct NON_NULLABLE_COLUMNS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 115)]
-#[expect(non_camel_case_types)]
-pub struct SQL_OJ_CAPABILITIES;
-impl InfoType<SQL_OJ_CAPABILITIES, SQL_OV_ODBC3> for OjCapabilities {}
-unsafe impl Attr<SQL_OJ_CAPABILITIES> for OjCapabilities {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_OJ_CAPABILITIES> for OjCapabilities {}
+#[derive(Tag)]
+#[tag(u16, unsafe(115))]
+pub struct OJ_CAPABILITIES;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 90)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ORDER_BY_COLUMNS_IN_SELECT;
-impl InfoType<SQL_ORDER_BY_COLUMNS_IN_SELECT, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_ORDER_BY_COLUMNS_IN_SELECT> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_ORDER_BY_COLUMNS_IN_SELECT> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(90))]
+pub struct ORDER_BY_COLUMNS_IN_SELECT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 38)]
-#[expect(non_camel_case_types)]
-pub struct SQL_OUTER_JOINS;
-impl InfoType<SQL_OUTER_JOINS, SQL_OV_ODBC3> for OuterJoins {}
-unsafe impl Attr<SQL_OUTER_JOINS> for OuterJoins {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_OUTER_JOINS> for OuterJoins {}
+#[derive(Tag)]
+#[tag(u16, unsafe(38))]
+pub struct OUTER_JOINS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 21)]
-#[expect(non_camel_case_types)]
-pub struct SQL_PROCEDURES;
-impl InfoType<SQL_PROCEDURES, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_PROCEDURES> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_PROCEDURES> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(21))]
+pub struct PROCEDURES;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 93)]
-#[expect(non_camel_case_types)]
-pub struct SQL_QUOTED_IDENTIFIER_CASE;
-impl InfoType<SQL_QUOTED_IDENTIFIER_CASE, SQL_OV_ODBC3> for IdentifierCase {}
-unsafe impl Attr<SQL_QUOTED_IDENTIFIER_CASE> for IdentifierCase {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_QUOTED_IDENTIFIER_CASE> for IdentifierCase {}
+#[derive(Tag)]
+#[tag(u16, unsafe(93))]
+pub struct QUOTED_IDENTIFIER_CASE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 91)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SCHEMA_USAGE;
-impl InfoType<SQL_SCHEMA_USAGE, SQL_OV_ODBC3> for SchemaUsage {}
-unsafe impl Attr<SQL_SCHEMA_USAGE> for SchemaUsage {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SCHEMA_USAGE> for SchemaUsage {}
+#[derive(Tag)]
+#[tag(u16, unsafe(91))]
+pub struct SCHEMA_USAGE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 94)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SPECIAL_CHARACTERS;
-impl InfoType<SQL_SPECIAL_CHARACTERS, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_SPECIAL_CHARACTERS> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SPECIAL_CHARACTERS> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(94))]
+pub struct SPECIAL_CHARACTERS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 118)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SQL_CONFORMANCE;
-impl InfoType<SQL_SQL_CONFORMANCE, SQL_OV_ODBC3> for SqlConformance {}
-unsafe impl Attr<SQL_SQL_CONFORMANCE> for SqlConformance {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SQL_CONFORMANCE> for SqlConformance {}
+#[derive(Tag)]
+#[tag(u16, unsafe(118))]
+pub struct CONFORMANCE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 95)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SUBQUERIES;
-impl InfoType<SQL_SUBQUERIES, SQL_OV_ODBC3> for Subqueries {}
-unsafe impl Attr<SQL_SUBQUERIES> for Subqueries {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SUBQUERIES> for Subqueries {}
+#[derive(Tag)]
+#[tag(u16, unsafe(95))]
+pub struct SUBQUERIES;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 96)]
-#[expect(non_camel_case_types)]
-pub struct SQL_UNION;
-impl InfoType<SQL_UNION, SQL_OV_ODBC3> for Union {}
-unsafe impl Attr<SQL_UNION> for Union {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_UNION> for Union {}
+#[derive(Tag)]
+#[tag(u16, unsafe(96))]
+pub struct UNION;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////// SQL Limits ///////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 112)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_BINARY_LITERAL_LEN;
-impl InfoType<SQL_MAX_BINARY_LITERAL_LEN, SQL_OV_ODBC3> for SQLUINTEGER {}
-unsafe impl Attr<SQL_MAX_BINARY_LITERAL_LEN> for SQLUINTEGER {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_BINARY_LITERAL_LEN> for SQLUINTEGER {}
+#[derive(Tag)]
+#[tag(u16, unsafe(112))]
+pub struct MAX_BINARY_LITERAL_LEN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 34)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_CATALOG_NAME_LEN;
-impl InfoType<SQL_MAX_CATALOG_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_CATALOG_NAME_LEN> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_CATALOG_NAME_LEN> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(34))]
+pub struct MAX_CATALOG_NAME_LEN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 108)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_CHAR_LITERAL_LEN;
-impl InfoType<SQL_MAX_CHAR_LITERAL_LEN, SQL_OV_ODBC3> for SQLUINTEGER {}
-unsafe impl Attr<SQL_MAX_CHAR_LITERAL_LEN> for SQLUINTEGER {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_CHAR_LITERAL_LEN> for SQLUINTEGER {}
+#[derive(Tag)]
+#[tag(u16, unsafe(108))]
+pub struct MAX_CHAR_LITERAL_LEN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 30)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_COLUMN_NAME_LEN;
-impl InfoType<SQL_MAX_COLUMN_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_COLUMN_NAME_LEN> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_COLUMN_NAME_LEN> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(30))]
+pub struct MAX_COLUMN_NAME_LEN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 97)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_COLUMNS_IN_GROUP_BY;
-impl InfoType<SQL_MAX_COLUMNS_IN_GROUP_BY, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_COLUMNS_IN_GROUP_BY> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_GROUP_BY> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(97))]
+pub struct MAX_COLUMNS_IN_GROUP_BY;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 98)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_COLUMNS_IN_INDEX;
-impl InfoType<SQL_MAX_COLUMNS_IN_INDEX, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_COLUMNS_IN_INDEX> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_INDEX> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(98))]
+pub struct MAX_COLUMNS_IN_INDEX;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 99)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_COLUMNS_IN_ORDER_BY;
-impl InfoType<SQL_MAX_COLUMNS_IN_ORDER_BY, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_COLUMNS_IN_ORDER_BY> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_ORDER_BY> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(99))]
+pub struct MAX_COLUMNS_IN_ORDER_BY;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 100)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_COLUMNS_IN_SELECT;
-impl InfoType<SQL_MAX_COLUMNS_IN_SELECT, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_COLUMNS_IN_SELECT> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_SELECT> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(100))]
+pub struct MAX_COLUMNS_IN_SELECT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 101)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_COLUMNS_IN_TABLE;
-impl InfoType<SQL_MAX_COLUMNS_IN_TABLE, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_COLUMNS_IN_TABLE> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_COLUMNS_IN_TABLE> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(101))]
+pub struct MAX_COLUMNS_IN_TABLE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 31)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_CURSOR_NAME_LEN;
-impl InfoType<SQL_MAX_CURSOR_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_CURSOR_NAME_LEN> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_CURSOR_NAME_LEN> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(31))]
+pub struct MAX_CURSOR_NAME_LEN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 10005)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_IDENTIFIER_LEN;
-impl InfoType<SQL_MAX_IDENTIFIER_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_IDENTIFIER_LEN> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_IDENTIFIER_LEN> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(10005))]
+pub struct MAX_IDENTIFIER_LEN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 102)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_INDEX_SIZE;
-impl InfoType<SQL_MAX_INDEX_SIZE, SQL_OV_ODBC3> for SQLUINTEGER {}
-unsafe impl Attr<SQL_MAX_INDEX_SIZE> for SQLUINTEGER {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_INDEX_SIZE> for SQLUINTEGER {}
+#[derive(Tag)]
+#[tag(u16, unsafe(102))]
+pub struct MAX_INDEX_SIZE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 33)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_PROCEDURE_NAME_LEN;
-impl InfoType<SQL_MAX_PROCEDURE_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_PROCEDURE_NAME_LEN> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_PROCEDURE_NAME_LEN> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(33))]
+pub struct MAX_PROCEDURE_NAME_LEN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 104)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_ROW_SIZE;
-impl InfoType<SQL_MAX_ROW_SIZE, SQL_OV_ODBC3> for SQLUINTEGER {}
-unsafe impl Attr<SQL_MAX_ROW_SIZE> for SQLUINTEGER {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_ROW_SIZE> for SQLUINTEGER {}
+#[derive(Tag)]
+#[tag(u16, unsafe(104))]
+pub struct MAX_ROW_SIZE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 103)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_ROW_SIZE_INCLUDES_LONG;
-impl InfoType<SQL_MAX_ROW_SIZE_INCLUDES_LONG, SQL_OV_ODBC3> for OdbcStr<SQLCHAR> {}
-unsafe impl Attr<SQL_MAX_ROW_SIZE_INCLUDES_LONG> for OdbcStr<SQLCHAR> {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_ROW_SIZE_INCLUDES_LONG> for OdbcStr<SQLCHAR> {}
+#[derive(Tag)]
+#[tag(u16, unsafe(103))]
+pub struct MAX_ROW_SIZE_INCLUDES_LONG;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 32)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_SCHEMA_NAME_LEN;
-impl InfoType<SQL_MAX_SCHEMA_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_SCHEMA_NAME_LEN> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_SCHEMA_NAME_LEN> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(32))]
+pub struct MAX_SCHEMA_NAME_LEN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 105)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_STATEMENT_LEN;
-impl InfoType<SQL_MAX_STATEMENT_LEN, SQL_OV_ODBC3> for SQLUINTEGER {}
-unsafe impl Attr<SQL_MAX_STATEMENT_LEN> for SQLUINTEGER {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_STATEMENT_LEN> for SQLUINTEGER {}
+#[derive(Tag)]
+#[tag(u16, unsafe(105))]
+pub struct MAX_STATEMENT_LEN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 35)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_TABLE_NAME_LEN;
-impl InfoType<SQL_MAX_TABLE_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_TABLE_NAME_LEN> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_TABLE_NAME_LEN> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(35))]
+pub struct MAX_TABLE_NAME_LEN;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 106)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_TABLES_IN_SELECT;
-impl InfoType<SQL_MAX_TABLES_IN_SELECT, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_TABLES_IN_SELECT> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_TABLES_IN_SELECT> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(106))]
+pub struct MAX_TABLES_IN_SELECT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 107)]
-#[expect(non_camel_case_types)]
-pub struct SQL_MAX_USER_NAME_LEN;
-impl InfoType<SQL_MAX_USER_NAME_LEN, SQL_OV_ODBC3> for SQLUSMALLINT {}
-unsafe impl Attr<SQL_MAX_USER_NAME_LEN> for SQLUSMALLINT {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_MAX_USER_NAME_LEN> for SQLUSMALLINT {}
+#[derive(Tag)]
+#[tag(u16, unsafe(107))]
+pub struct MAX_USER_NAME_LEN;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// Scalar Function Information //////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 48)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_FUNCTIONS;
-impl InfoType<SQL_CONVERT_FUNCTIONS, SQL_OV_ODBC3> for ConvertFunctions {}
-unsafe impl Attr<SQL_CONVERT_FUNCTIONS> for ConvertFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_FUNCTIONS> for ConvertFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(48))]
+pub struct CONVERT_FUNCTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 49)]
-#[expect(non_camel_case_types)]
-pub struct SQL_NUMERIC_FUNCTIONS;
-impl InfoType<SQL_NUMERIC_FUNCTIONS, SQL_OV_ODBC3> for NumericFunctions {}
-unsafe impl Attr<SQL_NUMERIC_FUNCTIONS> for NumericFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_NUMERIC_FUNCTIONS> for NumericFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(49))]
+pub struct NUMERIC_FUNCTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 50)]
-#[expect(non_camel_case_types)]
-pub struct SQL_STRING_FUNCTIONS;
-impl InfoType<SQL_STRING_FUNCTIONS, SQL_OV_ODBC3> for StringFunctions {}
-unsafe impl Attr<SQL_STRING_FUNCTIONS> for StringFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_STRING_FUNCTIONS> for StringFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(50))]
+pub struct STRING_FUNCTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 51)]
-#[expect(non_camel_case_types)]
-pub struct SQL_SYSTEM_FUNCTIONS;
-impl InfoType<SQL_SYSTEM_FUNCTIONS, SQL_OV_ODBC3> for SystemFunctions {}
-unsafe impl Attr<SQL_SYSTEM_FUNCTIONS> for SystemFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_SYSTEM_FUNCTIONS> for SystemFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(51))]
+pub struct SYSTEM_FUNCTIONS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 109)]
-#[expect(non_camel_case_types)]
-pub struct SQL_TIMEDATE_ADD_INTERVALS;
-impl InfoType<SQL_TIMEDATE_ADD_INTERVALS, SQL_OV_ODBC3> for TimedateIntervals {}
-unsafe impl Attr<SQL_TIMEDATE_ADD_INTERVALS> for TimedateIntervals {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_TIMEDATE_ADD_INTERVALS> for TimedateIntervals {}
+#[derive(Tag)]
+#[tag(u16, unsafe(109))]
+pub struct TIMEDATE_ADD_INTERVALS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 110)]
-#[expect(non_camel_case_types)]
-pub struct SQL_TIMEDATE_DIFF_INTERVALS;
-impl InfoType<SQL_TIMEDATE_DIFF_INTERVALS, SQL_OV_ODBC3> for TimedateIntervals {}
-unsafe impl Attr<SQL_TIMEDATE_DIFF_INTERVALS> for TimedateIntervals {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_TIMEDATE_DIFF_INTERVALS> for TimedateIntervals {}
+#[derive(Tag)]
+#[tag(u16, unsafe(110))]
+pub struct TIMEDATE_DIFF_INTERVALS;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 52)]
-#[expect(non_camel_case_types)]
-pub struct SQL_TIMEDATE_FUNCTIONS;
-impl InfoType<SQL_TIMEDATE_FUNCTIONS, SQL_OV_ODBC3> for TimedateFunctions {}
-unsafe impl Attr<SQL_TIMEDATE_FUNCTIONS> for TimedateFunctions {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_TIMEDATE_FUNCTIONS> for TimedateFunctions {}
+#[derive(Tag)]
+#[tag(u16, unsafe(52))]
+pub struct TIMEDATE_FUNCTIONS;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// Conversion Information /////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 53)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_BIGINT;
-impl InfoType<SQL_CONVERT_BIGINT, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_BIGINT> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_BIGINT> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(53))]
+pub struct CONVERT_BIGINT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 54)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_BINARY;
-impl InfoType<SQL_CONVERT_BINARY, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_BINARY> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_BINARY> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(54))]
+pub struct CONVERT_BINARY;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 55)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_BIT;
-impl InfoType<SQL_CONVERT_BIT, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_BIT> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_BIT> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(55))]
+pub struct CONVERT_BIT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 56)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_CHAR;
-impl InfoType<SQL_CONVERT_CHAR, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_CHAR> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_CHAR> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(56))]
+pub struct CONVERT_CHAR;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 57)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_DATE;
-impl InfoType<SQL_CONVERT_DATE, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_DATE> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_DATE> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(57))]
+pub struct CONVERT_DATE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 58)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_DECIMAL;
-impl InfoType<SQL_CONVERT_DECIMAL, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_DECIMAL> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_DECIMAL> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(58))]
+pub struct CONVERT_DECIMAL;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 59)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_DOUBLE;
-impl InfoType<SQL_CONVERT_DOUBLE, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_DOUBLE> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_DOUBLE> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(59))]
+pub struct CONVERT_DOUBLE;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 60)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_FLOAT;
-impl InfoType<SQL_CONVERT_FLOAT, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_FLOAT> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_FLOAT> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(60))]
+pub struct CONVERT_FLOAT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 61)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_INTEGER;
-impl InfoType<SQL_CONVERT_INTEGER, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_INTEGER> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_INTEGER> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(61))]
+pub struct CONVERT_INTEGER;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 123)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_INTERVAL_DAY_TIME;
-impl InfoType<SQL_CONVERT_INTERVAL_DAY_TIME, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_INTERVAL_DAY_TIME> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_INTERVAL_DAY_TIME> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(123))]
+pub struct CONVERT_INTERVAL_DAY_TIME;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 124)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_INTERVAL_YEAR_MONTH;
-impl InfoType<SQL_CONVERT_INTERVAL_YEAR_MONTH, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_INTERVAL_YEAR_MONTH> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_INTERVAL_YEAR_MONTH> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(124))]
+pub struct CONVERT_INTERVAL_YEAR_MONTH;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 71)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_LONGVARBINARY;
-impl InfoType<SQL_CONVERT_LONGVARBINARY, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_LONGVARBINARY> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_LONGVARBINARY> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(71))]
+pub struct CONVERT_LONGVARBINARY;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 62)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_LONGVARCHAR;
-impl InfoType<SQL_CONVERT_LONGVARCHAR, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_LONGVARCHAR> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_LONGVARCHAR> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(62))]
+pub struct CONVERT_LONGVARCHAR;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 63)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_NUMERIC;
-impl InfoType<SQL_CONVERT_NUMERIC, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_NUMERIC> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_NUMERIC> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(63))]
+pub struct CONVERT_NUMERIC;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 64)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_REAL;
-impl InfoType<SQL_CONVERT_REAL, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_REAL> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_REAL> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(64))]
+pub struct CONVERT_REAL;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 65)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_SMALLINT;
-impl InfoType<SQL_CONVERT_SMALLINT, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_SMALLINT> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_SMALLINT> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(65))]
+pub struct CONVERT_SMALLINT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 66)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_TIME;
-impl InfoType<SQL_CONVERT_TIME, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_TIME> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_TIME> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(66))]
+pub struct CONVERT_TIME;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 67)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_TIMESTAMP;
-impl InfoType<SQL_CONVERT_TIMESTAMP, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_TIMESTAMP> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_TIMESTAMP> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(67))]
+pub struct CONVERT_TIMESTAMP;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 68)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_TINYINT;
-impl InfoType<SQL_CONVERT_TINYINT, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_TINYINT> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_TINYINT> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(68))]
+pub struct CONVERT_TINYINT;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 69)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_VARBINARY;
-impl InfoType<SQL_CONVERT_VARBINARY, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_VARBINARY> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_VARBINARY> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(69))]
+pub struct CONVERT_VARBINARY;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 70)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_VARCHAR;
-impl InfoType<SQL_CONVERT_VARCHAR, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_VARCHAR> for Conversion {
-    type DefinedBy = OdbcDefined;
-}
-unsafe impl AttrGet<SQL_CONVERT_VARCHAR> for Conversion {}
+#[derive(Tag)]
+#[tag(u16, unsafe(70))]
+pub struct CONVERT_VARCHAR;
 
-#[derive(Ident)]
-#[identifier(SQLUSMALLINT, 173)]
-#[expect(non_camel_case_types)]
-pub struct SQL_CONVERT_GUID;
-impl InfoType<SQL_CONVERT_GUID, SQL_OV_ODBC3> for Conversion {}
-unsafe impl Attr<SQL_CONVERT_GUID> for Conversion {
-    type DefinedBy = OdbcDefined;
+#[derive(Tag)]
+#[tag(u16, unsafe(122))]
+pub struct CONVERT_WCHAR;
+
+#[derive(Tag)]
+#[tag(u16, unsafe(125))]
+pub struct CONVERT_WLONGVARCHAR;
+
+#[derive(Tag)]
+#[tag(u16, unsafe(126))]
+pub struct CONVERT_WVARCHAR;
+
+#[derive(Tag)]
+#[tag(u16, unsafe(173))]
+pub struct CONVERT_GUID;
+
+impl_info_type!(OV_ODBC3, DM_VER => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, XOPEN_CLI_YEAR => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, CREATE_VIEW => CreateView);
+impl_info_type!(OV_ODBC3, SQL92_DATETIME_FUNCTIONS => DatetimeFunctions);
+impl_info_type!(OV_ODBC3, SQL92_FOREIGN_KEY_DELETE_RULE => ForeignKeyDeleteRule);
+impl_info_type!(OV_ODBC3, SQL92_FOREIGN_KEY_UPDATE_RULE => ForeignKeyUpdateRule);
+impl_info_type!(OV_ODBC3, SQL92_GRANT => Grant);
+impl_info_type!(OV_ODBC3, DATETIME_LITERALS => DatetimeLiterals);
+impl_info_type!(OV_ODBC3, SQL92_NUMERIC_VALUE_FUNCTIONS => NumericValueFunctions);
+impl_info_type!(OV_ODBC3, SQL92_PREDICATES => Predicates);
+impl_info_type!(OV_ODBC3, SQL92_RELATIONAL_JOIN_OPERATORS => RelationalJoinOperators);
+impl_info_type!(OV_ODBC3, SQL92_REVOKE => Revoke);
+impl_info_type!(OV_ODBC3, SQL92_ROW_VALUE_CONSTRUCTOR => RowValueConstructor);
+impl_info_type!(OV_ODBC3, SQL92_STRING_FUNCTIONS => StringScalarFunctions);
+impl_info_type!(OV_ODBC3, SQL92_VALUE_EXPRESSIONS => ValueExpressions);
+impl_info_type!(OV_ODBC3, STANDARD_CLI_CONFORMANCE => StandardCliConformance);
+impl_info_type!(OV_ODBC4, BINARY_FUNCTIONS => BinaryFunctions);
+impl_info_type!(OV_ODBC4, ISO_STRING_FUNCTIONS => StringScalarFunctions);
+impl_info_type!(OV_ODBC4, ISO_BINARY_FUNCTIONS => IsoBinaryFunctions);
+impl_info_type!(OV_ODBC4, LIMIT_ESCAPE_CLAUSE => LimitEscapeClause);
+impl_info_type!(OV_ODBC4, NATIVE_ESCAPE_CLAUSE => OdbcStr<C>);
+impl_info_type!(OV_ODBC4, RETURN_ESCAPE_CLAUSE => ReturnEscapeClause);
+impl_info_type!(OV_ODBC4, FORMAT_ESCAPE_CLAUSE => FormatEscapeClause);
+impl_info_type!(OV_ODBC4, ISO_DATETIME_FUNCTIONS => DatetimeFunctions);
+impl_info_type!(OV_ODBC4, ISO_FOREIGN_KEY_DELETE_RULE => ForeignKeyDeleteRule);
+impl_info_type!(OV_ODBC4, ISO_FOREIGN_KEY_UPDATE_RULE => ForeignKeyUpdateRule);
+impl_info_type!(OV_ODBC4, ISO_GRANT => Grant);
+impl_info_type!(OV_ODBC4, ISO_NUMERIC_VALUE_FUNCTIONS => NumericValueFunctions);
+impl_info_type!(OV_ODBC4, ISO_PREDICATES => Predicates);
+impl_info_type!(OV_ODBC4, ISO_RELATIONAL_JOIN_OPERATORS => RelationalJoinOperators);
+impl_info_type!(OV_ODBC4, ISO_REVOKE => Revoke);
+impl_info_type!(OV_ODBC4, ISO_ROW_VALUE_CONSTRUCTOR => RowValueConstructor);
+impl_info_type!(OV_ODBC4, ISO_VALUE_EXPRESSIONS => ValueExpressions);
+impl_info_type!(OV_ODBC3, ACTIVE_ENVIRONMENTS => u16);
+impl_info_type!(OV_ODBC3_80, ASYNC_DBC_FUNCTIONS => AsyncDbcFunctions);
+impl_info_type!(OV_ODBC3, ASYNC_MODE => AsyncMode);
+impl_info_type!(OV_ODBC3_80, ASYNC_NOTIFICATION => AsyncNotification);
+impl_info_type!(OV_ODBC3, BATCH_ROW_COUNT => BatchRowCount);
+impl_info_type!(OV_ODBC3, BATCH_SUPPORT => BatchSupport);
+impl_info_type!(OV_ODBC3, DATA_SOURCE_NAME => OdbcStr<C>);
+impl_info_type!(OV_ODBC3_80, DRIVER_AWARE_POOLING_SUPPORTED => DriverAwarePoolingSupported);
+impl_info_type!(OV_ODBC3, DRIVER_NAME => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, DRIVER_ODBC_VER => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, DRIVER_VER => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, DYNAMIC_CURSOR_ATTRIBUTES1 => CursorAttributes1);
+impl_info_type!(OV_ODBC3, DYNAMIC_CURSOR_ATTRIBUTES2 => CursorAttributes2);
+impl_info_type!(OV_ODBC3, FORWARD_ONLY_CURSOR_ATTRIBUTES1 => CursorAttributes1);
+impl_info_type!(OV_ODBC3, FORWARD_ONLY_CURSOR_ATTRIBUTES2 => CursorAttributes2);
+impl_info_type!(OV_ODBC3, FILE_USAGE => FileUsage);
+impl_info_type!(OV_ODBC3, GETDATA_EXTENSIONS => GetdataExtensions);
+impl_info_type!(OV_ODBC3, INFO_SCHEMA_VIEWS => InfoSchemaViews);
+impl_info_type!(OV_ODBC3, KEYSET_CURSOR_ATTRIBUTES1 => CursorAttributes1);
+impl_info_type!(OV_ODBC3, KEYSET_CURSOR_ATTRIBUTES2 => CursorAttributes2);
+impl_info_type!(OV_ODBC3, MAX_ASYNC_CONCURRENT_STATEMENTS => u32);
+impl_info_type!(OV_ODBC3, MAX_CONCURRENT_ACTIVITIES => u16);
+impl_info_type!(OV_ODBC3, MAX_DRIVER_CONNECTIONS => u16);
+impl_info_type!(OV_ODBC3, ODBC_INTERFACE_CONFORMANCE => OdbcInterfaceConformance);
+impl_info_type!(OV_ODBC3, ODBC_VER => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, PARAM_ARRAY_ROW_COUNTS => ParamArrayRowCounts);
+impl_info_type!(OV_ODBC3, PARAM_ARRAY_SELECTS => ParamArraySelects);
+impl_info_type!(OV_ODBC3, ROW_UPDATES => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, SEARCH_PATTERN_ESCAPE => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, SERVER_NAME => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, STATIC_CURSOR_ATTRIBUTES1 => CursorAttributes1);
+impl_info_type!(OV_ODBC3, STATIC_CURSOR_ATTRIBUTES2 => CursorAttributes2);
+impl_info_type!(OV_ODBC3, DATABASE_NAME => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, DBMS_NAME => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, DBMS_VER => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, ACCESSIBLE_PROCEDURES => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, ACCESSIBLE_TABLES => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, BOOKMARK_PERSISTENCE => BookmarkPersistence);
+impl_info_type!(OV_ODBC3, CATALOG_TERM => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, COLLATION_SEQ => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, CONCAT_NULL_BEHAVIOR => ConcatNullBehavior);
+impl_info_type!(OV_ODBC3, CURSOR_COMMIT_BEHAVIOR => CursorBehavior);
+impl_info_type!(OV_ODBC3, CURSOR_ROLLBACK_BEHAVIOR => CursorBehavior);
+impl_info_type!(OV_ODBC3, CURSOR_SENSITIVITY => CursorSensitivity);
+impl_info_type!(OV_ODBC3, DATA_SOURCE_READ_ONLY => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, DEFAULT_TXN_ISOLATION => Option<TxnIsolation>);
+impl_info_type!(OV_ODBC3, DESCRIBE_PARAMETER => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, MULT_RESULT_SETS => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, MULTIPLE_ACTIVE_TXN => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, NEED_LONG_DATA_LEN => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, NULL_COLLATION => NullCollation);
+impl_info_type!(OV_ODBC3, PROCEDURE_TERM => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, SCHEMA_TERM => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, SCROLL_OPTIONS => ScrollOptions);
+impl_info_type!(OV_ODBC3, TABLE_TERM => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, TXN_CAPABLE => TxnCapable);
+impl_info_type!(OV_ODBC3, TXN_ISOLATION_OPTION => TxnIsolationOptions);
+impl_info_type!(OV_ODBC3, USER_NAME => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, AGGREGATE_FUNCTIONS => AggregateFunctions);
+impl_info_type!(OV_ODBC3, ALTER_DOMAIN => AlterDomain);
+impl_info_type!(OV_ODBC3, ALTER_TABLE => AlterTable);
+impl_info_type!(OV_ODBC3, CATALOG_LOCATION => CatalogLocation);
+impl_info_type!(OV_ODBC3, CATALOG_NAME => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, CATALOG_NAME_SEPARATOR => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, CATALOG_USAGE => CatalogUsage);
+impl_info_type!(OV_ODBC3, COLUMN_ALIAS => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, CORRELATION_NAME => CorrelationName);
+impl_info_type!(OV_ODBC3, CREATE_ASSERTION => CreateAssertion);
+impl_info_type!(OV_ODBC3, CREATE_CHARACTER_SET => CreateCharacterSet);
+impl_info_type!(OV_ODBC3, CREATE_COLLATION => CreateCollation);
+impl_info_type!(OV_ODBC3, CREATE_DOMAIN => CreateDomain);
+impl_info_type!(OV_ODBC3, CREATE_SCHEMA => CreateSchema);
+impl_info_type!(OV_ODBC3, CREATE_TABLE => CreateTable);
+impl_info_type!(OV_ODBC3, CREATE_TRANSLATION => CreateTranslation);
+impl_info_type!(OV_ODBC3, DDL_INDEX => DdlIndex);
+impl_info_type!(OV_ODBC3, DROP_ASSERTION => DropAssertion);
+impl_info_type!(OV_ODBC3, DROP_CHARACTER_SET => DropCharacterSet);
+impl_info_type!(OV_ODBC3, DROP_COLLATION => DropCollation);
+impl_info_type!(OV_ODBC3, DROP_DOMAIN => DropDomain);
+impl_info_type!(OV_ODBC3, DROP_SCHEMA => DropSchema);
+impl_info_type!(OV_ODBC3, DROP_TABLE => DropTable);
+impl_info_type!(OV_ODBC3, DROP_TRANSLATION => DropTranslation);
+impl_info_type!(OV_ODBC3, DROP_VIEW => DropView);
+impl_info_type!(OV_ODBC3, EXPRESSIONS_IN_ORDERBY => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, GROUP_BY => GroupBy);
+impl_info_type!(OV_ODBC3, IDENTIFIER_CASE => IdentifierCase);
+impl_info_type!(OV_ODBC3, IDENTIFIER_QUOTE_CHAR => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, INDEX_KEYWORDS => IndexKeywords);
+impl_info_type!(OV_ODBC3, INSERT_STATEMENT => InsertStatement);
+impl_info_type!(OV_ODBC3, INTEGRITY => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, KEYWORDS => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, LIKE_ESCAPE_CLAUSE => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, NON_NULLABLE_COLUMNS => NonNullableColumns);
+impl_info_type!(OV_ODBC3, OJ_CAPABILITIES => OjCapabilities);
+impl_info_type!(OV_ODBC3, ORDER_BY_COLUMNS_IN_SELECT => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, OUTER_JOINS => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, PROCEDURES => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, QUOTED_IDENTIFIER_CASE => IdentifierCase);
+impl_info_type!(OV_ODBC3, SCHEMA_USAGE => SchemaUsage);
+impl_info_type!(OV_ODBC3, SPECIAL_CHARACTERS => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, CONFORMANCE => Option<SqlConformance>);
+impl_info_type!(OV_ODBC3, SUBQUERIES => Subqueries);
+impl_info_type!(OV_ODBC3, UNION => Union);
+impl_info_type!(OV_ODBC3, MAX_BINARY_LITERAL_LEN => u32);
+impl_info_type!(OV_ODBC3, MAX_CATALOG_NAME_LEN => u16);
+impl_info_type!(OV_ODBC3, MAX_CHAR_LITERAL_LEN => u32);
+impl_info_type!(OV_ODBC3, MAX_COLUMN_NAME_LEN => u16);
+impl_info_type!(OV_ODBC3, MAX_COLUMNS_IN_GROUP_BY => u16);
+impl_info_type!(OV_ODBC3, MAX_COLUMNS_IN_INDEX => u16);
+impl_info_type!(OV_ODBC3, MAX_COLUMNS_IN_ORDER_BY => u16);
+impl_info_type!(OV_ODBC3, MAX_COLUMNS_IN_SELECT => u16);
+impl_info_type!(OV_ODBC3, MAX_COLUMNS_IN_TABLE => u16);
+impl_info_type!(OV_ODBC3, MAX_CURSOR_NAME_LEN => u16);
+impl_info_type!(OV_ODBC3, MAX_IDENTIFIER_LEN => u16);
+impl_info_type!(OV_ODBC3, MAX_INDEX_SIZE => u32);
+impl_info_type!(OV_ODBC3, MAX_PROCEDURE_NAME_LEN => u16);
+impl_info_type!(OV_ODBC3, MAX_ROW_SIZE => u32);
+impl_info_type!(OV_ODBC3, MAX_ROW_SIZE_INCLUDES_LONG => OdbcStr<C>);
+impl_info_type!(OV_ODBC3, MAX_SCHEMA_NAME_LEN => u16);
+impl_info_type!(OV_ODBC3, MAX_STATEMENT_LEN => u32);
+impl_info_type!(OV_ODBC3, MAX_TABLE_NAME_LEN => u16);
+impl_info_type!(OV_ODBC3, MAX_TABLES_IN_SELECT => u16);
+impl_info_type!(OV_ODBC3, MAX_USER_NAME_LEN => u16);
+impl_info_type!(OV_ODBC3, CONVERT_FUNCTIONS => ConvertFunctions);
+impl_info_type!(OV_ODBC3, NUMERIC_FUNCTIONS => NumericFunctions);
+impl_info_type!(OV_ODBC3, STRING_FUNCTIONS => StringFunctions);
+impl_info_type!(OV_ODBC3, SYSTEM_FUNCTIONS => SystemFunctions);
+impl_info_type!(OV_ODBC3, TIMEDATE_ADD_INTERVALS => TimedateIntervals);
+impl_info_type!(OV_ODBC3, TIMEDATE_DIFF_INTERVALS => TimedateIntervals);
+impl_info_type!(OV_ODBC3, TIMEDATE_FUNCTIONS => TimedateFunctions);
+impl_info_type!(OV_ODBC3, CONVERT_BIGINT => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_BINARY => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_BIT => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_CHAR => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_DATE => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_DECIMAL => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_DOUBLE => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_FLOAT => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_INTEGER => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_INTERVAL_DAY_TIME => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_INTERVAL_YEAR_MONTH => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_LONGVARBINARY => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_LONGVARCHAR => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_NUMERIC => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_REAL => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_SMALLINT => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_TIME => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_TIMESTAMP => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_TINYINT => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_VARBINARY => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_VARCHAR => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_WCHAR => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_WLONGVARCHAR => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_WVARCHAR => Conversion);
+impl_info_type!(OV_ODBC3, CONVERT_GUID => Conversion);
+impl_info_type!(OV_ODBC4, SCHEMA_INFERENCE => SchemaInference);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+#[repr(u32)]
+pub enum SchemaInference {
+    FALSE = 0,
+    TRUE = 1,
 }
-unsafe impl AttrGet<SQL_CONVERT_GUID> for Conversion {}
+
+impl From<bool> for SchemaInference {
+    fn from(value: bool) -> Self {
+        if value { Self::TRUE } else { Self::FALSE }
+    }
+}
+
+impl From<SchemaInference> for bool {
+    fn from(value: SchemaInference) -> Self {
+        value == SchemaInference::TRUE
+    }
+}
 
 //=====================================================================================//
 
-#[odbc_type(SQLUINTEGER)]
-pub struct AsyncDbcFunctions;
-pub const SQL_ASYNC_DBC_NOT_CAPABLE: AsyncDbcFunctions = AsyncDbcFunctions(0x0000000);
-pub const SQL_ASYNC_DBC_CAPABLE: AsyncDbcFunctions = AsyncDbcFunctions(0x00000001);
+macro_rules! info_enum {
+    ($name:ident, $repr:ty, { $($variant:ident = $value:expr),+ $(,)? }) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+        #[repr($repr)]
+        pub enum $name {
+            $($variant = $value),+
+        }
 
-#[odbc_type(SQLUINTEGER)]
-pub struct AsyncMode;
-pub const SQL_AM_NONE: AsyncMode = AsyncMode(0);
-pub const SQL_AM_CONNECTION: AsyncMode = AsyncMode(1);
-pub const SQL_AM_STATEMENT: AsyncMode = AsyncMode(2);
+        $(pub const $variant: $name = $name::$variant;)+
+    };
+}
 
-#[odbc_type(SQLUINTEGER)]
-pub struct AsyncNotification;
-pub const SQL_ASYNC_NOTIFICATION_NOT_CAPABLE: AsyncNotification = AsyncNotification(0x00000000);
-pub const SQL_ASYNC_NOTIFICATION_CAPABLE: AsyncNotification = AsyncNotification(0x00000001);
+info_enum!(AsyncDbcFunctions, u32, {
+    ASYNC_DBC_NOT_CAPABLE = 0x0000000,
+    ASYNC_DBC_CAPABLE = 0x00000001,
+});
+info_enum!(AsyncMode, u32, {
+    AM_NONE = 0,
+    AM_CONNECTION = 1,
+    AM_STATEMENT = 2,
+});
+info_enum!(AsyncNotification, u32, {
+    ASYNC_NOTIFICATION_NOT_CAPABLE = 0x00000000,
+    ASYNC_NOTIFICATION_CAPABLE = 0x00000001,
+});
+info_enum!(ConcatNullBehavior, u16, {
+    CB_NON_NULL = 0x0000,
+    CB_NULL = 0x0001,
+});
+info_enum!(CorrelationName, u16, {
+    CN_NONE = 0x0000,
+    CN_DIFFERENT = 0x0001,
+    CN_ANY = 0x0002,
+});
+info_enum!(CatalogLocation, u16, { CL_START = 0x0001, CL_END = 0x0002 });
+info_enum!(CursorBehavior, u16, {
+    CB_DELETE = 0,
+    CB_CLOSE = 1,
+    CB_PRESERVE = 2,
+});
+info_enum!(CursorSensitivity, u32, {
+    UNSPECIFIED = 0,
+    INSENSITIVE = 1,
+    SENSITIVE = 2,
+});
 
-#[odbc_type(SQLUSMALLINT)]
-pub struct ConcatNullBehavior;
-pub const SQL_CB_NON_NULL: ConcatNullBehavior = ConcatNullBehavior(0x0000);
-pub const SQL_CB_NULL: ConcatNullBehavior = ConcatNullBehavior(0x0001);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+#[reprC(identity)]
+#[repr(transparent)]
+pub struct DdlIndex(pub(crate) u32);
+pub const DI_CREATE_INDEX: DdlIndex = DdlIndex(0x00000001);
+pub const DI_DROP_INDEX: DdlIndex = DdlIndex(0x00000002);
 
-#[odbc_type(SQLUSMALLINT)]
-pub struct CorrelationName;
-pub const SQL_CN_NONE: CorrelationName = CorrelationName(0x0000);
-pub const SQL_CN_DIFFERENT: CorrelationName = CorrelationName(0x0001);
-pub const SQL_CN_ANY: CorrelationName = CorrelationName(0x0002);
+info_enum!(TxnCapable, u16, {
+    TC_NONE = 0,
+    TC_DML = 1,
+    TC_ALL = 2,
+    TC_DDL_COMMIT = 3,
+    TC_DDL_IGNORE = 4,
+});
 
-#[odbc_type(SQLUINTEGER)]
-pub struct CatalogLocation;
-pub const SQL_CL_START: CatalogLocation = CatalogLocation(0x0001);
-pub const SQL_CL_END: CatalogLocation = CatalogLocation(0x0002);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+#[reprC(NICHE_VALUE = CSqlConformance(0))]
+#[rust_spec(with_custom_niche)]
+#[repr(transparent)]
+pub struct SqlConformance(pub(crate) u32);
+pub const SC_SQL92_ENTRY: SqlConformance = SqlConformance(0x00000001);
+pub const SC_FIPS127_2_TRANSITIONAL: SqlConformance = SqlConformance(0x00000002);
+pub const SC_SQL92_INTERMEDIATE: SqlConformance = SqlConformance(0x00000004);
+pub const SC_SQL92_FULL: SqlConformance = SqlConformance(0x00000008);
 
-#[odbc_type(SQLUSMALLINT)]
-pub struct CursorBehavior;
-pub const SQL_CB_DELETE: CursorBehavior = CursorBehavior(0);
-pub const SQL_CB_CLOSE: CursorBehavior = CursorBehavior(1);
-pub const SQL_CB_PRESERVE: CursorBehavior = CursorBehavior(2);
+info_enum!(ParamArraySelects, u32, {
+    PAS_BATCH = 1,
+    PAS_NO_BATCH = 2,
+    PAS_NO_SELECT = 3,
+});
+info_enum!(ParamArrayRowCounts, u32, { PARC_BATCH = 1, PARC_NO_BATCH = 2 });
+info_enum!(OdbcInterfaceConformance, u32, {
+    OIC_CORE = 1,
+    OIC_LEVEL1 = 2,
+    OIC_LEVEL2 = 3,
+});
+info_enum!(NonNullableColumns, u16, { NNC_NULL = 0x0000, NNC_NON_NULL = 0x0001 });
+info_enum!(IdentifierCase, u16, {
+    IC_UPPER = 1,
+    IC_LOWER = 2,
+    IC_SENSITIVE = 3,
+    IC_MIXED = 4,
+});
+info_enum!(GroupBy, u16, {
+    GB_NOT_SUPPORTED = 0x0000,
+    GB_GROUP_BY_EQUALS_SELECT = 0x0001,
+    GB_GROUP_BY_CONTAINS_SELECT = 0x0002,
+    GB_NO_RELATION = 0x0003,
+    GB_COLLATE = 0x0004,
+});
+info_enum!(FileUsage, u16, {
+    FILE_NOT_SUPPORTED = 0x0000,
+    FILE_TABLE = 0x0001,
+    FILE_CATALOG = 0x0002,
+});
 
-#[odbc_type(SQLUINTEGER)]
-pub struct CursorSensitivity;
-pub const SQL_UNSPECIFIED: CursorSensitivity = CursorSensitivity(0);
-pub const SQL_INSENSITIVE: CursorSensitivity = CursorSensitivity(1);
-pub const SQL_SENSITIVE: CursorSensitivity = CursorSensitivity(2);
+odbc_bitmask!(UINTEGER, pub struct BatchRowCount);
+pub const BRC_PROCEDURES: BatchRowCount = BatchRowCount(0x0000001);
+pub const BRC_EXPLICIT: BatchRowCount = BatchRowCount(0x0000002);
+pub const BRC_ROLLED_UP: BatchRowCount = BatchRowCount(0x0000004);
 
-#[odbc_type(SQLUINTEGER)]
-pub struct DdlIndex;
-pub const SQL_DI_CREATE_INDEX: DdlIndex = DdlIndex(0x00000001);
-pub const SQL_DI_DROP_INDEX: DdlIndex = DdlIndex(0x00000002);
+odbc_bitmask!(UINTEGER, pub struct BatchSupport);
+pub const BS_SELECT_EXPLICIT: BatchSupport = BatchSupport(0x00000001);
+pub const BS_ROW_COUNT_EXPLICIT: BatchSupport = BatchSupport(0x00000002);
+pub const BS_SELECT_PROC: BatchSupport = BatchSupport(0x00000004);
+pub const BS_ROW_COUNT_PROC: BatchSupport = BatchSupport(0x00000008);
 
-#[odbc_type(SQLUSMALLINT)]
-pub struct TxnCapable;
-pub const SQL_TC_NONE: TxnCapable = TxnCapable(0);
-pub const SQL_TC_DML: TxnCapable = TxnCapable(1);
-pub const SQL_TC_ALL: TxnCapable = TxnCapable(2);
-pub const SQL_TC_DDL_COMMIT: TxnCapable = TxnCapable(3);
-pub const SQL_TC_DDL_IGNORE: TxnCapable = TxnCapable(4);
+info_enum!(DriverAwarePoolingSupported, u32, {
+    DRIVER_AWARE_POOLING_NOT_CAPABLE = 0x00000000,
+    DRIVER_AWARE_POOLING_CAPABLE = 0x00000001,
+});
 
-#[odbc_type(SQLUINTEGER)]
-pub struct SqlConformance;
-pub const SQL_SC_SQL92_ENTRY: SqlConformance = SqlConformance(0x00000001);
-pub const SQL_SC_FIPS127_2_TRANSITIONAL: SqlConformance = SqlConformance(0x00000002);
-pub const SQL92_INTERMEDIATE: SqlConformance = SqlConformance(0x00000004);
-pub const SQL_SC_SQL92_FULL: SqlConformance = SqlConformance(0x00000008);
+odbc_bitmask!(UINTEGER, pub struct CursorAttributes1);
+pub const CA1_NEXT: CursorAttributes1 = CursorAttributes1(0x00000001);
+pub const CA1_ABSOLUTE: CursorAttributes1 = CursorAttributes1(0x00000002);
+pub const CA1_RELATIVE: CursorAttributes1 = CursorAttributes1(0x00000004);
+pub const CA1_BOOKMARK: CursorAttributes1 = CursorAttributes1(0x00000008);
 
-#[odbc_type(SQLUINTEGER)]
-pub struct ParamArraySelects;
-pub const SQL_PAS_BATCH: ParamArraySelects = ParamArraySelects(1);
-pub const SQL_PAS_NO_BATCH: ParamArraySelects = ParamArraySelects(2);
-pub const SQL_PAS_NO_SELECT: ParamArraySelects = ParamArraySelects(3);
+pub const CA1_LOCK_NO_CHANGE: CursorAttributes1 = CursorAttributes1(0x00000040);
+pub const CA1_LOCK_EXCLUSIVE: CursorAttributes1 = CursorAttributes1(0x00000080);
+pub const CA1_LOCK_UNLOCK: CursorAttributes1 = CursorAttributes1(0x00000100);
 
-#[odbc_type(SQLUINTEGER)]
-pub struct ParamArrayRowCounts;
-pub const SQL_PARC_BATCH: ParamArrayRowCounts = ParamArrayRowCounts(1);
-pub const SQL_PARC_NO_BATCH: ParamArrayRowCounts = ParamArrayRowCounts(2);
+pub const CA1_POS_POSITION: CursorAttributes1 = CursorAttributes1(0x00000200);
+pub const CA1_POS_UPDATE: CursorAttributes1 = CursorAttributes1(0x00000400);
+pub const CA1_POS_DELETE: CursorAttributes1 = CursorAttributes1(0x00000800);
+pub const CA1_POS_REFRESH: CursorAttributes1 = CursorAttributes1(0x00001000);
 
-#[odbc_type(SQLUINTEGER)]
-pub struct OdbcInterfaceConformance;
-pub const SQL_OIC_CORE: OdbcInterfaceConformance = OdbcInterfaceConformance(1);
-pub const SQL_OIC_LEVEL1: OdbcInterfaceConformance = OdbcInterfaceConformance(2);
-pub const SQL_OIC_LEVEL2: OdbcInterfaceConformance = OdbcInterfaceConformance(3);
+pub const CA1_POSITIONED_UPDATE: CursorAttributes1 = CursorAttributes1(0x00002000);
+pub const CA1_POSITIONED_DELETE: CursorAttributes1 = CursorAttributes1(0x00004000);
+pub const CA1_SELECT_FOR_UPDATE: CursorAttributes1 = CursorAttributes1(0x00008000);
 
-#[odbc_type(SQLUSMALLINT)]
-pub struct NonNullableColumns;
-pub const SQL_NNC_NULL: NonNullableColumns = NonNullableColumns(0x0000);
-pub const SQL_NNC_NON_NULL: NonNullableColumns = NonNullableColumns(0x0001);
+pub const CA1_BULK_ADD: CursorAttributes1 = CursorAttributes1(0x00010000);
+pub const CA1_BULK_UPDATE_BY_BOOKMARK: CursorAttributes1 = CursorAttributes1(0x00020000);
+pub const CA1_BULK_DELETE_BY_BOOKMARK: CursorAttributes1 = CursorAttributes1(0x00040000);
+pub const CA1_BULK_FETCH_BY_BOOKMARK: CursorAttributes1 = CursorAttributes1(0x00080000);
 
-#[odbc_type(SQLUSMALLINT)]
-pub struct IdentifierCase;
-pub const SQL_IC_UPPER: IdentifierCase = IdentifierCase(1);
-pub const SQL_IC_LOWER: IdentifierCase = IdentifierCase(2);
-pub const SQL_IC_SENSITIVE: IdentifierCase = IdentifierCase(3);
-pub const SQL_IC_MIXED: IdentifierCase = IdentifierCase(4);
+odbc_bitmask!(UINTEGER, pub struct CursorAttributes2);
+pub const CA2_READ_ONLY_CONCURRENCY: CursorAttributes2 = CursorAttributes2(0x00000001);
+pub const CA2_LOCK_CONCURRENCY: CursorAttributes2 = CursorAttributes2(0x00000002);
+pub const CA2_OPT_ROWVER_CONCURRENCY: CursorAttributes2 = CursorAttributes2(0x00000004);
+pub const CA2_OPT_VALUES_CONCURRENCY: CursorAttributes2 = CursorAttributes2(0x00000008);
 
-#[odbc_type(SQLUSMALLINT)]
-pub struct GroupBy;
-pub const SQL_GB_NOT_SUPPORTED: GroupBy = GroupBy(0x0000);
-pub const SQL_GB_GROUP_BY_EQUALS_SELECT: GroupBy = GroupBy(0x0001);
-pub const SQL_GB_GROUP_BY_CONTAINS_SELECT: GroupBy = GroupBy(0x0002);
-pub const SQL_GB_NO_RELATION: GroupBy = GroupBy(0x0003);
-pub const SQL_GB_COLLATE: GroupBy = GroupBy(0x0004);
+pub const CA2_SENSITIVITY_ADDITIONS: CursorAttributes2 = CursorAttributes2(0x00000010);
+pub const CA2_SENSITIVITY_DELETIONS: CursorAttributes2 = CursorAttributes2(0x00000020);
+pub const CA2_SENSITIVITY_UPDATES: CursorAttributes2 = CursorAttributes2(0x00000040);
 
-#[odbc_type(SQLUSMALLINT)]
-pub struct FileUsage;
-pub const SQL_FILE_NOT_SUPPORTED: FileUsage = FileUsage(0x0000);
-pub const SQL_FILE_TABLE: FileUsage = FileUsage(0x0001);
-pub const SQL_FILE_CATALOG: FileUsage = FileUsage(0x0002);
-
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct BatchRowCount;
-pub const SQL_BRC_PROCEDURES: BatchRowCount = BatchRowCount(0x0000001);
-pub const SQL_BRC_EXPLICIT: BatchRowCount = BatchRowCount(0x0000002);
-pub const SQL_BRC_ROLLED_UP: BatchRowCount = BatchRowCount(0x0000004);
-
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct BatchSupport;
-pub const SQL_BS_SELECT_EXPLICIT: BatchSupport = BatchSupport(0x00000001);
-pub const SQL_BS_ROW_COUNT_EXPLICIT: BatchSupport = BatchSupport(0x00000002);
-pub const SQL_BS_SELECT_PROC: BatchSupport = BatchSupport(0x00000004);
-pub const SQL_BS_ROW_COUNT_PROC: BatchSupport = BatchSupport(0x00000008);
-
-#[odbc_type(SQLUINTEGER)]
-pub struct DriverAwarePoolingSupported;
-pub const SQL_DRIVER_AWARE_POOLING_NOT_CAPABLE: DriverAwarePoolingSupported =
-    DriverAwarePoolingSupported(0x00000000);
-pub const SQL_DRIVER_AWARE_POOLING_CAPABLE: DriverAwarePoolingSupported =
-    DriverAwarePoolingSupported(0x00000001);
-
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct CursorAttributes1;
-pub const SQL_CA1_NEXT: CursorAttributes1 = CursorAttributes1(0x00000001);
-pub const SQL_CA1_ABSOLUTE: CursorAttributes1 = CursorAttributes1(0x00000002);
-pub const SQL_CA1_RELATIVE: CursorAttributes1 = CursorAttributes1(0x00000004);
-pub const SQL_CA1_BOOKMARK: CursorAttributes1 = CursorAttributes1(0x00000008);
-
-pub const SQL_CA1_LOCK_NO_CHANGE: CursorAttributes1 = CursorAttributes1(0x00000040);
-pub const SQL_CA1_LOCK_EXCLUSIVE: CursorAttributes1 = CursorAttributes1(0x00000080);
-pub const SQL_CA1_LOCK_UNLOCK: CursorAttributes1 = CursorAttributes1(0x00000100);
-
-pub const SQL_CA1_POS_POSITION: CursorAttributes1 = CursorAttributes1(0x00000200);
-pub const SQL_CA1_POS_UPDATE: CursorAttributes1 = CursorAttributes1(0x00000400);
-pub const SQL_CA1_POS_DELETE: CursorAttributes1 = CursorAttributes1(0x00000800);
-pub const SQL_CA1_POS_REFRESH: CursorAttributes1 = CursorAttributes1(0x00001000);
-
-pub const SQL_CA1_POSITIONED_UPDATE: CursorAttributes1 = CursorAttributes1(0x00002000);
-pub const SQL_CA1_POSITIONED_DELETE: CursorAttributes1 = CursorAttributes1(0x00004000);
-pub const SQL_CA1_SELECT_FOR_UPDATE: CursorAttributes1 = CursorAttributes1(0x00008000);
-
-pub const SQL_CA1_BULK_ADD: CursorAttributes1 = CursorAttributes1(0x00010000);
-pub const SQL_CA1_BULK_UPDATE_BY_BOOKMARK: CursorAttributes1 = CursorAttributes1(0x00020000);
-pub const SQL_CA1_BULK_DELETE_BY_BOOKMARK: CursorAttributes1 = CursorAttributes1(0x00040000);
-pub const SQL_CA1_BULK_FETCH_BY_BOOKMARK: CursorAttributes1 = CursorAttributes1(0x00080000);
-
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct CursorAttributes2;
-pub const SQL_CA2_READ_ONLY_CONCURRENCY: CursorAttributes2 = CursorAttributes2(0x00000001);
-pub const SQL_CA2_LOCK_CONCURRENCY: CursorAttributes2 = CursorAttributes2(0x00000002);
-pub const SQL_CA2_OPT_ROWVER_CONCURRENCY: CursorAttributes2 = CursorAttributes2(0x00000004);
-pub const SQL_CA2_OPT_VALUES_CONCURRENCY: CursorAttributes2 = CursorAttributes2(0x00000008);
-
-pub const SQL_CA2_SENSITIVITY_ADDITIONS: CursorAttributes2 = CursorAttributes2(0x00000010);
-pub const SQL_CA2_SENSITIVITY_DELETIONS: CursorAttributes2 = CursorAttributes2(0x00000020);
-pub const SQL_CA2_SENSITIVITY_UPDATES: CursorAttributes2 = CursorAttributes2(0x00000040);
-
-pub const SQL_CA2_MAX_ROWS_SELECT: CursorAttributes2 = CursorAttributes2(0x00000080);
-pub const SQL_CA2_MAX_ROWS_INSERT: CursorAttributes2 = CursorAttributes2(0x00000100);
-pub const SQL_CA2_MAX_ROWS_DELETE: CursorAttributes2 = CursorAttributes2(0x00000200);
-pub const SQL_CA2_MAX_ROWS_UPDATE: CursorAttributes2 = CursorAttributes2(0x00000400);
-pub const SQL_CA2_MAX_ROWS_CATALOG: CursorAttributes2 = CursorAttributes2(0x00000800);
-pub const SQL_CA2_MAX_ROWS_AFFECTS_ALL: CursorAttributes2 = CursorAttributes2(
-    SQL_CA2_MAX_ROWS_SELECT.0
-        | SQL_CA2_MAX_ROWS_INSERT.0
-        | SQL_CA2_MAX_ROWS_DELETE.0
-        | SQL_CA2_MAX_ROWS_UPDATE.0
-        | SQL_CA2_MAX_ROWS_CATALOG.0,
+pub const CA2_MAX_ROWS_SELECT: CursorAttributes2 = CursorAttributes2(0x00000080);
+pub const CA2_MAX_ROWS_INSERT: CursorAttributes2 = CursorAttributes2(0x00000100);
+pub const CA2_MAX_ROWS_DELETE: CursorAttributes2 = CursorAttributes2(0x00000200);
+pub const CA2_MAX_ROWS_UPDATE: CursorAttributes2 = CursorAttributes2(0x00000400);
+pub const CA2_MAX_ROWS_CATALOG: CursorAttributes2 = CursorAttributes2(0x00000800);
+pub const CA2_MAX_ROWS_AFFECTS_ALL: CursorAttributes2 = CursorAttributes2(
+    CA2_MAX_ROWS_SELECT.0
+        | CA2_MAX_ROWS_INSERT.0
+        | CA2_MAX_ROWS_DELETE.0
+        | CA2_MAX_ROWS_UPDATE.0
+        | CA2_MAX_ROWS_CATALOG.0,
 );
 
-pub const SQL_CA2_CRC_EXACT: CursorAttributes2 = CursorAttributes2(0x00001000);
-pub const SQL_CA2_CRC_APPROXIMATE: CursorAttributes2 = CursorAttributes2(0x00002000);
+pub const CA2_CRC_EXACT: CursorAttributes2 = CursorAttributes2(0x00001000);
+pub const CA2_CRC_APPROXIMATE: CursorAttributes2 = CursorAttributes2(0x00002000);
 
-pub const SQL_CA2_SIMULATE_NON_UNIQUE: CursorAttributes2 = CursorAttributes2(0x00004000);
-pub const SQL_CA2_SIMULATE_TRY_UNIQUE: CursorAttributes2 = CursorAttributes2(0x00008000);
-pub const SQL_CA2_SIMULATE_UNIQUE: CursorAttributes2 = CursorAttributes2(0x00010000);
+pub const CA2_SIMULATE_NON_UNIQUE: CursorAttributes2 = CursorAttributes2(0x00004000);
+pub const CA2_SIMULATE_TRY_UNIQUE: CursorAttributes2 = CursorAttributes2(0x00008000);
+pub const CA2_SIMULATE_UNIQUE: CursorAttributes2 = CursorAttributes2(0x00010000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct GetdataExtensions;
-pub const SQL_GD_ANY_COLUMN: GetdataExtensions = GetdataExtensions(0x00000001);
-pub const SQL_GD_ANY_ORDER: GetdataExtensions = GetdataExtensions(0x00000002);
-pub const SQL_GD_BLOCK: GetdataExtensions = GetdataExtensions(0x00000004);
-pub const SQL_GD_BOUND: GetdataExtensions = GetdataExtensions(0x00000008);
-pub const SQL_GD_OUTPUT_PARAMS: GetdataExtensions = GetdataExtensions(0x00000010);
-pub const SQL_GD_CONCURRENT: GetdataExtensions = GetdataExtensions(0x00000020);
+odbc_bitmask!(UINTEGER, pub struct GetdataExtensions);
+pub const GD_ANY_COLUMN: GetdataExtensions = GetdataExtensions(0x00000001);
+pub const GD_ANY_ORDER: GetdataExtensions = GetdataExtensions(0x00000002);
+pub const GD_BLOCK: GetdataExtensions = GetdataExtensions(0x00000004);
+pub const GD_BOUND: GetdataExtensions = GetdataExtensions(0x00000008);
+pub const GD_OUTPUT_PARAMS: GetdataExtensions = GetdataExtensions(0x00000010);
+pub const GD_CONCURRENT: GetdataExtensions = GetdataExtensions(0x00000020);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct InfoSchemaViews;
-pub const SQL_ISV_ASSERTIONS: InfoSchemaViews = InfoSchemaViews(0x00000001);
-pub const SQL_ISV_CHARACTER_SETS: InfoSchemaViews = InfoSchemaViews(0x00000002);
-pub const SQL_ISV_CHECK_CONSTRAINTS: InfoSchemaViews = InfoSchemaViews(0x00000004);
-pub const SQL_ISV_COLLATIONS: InfoSchemaViews = InfoSchemaViews(0x00000008);
-pub const SQL_ISV_COLUMN_DOMAIN_USAGE: InfoSchemaViews = InfoSchemaViews(0x00000010);
-pub const SQL_ISV_COLUMN_PRIVILEGES: InfoSchemaViews = InfoSchemaViews(0x00000020);
-pub const SQL_ISV_COLUMNS: InfoSchemaViews = InfoSchemaViews(0x00000040);
-pub const SQL_ISV_CONSTRAINT_COLUMN_USAGE: InfoSchemaViews = InfoSchemaViews(0x00000080);
-pub const SQL_ISV_CONSTRAINT_TABLE_USAGE: InfoSchemaViews = InfoSchemaViews(0x00000100);
-pub const SQL_ISV_DOMAIN_CONSTRAINTS: InfoSchemaViews = InfoSchemaViews(0x00000200);
-pub const SQL_ISV_DOMAINS: InfoSchemaViews = InfoSchemaViews(0x00000400);
-pub const SQL_ISV_KEY_COLUMN_USAGE: InfoSchemaViews = InfoSchemaViews(0x00000800);
-pub const SQL_ISV_REFERENTIAL_CONSTRAINTS: InfoSchemaViews = InfoSchemaViews(0x00001000);
-pub const SQL_ISV_SCHEMATA: InfoSchemaViews = InfoSchemaViews(0x00002000);
-pub const SQL_ISV_SQL_LANGUAGES: InfoSchemaViews = InfoSchemaViews(0x00004000);
-pub const SQL_ISV_TABLE_CONSTRAINTS: InfoSchemaViews = InfoSchemaViews(0x00008000);
-pub const SQL_ISV_TABLE_PRIVILEGES: InfoSchemaViews = InfoSchemaViews(0x00010000);
-pub const SQL_ISV_TABLES: InfoSchemaViews = InfoSchemaViews(0x00020000);
-pub const SQL_ISV_TRANSLATIONS: InfoSchemaViews = InfoSchemaViews(0x00040000);
-pub const SQL_ISV_USAGE_PRIVILEGES: InfoSchemaViews = InfoSchemaViews(0x00080000);
-pub const SQL_ISV_VIEW_COLUMN_USAGE: InfoSchemaViews = InfoSchemaViews(0x00100000);
-pub const SQL_ISV_VIEW_TABLE_USAGE: InfoSchemaViews = InfoSchemaViews(0x00200000);
-pub const SQL_ISV_VIEWS: InfoSchemaViews = InfoSchemaViews(0x00400000);
+odbc_bitmask!(UINTEGER, pub struct InfoSchemaViews);
+pub const ISV_ASSERTIONS: InfoSchemaViews = InfoSchemaViews(0x00000001);
+pub const ISV_CHARACTER_SETS: InfoSchemaViews = InfoSchemaViews(0x00000002);
+pub const ISV_CHECK_CONSTRAINTS: InfoSchemaViews = InfoSchemaViews(0x00000004);
+pub const ISV_COLLATIONS: InfoSchemaViews = InfoSchemaViews(0x00000008);
+pub const ISV_COLUMN_DOMAIN_USAGE: InfoSchemaViews = InfoSchemaViews(0x00000010);
+pub const ISV_COLUMN_PRIVILEGES: InfoSchemaViews = InfoSchemaViews(0x00000020);
+pub const ISV_COLUMNS: InfoSchemaViews = InfoSchemaViews(0x00000040);
+pub const ISV_CONSTRAINT_COLUMN_USAGE: InfoSchemaViews = InfoSchemaViews(0x00000080);
+pub const ISV_CONSTRAINT_TABLE_USAGE: InfoSchemaViews = InfoSchemaViews(0x00000100);
+pub const ISV_DOMAIN_CONSTRAINTS: InfoSchemaViews = InfoSchemaViews(0x00000200);
+pub const ISV_DOMAINS: InfoSchemaViews = InfoSchemaViews(0x00000400);
+pub const ISV_KEY_COLUMN_USAGE: InfoSchemaViews = InfoSchemaViews(0x00000800);
+pub const ISV_REFERENTIAL_CONSTRAINTS: InfoSchemaViews = InfoSchemaViews(0x00001000);
+pub const ISV_SCHEMATA: InfoSchemaViews = InfoSchemaViews(0x00002000);
+pub const ISV_SQL_LANGUAGES: InfoSchemaViews = InfoSchemaViews(0x00004000);
+pub const ISV_TABLE_CONSTRAINTS: InfoSchemaViews = InfoSchemaViews(0x00008000);
+pub const ISV_TABLE_PRIVILEGES: InfoSchemaViews = InfoSchemaViews(0x00010000);
+pub const ISV_TABLES: InfoSchemaViews = InfoSchemaViews(0x00020000);
+pub const ISV_TRANSLATIONS: InfoSchemaViews = InfoSchemaViews(0x00040000);
+pub const ISV_USAGE_PRIVILEGES: InfoSchemaViews = InfoSchemaViews(0x00080000);
+pub const ISV_VIEW_COLUMN_USAGE: InfoSchemaViews = InfoSchemaViews(0x00100000);
+pub const ISV_VIEW_TABLE_USAGE: InfoSchemaViews = InfoSchemaViews(0x00200000);
+pub const ISV_VIEWS: InfoSchemaViews = InfoSchemaViews(0x00400000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct BookmarkPersistence;
-pub const SQL_BP_CLOSE: BookmarkPersistence = BookmarkPersistence(0x00000001);
-pub const SQL_BP_DELETE: BookmarkPersistence = BookmarkPersistence(0x00000002);
-pub const SQL_BP_DROP: BookmarkPersistence = BookmarkPersistence(0x00000004);
-pub const SQL_BP_TRANSACTION: BookmarkPersistence = BookmarkPersistence(0x00000008);
-pub const SQL_BP_UPDATE: BookmarkPersistence = BookmarkPersistence(0x00000010);
-pub const SQL_BP_OTHER_HSTMT: BookmarkPersistence = BookmarkPersistence(0x00000020);
-// TODO: should also be supported?
-// pub const SQL_BP_SCROLL: BookmarkPersistence = BookmarkPersistence(0x00000040);
+odbc_bitmask!(UINTEGER, pub struct BookmarkPersistence);
+pub const BP_CLOSE: BookmarkPersistence = BookmarkPersistence(0x00000001);
+pub const BP_DELETE: BookmarkPersistence = BookmarkPersistence(0x00000002);
+pub const BP_DROP: BookmarkPersistence = BookmarkPersistence(0x00000004);
+pub const BP_TRANSACTION: BookmarkPersistence = BookmarkPersistence(0x00000008);
+pub const BP_UPDATE: BookmarkPersistence = BookmarkPersistence(0x00000010);
+pub const BP_OTHER_HSTMT: BookmarkPersistence = BookmarkPersistence(0x00000020);
+pub const BP_SCROLL: BookmarkPersistence = BookmarkPersistence(0x00000040);
 
-#[odbc_type(SQLUSMALLINT)]
-pub struct NullCollation;
-pub const SQL_NC_HIGH: NullCollation = NullCollation(0);
-pub const SQL_NC_LOW: NullCollation = NullCollation(1);
-pub const SQL_NC_START: NullCollation = NullCollation(0x0002);
-pub const SQL_NC_END: NullCollation = NullCollation(0x0004);
+info_enum!(NullCollation, u16, {
+    NC_HIGH = 0,
+    NC_LOW = 1,
+    NC_START = 0x0002,
+    NC_END = 0x0004,
+});
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct ScrollOptions;
-pub const SQL_SO_FORWARD_ONLY: ScrollOptions = ScrollOptions(0x00000001);
-pub const SQL_SO_KEYSET_DRIVEN: ScrollOptions = ScrollOptions(0x00000002);
-pub const SQL_SO_DYNAMIC: ScrollOptions = ScrollOptions(0x00000004);
-pub const SQL_SO_MIXED: ScrollOptions = ScrollOptions(0x00000008);
-pub const SQL_SO_STATIC: ScrollOptions = ScrollOptions(0x00000010);
+odbc_bitmask!(UINTEGER, pub struct ScrollOptions);
+pub const SO_FORWARD_ONLY: ScrollOptions = ScrollOptions(0x00000001);
+pub const SO_KEYSET_DRIVEN: ScrollOptions = ScrollOptions(0x00000002);
+pub const SO_DYNAMIC: ScrollOptions = ScrollOptions(0x00000004);
+pub const SO_MIXED: ScrollOptions = ScrollOptions(0x00000008);
+pub const SO_STATIC: ScrollOptions = ScrollOptions(0x00000010);
 
-// TODO: This is both an odbc type and bitmask
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct TxnIsolation;
-pub const SQL_TXN_READ_UNCOMMITTED: TxnIsolation = TxnIsolation(0x00000001);
-pub const SQL_TXN_READ_COMMITTED: TxnIsolation = TxnIsolation(0x00000002);
-pub const SQL_TXN_REPEATABLE_READ: TxnIsolation = TxnIsolation(0x00000004);
-pub const SQL_TXN_SERIALIZABLE: TxnIsolation = TxnIsolation(0x00000008);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
+#[reprC(NICHE_VALUE = CTxnIsolation(0))]
+#[rust_spec(with_custom_niche)]
+#[repr(transparent)]
+pub struct TxnIsolation(u32);
+pub const TXN_READ_UNCOMMITTED: TxnIsolation = TxnIsolation(0x00000001);
+pub const TXN_READ_COMMITTED: TxnIsolation = TxnIsolation(0x00000002);
+pub const TXN_REPEATABLE_READ: TxnIsolation = TxnIsolation(0x00000004);
+pub const TXN_SERIALIZABLE: TxnIsolation = TxnIsolation(0x00000008);
+crate::attr::impl_odbc_scalar_attr_unpack!(TxnIsolation => u32);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct AggregateFunctions;
-pub const SQL_AF_AVG: AggregateFunctions = AggregateFunctions(0x00000001);
-pub const SQL_AF_COUNT: AggregateFunctions = AggregateFunctions(0x00000002);
-pub const SQL_AF_MAX: AggregateFunctions = AggregateFunctions(0x00000004);
-pub const SQL_AF_MIN: AggregateFunctions = AggregateFunctions(0x00000008);
-pub const SQL_AF_SUM: AggregateFunctions = AggregateFunctions(0x00000010);
-pub const SQL_AF_DISTINCT: AggregateFunctions = AggregateFunctions(0x00000020);
-pub const SQL_AF_ALL: AggregateFunctions = AggregateFunctions(0x00000040);
-pub const SQL_AF_EVERY: AggregateFunctions = AggregateFunctions(0x00000080);
-pub const SQL_AF_ANY: AggregateFunctions = AggregateFunctions(0x00000100);
-pub const SQL_AF_STDEV_OP: AggregateFunctions = AggregateFunctions(0x00000200);
-pub const SQL_AF_STDEV_SAMP: AggregateFunctions = AggregateFunctions(0x00000400);
-pub const SQL_AF_VAR_SAMP: AggregateFunctions = AggregateFunctions(0x00000800);
-pub const SQL_AF_VAR_POP: AggregateFunctions = AggregateFunctions(0x00001000);
-pub const SQL_AF_ARRAY_AGG: AggregateFunctions = AggregateFunctions(0x00002000);
-pub const SQL_AF_COLLECT: AggregateFunctions = AggregateFunctions(0x00004000);
-pub const SQL_AF_FUSION: AggregateFunctions = AggregateFunctions(0x00008000);
-pub const SQL_AF_INTERSECTION: AggregateFunctions = AggregateFunctions(0x00010000);
+odbc_bitmask!(UINTEGER, pub struct TxnIsolationOptions);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct AlterDomain;
-pub const SQL_AD_CONSTRAINT_NAME_DEFINITION: AlterDomain = AlterDomain(0x00000001);
-pub const SQL_AD_ADD_DOMAIN_CONSTRAINT: AlterDomain = AlterDomain(0x00000002);
-pub const SQL_AD_DROP_DOMAIN_CONSTRAINT: AlterDomain = AlterDomain(0x00000004);
-pub const SQL_AD_ADD_DOMAIN_DEFAULT: AlterDomain = AlterDomain(0x00000008);
-pub const SQL_AD_DROP_DOMAIN_DEFAULT: AlterDomain = AlterDomain(0x00000010);
-pub const SQL_AD_ADD_CONSTRAINT_INITIALLY_DEFERRED: AlterDomain = AlterDomain(0x00000020);
-pub const SQL_AD_ADD_CONSTRAINT_INITIALLY_IMMEDIATE: AlterDomain = AlterDomain(0x00000040);
-pub const SQL_AD_ADD_CONSTRAINT_DEFERRABLE: AlterDomain = AlterDomain(0x00000080);
-pub const SQL_AD_ADD_CONSTRAINT_NON_DEFERRABLE: AlterDomain = AlterDomain(0x00000100);
+impl From<TxnIsolation> for TxnIsolationOptions {
+    fn from(level: TxnIsolation) -> Self {
+        Self(level.0)
+    }
+}
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct AlterTable;
-// TODO: Are these two to be supported
-//pub const SQL_AT_ADD_COLUMN: AlterTable = AlterTable(0x00000001);
-//pub const SQL_AT_DROP_COLUMN: AlterTable = AlterTable(0x00000002);
-pub const SQL_AT_ADD_CONSTRAINT: AlterTable = AlterTable(0x00000008);
-pub const SQL_AT_ADD_COLUMN_SINGLE: AlterTable = AlterTable(0x00000020);
-pub const SQL_AT_ADD_COLUMN_DEFAULT: AlterTable = AlterTable(0x00000040);
-pub const SQL_AT_ADD_COLUMN_COLLATION: AlterTable = AlterTable(0x00000080);
-pub const SQL_AT_SET_COLUMN_DEFAULT: AlterTable = AlterTable(0x00000100);
-pub const SQL_AT_DROP_COLUMN_DEFAULT: AlterTable = AlterTable(0x00000200);
-pub const SQL_AT_DROP_COLUMN_CASCADE: AlterTable = AlterTable(0x00000400);
-pub const SQL_AT_DROP_COLUMN_RESTRICT: AlterTable = AlterTable(0x00000800);
-pub const SQL_AT_ADD_TABLE_CONSTRAINT: AlterTable = AlterTable(0x00001000);
-pub const SQL_AT_DROP_TABLE_CONSTRAINT_CASCADE: AlterTable = AlterTable(0x00002000);
-pub const SQL_AT_DROP_TABLE_CONSTRAINT_RESTRICT: AlterTable = AlterTable(0x00004000);
-pub const SQL_AT_CONSTRAINT_NAME_DEFINITION: AlterTable = AlterTable(0x00008000);
-pub const SQL_AT_CONSTRAINT_INITIALLY_DEFERRED: AlterTable = AlterTable(0x00010000);
-pub const SQL_AT_CONSTRAINT_INITIALLY_IMMEDIATE: AlterTable = AlterTable(0x00020000);
-pub const SQL_AT_CONSTRAINT_DEFERRABLE: AlterTable = AlterTable(0x00040000);
-pub const SQL_AT_CONSTRAINT_NON_DEFERRABLE: AlterTable = AlterTable(0x00080000);
+impl TryFrom<TxnIsolationOptions> for TxnIsolation {
+    type Error = TxnIsolationOptions;
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct CatalogUsage;
-pub const SQL_CU_DML_STATEMENTS: CatalogUsage = CatalogUsage(0x00000001);
-pub const SQL_CU_PROCEDURE_INVOCATION: CatalogUsage = CatalogUsage(0x00000002);
-pub const SQL_CU_TABLE_DEFINITION: CatalogUsage = CatalogUsage(0x00000004);
-pub const SQL_CU_INDEX_DEFINITION: CatalogUsage = CatalogUsage(0x00000008);
-pub const SQL_CU_PRIVILEGE_DEFINITION: CatalogUsage = CatalogUsage(0x00000010);
+    fn try_from(options: TxnIsolationOptions) -> Result<Self, Self::Error> {
+        if options.0.count_ones() == 1 {
+            Ok(Self(options.0))
+        } else {
+            Err(options)
+        }
+    }
+}
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct CreateAssertion;
-pub const SQL_CA_CREATE_ASSERTION: CreateAssertion = CreateAssertion(0x00000001);
-pub const SQL_CA_CONSTRAINT_INITIALLY_DEFERRED: CreateAssertion = CreateAssertion(0x00000010);
-pub const SQL_CA_CONSTRAINT_INITIALLY_IMMEDIATE: CreateAssertion = CreateAssertion(0x00000020);
-pub const SQL_CA_CONSTRAINT_DEFERRABLE: CreateAssertion = CreateAssertion(0x00000040);
-pub const SQL_CA_CONSTRAINT_NON_DEFERRABLE: CreateAssertion = CreateAssertion(0x00000080);
+impl core::ops::BitAnd<TxnIsolation> for TxnIsolationOptions {
+    type Output = u32;
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct CreateCharacterSet;
-pub const SQL_CCS_CREATE_CHARACTER_SET: CreateCharacterSet = CreateCharacterSet(0x00000001);
-pub const SQL_CCS_COLLATE_CLAUSE: CreateCharacterSet = CreateCharacterSet(0x00000002);
-pub const SQL_CCS_LIMITED_COLLATION: CreateCharacterSet = CreateCharacterSet(0x00000004);
+    fn bitand(self, level: TxnIsolation) -> Self::Output {
+        self.0 & level.0
+    }
+}
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct CreateCollation;
-pub const SQL_CCOL_CREATE_COLLATION: CreateCollation = CreateCollation(0x00000001);
+odbc_bitmask!(UINTEGER, pub struct AggregateFunctions);
+pub const AF_AVG: AggregateFunctions = AggregateFunctions(0x00000001);
+pub const AF_COUNT: AggregateFunctions = AggregateFunctions(0x00000002);
+pub const AF_MAX: AggregateFunctions = AggregateFunctions(0x00000004);
+pub const AF_MIN: AggregateFunctions = AggregateFunctions(0x00000008);
+pub const AF_SUM: AggregateFunctions = AggregateFunctions(0x00000010);
+pub const AF_DISTINCT: AggregateFunctions = AggregateFunctions(0x00000020);
+pub const AF_ALL: AggregateFunctions = AggregateFunctions(0x00000040);
+pub const AF_EVERY: AggregateFunctions = AggregateFunctions(0x00000080);
+pub const AF_ANY: AggregateFunctions = AggregateFunctions(0x00000100);
+pub const AF_STDEV_OP: AggregateFunctions = AggregateFunctions(0x00000200);
+pub const AF_STDEV_SAMP: AggregateFunctions = AggregateFunctions(0x00000400);
+pub const AF_VAR_SAMP: AggregateFunctions = AggregateFunctions(0x00000800);
+pub const AF_VAR_POP: AggregateFunctions = AggregateFunctions(0x00001000);
+pub const AF_ARRAY_AGG: AggregateFunctions = AggregateFunctions(0x00002000);
+pub const AF_COLLECT: AggregateFunctions = AggregateFunctions(0x00004000);
+pub const AF_FUSION: AggregateFunctions = AggregateFunctions(0x00008000);
+pub const AF_INTERSECTION: AggregateFunctions = AggregateFunctions(0x00010000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct CreateDomain;
-pub const SQL_CDO_CREATE_DOMAIN: CreateDomain = CreateDomain(0x00000001);
-pub const SQL_CDO_DEFAULT: CreateDomain = CreateDomain(0x00000002);
-pub const SQL_CDO_CONSTRAINT: CreateDomain = CreateDomain(0x00000004);
-pub const SQL_CDO_COLLATION: CreateDomain = CreateDomain(0x00000008);
-pub const SQL_CDO_CONSTRAINT_NAME_DEFINITION: CreateDomain = CreateDomain(0x00000010);
-pub const SQL_CDO_CONSTRAINT_INITIALLY_DEFERRED: CreateDomain = CreateDomain(0x00000020);
-pub const SQL_CDO_CONSTRAINT_INITIALLY_IMMEDIATE: CreateDomain = CreateDomain(0x00000040);
-pub const SQL_CDO_CONSTRAINT_DEFERRABLE: CreateDomain = CreateDomain(0x00000080);
-pub const SQL_CDO_CONSTRAINT_NON_DEFERRABLE: CreateDomain = CreateDomain(0x00000100);
+odbc_bitmask!(UINTEGER, pub struct AlterDomain);
+pub const AD_CONSTRAINT_NAME_DEFINITION: AlterDomain = AlterDomain(0x00000001);
+pub const AD_ADD_DOMAIN_CONSTRAINT: AlterDomain = AlterDomain(0x00000002);
+pub const AD_DROP_DOMAIN_CONSTRAINT: AlterDomain = AlterDomain(0x00000004);
+pub const AD_ADD_DOMAIN_DEFAULT: AlterDomain = AlterDomain(0x00000008);
+pub const AD_DROP_DOMAIN_DEFAULT: AlterDomain = AlterDomain(0x00000010);
+pub const AD_ADD_CONSTRAINT_INITIALLY_DEFERRED: AlterDomain = AlterDomain(0x00000020);
+pub const AD_ADD_CONSTRAINT_INITIALLY_IMMEDIATE: AlterDomain = AlterDomain(0x00000040);
+pub const AD_ADD_CONSTRAINT_DEFERRABLE: AlterDomain = AlterDomain(0x00000080);
+pub const AD_ADD_CONSTRAINT_NON_DEFERRABLE: AlterDomain = AlterDomain(0x00000100);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct CreateSchema;
-pub const SQL_CS_CREATE_SCHEMA: CreateSchema = CreateSchema(0x00000001);
-pub const SQL_CS_AUTHORIZATION: CreateSchema = CreateSchema(0x00000002);
-pub const SQL_CS_DEFAULT_CHARACTER_SET: CreateSchema = CreateSchema(0x00000004);
+odbc_bitmask!(UINTEGER, pub struct AlterTable);
+pub const AT_ADD_CONSTRAINT: AlterTable = AlterTable(0x00000008);
+pub const AT_ADD_COLUMN_SINGLE: AlterTable = AlterTable(0x00000020);
+pub const AT_ADD_COLUMN_DEFAULT: AlterTable = AlterTable(0x00000040);
+pub const AT_ADD_COLUMN_COLLATION: AlterTable = AlterTable(0x00000080);
+pub const AT_SET_COLUMN_DEFAULT: AlterTable = AlterTable(0x00000100);
+pub const AT_DROP_COLUMN_DEFAULT: AlterTable = AlterTable(0x00000200);
+pub const AT_DROP_COLUMN_CASCADE: AlterTable = AlterTable(0x00000400);
+pub const AT_DROP_COLUMN_RESTRICT: AlterTable = AlterTable(0x00000800);
+pub const AT_ADD_TABLE_CONSTRAINT: AlterTable = AlterTable(0x00001000);
+pub const AT_DROP_TABLE_CONSTRAINT_CASCADE: AlterTable = AlterTable(0x00002000);
+pub const AT_DROP_TABLE_CONSTRAINT_RESTRICT: AlterTable = AlterTable(0x00004000);
+pub const AT_CONSTRAINT_NAME_DEFINITION: AlterTable = AlterTable(0x00008000);
+pub const AT_CONSTRAINT_INITIALLY_DEFERRED: AlterTable = AlterTable(0x00010000);
+pub const AT_CONSTRAINT_INITIALLY_IMMEDIATE: AlterTable = AlterTable(0x00020000);
+pub const AT_CONSTRAINT_DEFERRABLE: AlterTable = AlterTable(0x00040000);
+pub const AT_CONSTRAINT_NON_DEFERRABLE: AlterTable = AlterTable(0x00080000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct CreateTable;
-pub const SQL_CT_CREATE_TABLE: CreateTable = CreateTable(0x00000001);
-pub const SQL_CT_COMMIT_PRESERVE: CreateTable = CreateTable(0x00000002);
-pub const SQL_CT_COMMIT_DELETE: CreateTable = CreateTable(0x00000004);
-pub const SQL_CT_GLOBAL_TEMPORARY: CreateTable = CreateTable(0x00000008);
-pub const SQL_CT_LOCAL_TEMPORARY: CreateTable = CreateTable(0x00000010);
-pub const SQL_CT_CONSTRAINT_INITIALLY_DEFERRED: CreateTable = CreateTable(0x00000020);
-pub const SQL_CT_CONSTRAINT_INITIALLY_IMMEDIATE: CreateTable = CreateTable(0x00000040);
-pub const SQL_CT_CONSTRAINT_DEFERRABLE: CreateTable = CreateTable(0x00000080);
-pub const SQL_CT_CONSTRAINT_NON_DEFERRABLE: CreateTable = CreateTable(0x00000100);
-pub const SQL_CT_COLUMN_CONSTRAINT: CreateTable = CreateTable(0x00000200);
-pub const SQL_CT_COLUMN_DEFAULT: CreateTable = CreateTable(0x00000400);
-pub const SQL_CT_COLUMN_COLLATION: CreateTable = CreateTable(0x00000800);
-pub const SQL_CT_TABLE_CONSTRAINT: CreateTable = CreateTable(0x00001000);
-pub const SQL_CT_CONSTRAINT_NAME_DEFINITION: CreateTable = CreateTable(0x00002000);
+odbc_bitmask!(UINTEGER, pub struct CatalogUsage);
+pub const CU_DML_STATEMENTS: CatalogUsage = CatalogUsage(0x00000001);
+pub const CU_PROCEDURE_INVOCATION: CatalogUsage = CatalogUsage(0x00000002);
+pub const CU_TABLE_DEFINITION: CatalogUsage = CatalogUsage(0x00000004);
+pub const CU_INDEX_DEFINITION: CatalogUsage = CatalogUsage(0x00000008);
+pub const CU_PRIVILEGE_DEFINITION: CatalogUsage = CatalogUsage(0x00000010);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct CreateTranslation;
-pub const SQL_CTR_CREATE_TRANSLATION: CreateTranslation = CreateTranslation(0x00000001);
+odbc_bitmask!(UINTEGER, pub struct CreateAssertion);
+pub const CA_CREATE_ASSERTION: CreateAssertion = CreateAssertion(0x00000001);
+pub const CA_CONSTRAINT_INITIALLY_DEFERRED: CreateAssertion = CreateAssertion(0x00000010);
+pub const CA_CONSTRAINT_INITIALLY_IMMEDIATE: CreateAssertion = CreateAssertion(0x00000020);
+pub const CA_CONSTRAINT_DEFERRABLE: CreateAssertion = CreateAssertion(0x00000040);
+pub const CA_CONSTRAINT_NON_DEFERRABLE: CreateAssertion = CreateAssertion(0x00000080);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct CreateView;
-pub const SQL_CV_CREATE_VIEW: CreateView = CreateView(0x00000001);
-pub const SQL_CV_CHECK_OPTION: CreateView = CreateView(0x00000002);
-pub const SQL_CV_CASCADED: CreateView = CreateView(0x00000004);
-pub const SQL_CV_LOCAL: CreateView = CreateView(0x00000008);
+odbc_bitmask!(UINTEGER, pub struct CreateCharacterSet);
+pub const CCS_CREATE_CHARACTER_SET: CreateCharacterSet = CreateCharacterSet(0x00000001);
+pub const CCS_COLLATE_CLAUSE: CreateCharacterSet = CreateCharacterSet(0x00000002);
+pub const CCS_LIMITED_COLLATION: CreateCharacterSet = CreateCharacterSet(0x00000004);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct DropAssertion;
-pub const SQL_DA_DROP_ASSERTION: DropAssertion = DropAssertion(0x00000001);
+odbc_bitmask!(UINTEGER, pub struct CreateCollation);
+pub const CCOL_CREATE_COLLATION: CreateCollation = CreateCollation(0x00000001);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct Conversion;
-pub const SQL_CVT_CHAR: Conversion = Conversion(0x00000001);
-pub const SQL_CVT_NUMERIC: Conversion = Conversion(0x00000002);
-pub const SQL_CVT_DECIMAL: Conversion = Conversion(0x00000004);
-pub const SQL_CVT_INTEGER: Conversion = Conversion(0x00000008);
-pub const SQL_CVT_SMALLINT: Conversion = Conversion(0x00000010);
-pub const SQL_CVT_FLOAT: Conversion = Conversion(0x00000020);
-pub const SQL_CVT_REAL: Conversion = Conversion(0x00000040);
-pub const SQL_CVT_DOUBLE: Conversion = Conversion(0x00000080);
-pub const SQL_CVT_VARCHAR: Conversion = Conversion(0x00000100);
-pub const SQL_CVT_LONGVARCHAR: Conversion = Conversion(0x00000200);
-pub const SQL_CVT_BINARY: Conversion = Conversion(0x00000400);
-pub const SQL_CVT_VARBINARY: Conversion = Conversion(0x00000800);
-pub const SQL_CVT_BIT: Conversion = Conversion(0x00001000);
-pub const SQL_CVT_TINYINT: Conversion = Conversion(0x00002000);
-pub const SQL_CVT_BIGINT: Conversion = Conversion(0x00004000);
-pub const SQL_CVT_DATE: Conversion = Conversion(0x00008000);
-pub const SQL_CVT_TIME: Conversion = Conversion(0x00010000);
-pub const SQL_CVT_TIMESTAMP: Conversion = Conversion(0x00020000);
-pub const SQL_CVT_LONGVARBINARY: Conversion = Conversion(0x00040000);
+odbc_bitmask!(UINTEGER, pub struct CreateDomain);
+pub const CDO_CREATE_DOMAIN: CreateDomain = CreateDomain(0x00000001);
+pub const CDO_DEFAULT: CreateDomain = CreateDomain(0x00000002);
+pub const CDO_CONSTRAINT: CreateDomain = CreateDomain(0x00000004);
+pub const CDO_COLLATION: CreateDomain = CreateDomain(0x00000008);
+pub const CDO_CONSTRAINT_NAME_DEFINITION: CreateDomain = CreateDomain(0x00000010);
+pub const CDO_CONSTRAINT_INITIALLY_DEFERRED: CreateDomain = CreateDomain(0x00000020);
+pub const CDO_CONSTRAINT_INITIALLY_IMMEDIATE: CreateDomain = CreateDomain(0x00000040);
+pub const CDO_CONSTRAINT_DEFERRABLE: CreateDomain = CreateDomain(0x00000080);
+pub const CDO_CONSTRAINT_NON_DEFERRABLE: CreateDomain = CreateDomain(0x00000100);
 
-pub const SQL_CVT_INTERVAL_YEAR_MONTH: Conversion = Conversion(0x00080000);
-pub const SQL_CVT_INTERVAL_DAY_TIME: Conversion = Conversion(0x00100000);
+odbc_bitmask!(UINTEGER, pub struct CreateSchema);
+pub const CS_CREATE_SCHEMA: CreateSchema = CreateSchema(0x00000001);
+pub const CS_AUTHORIZATION: CreateSchema = CreateSchema(0x00000002);
+pub const CS_DEFAULT_CHARACTER_SET: CreateSchema = CreateSchema(0x00000004);
 
-pub const SQL_CVT_GUID: Conversion = Conversion(0x01000000);
+odbc_bitmask!(UINTEGER, pub struct CreateTable);
+pub const CT_CREATE_TABLE: CreateTable = CreateTable(0x00000001);
+pub const CT_COMMIT_PRESERVE: CreateTable = CreateTable(0x00000002);
+pub const CT_COMMIT_DELETE: CreateTable = CreateTable(0x00000004);
+pub const CT_GLOBAL_TEMPORARY: CreateTable = CreateTable(0x00000008);
+pub const CT_LOCAL_TEMPORARY: CreateTable = CreateTable(0x00000010);
+pub const CT_CONSTRAINT_INITIALLY_DEFERRED: CreateTable = CreateTable(0x00000020);
+pub const CT_CONSTRAINT_INITIALLY_IMMEDIATE: CreateTable = CreateTable(0x00000040);
+pub const CT_CONSTRAINT_DEFERRABLE: CreateTable = CreateTable(0x00000080);
+pub const CT_CONSTRAINT_NON_DEFERRABLE: CreateTable = CreateTable(0x00000100);
+pub const CT_COLUMN_CONSTRAINT: CreateTable = CreateTable(0x00000200);
+pub const CT_COLUMN_DEFAULT: CreateTable = CreateTable(0x00000400);
+pub const CT_COLUMN_COLLATION: CreateTable = CreateTable(0x00000800);
+pub const CT_TABLE_CONSTRAINT: CreateTable = CreateTable(0x00001000);
+pub const CT_CONSTRAINT_NAME_DEFINITION: CreateTable = CreateTable(0x00002000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct DropCharacterSet;
-pub const SQL_DCS_DROP_CHARACTER_SET: DropCharacterSet = DropCharacterSet(0x00000001);
+odbc_bitmask!(UINTEGER, pub struct CreateTranslation);
+pub const CTR_CREATE_TRANSLATION: CreateTranslation = CreateTranslation(0x00000001);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct DropCollation;
-pub const SQL_DC_DROP_COLLATION: DropCollation = DropCollation(0x00000001);
+odbc_bitmask!(UINTEGER, pub struct CreateView);
+pub const CV_CREATE_VIEW: CreateView = CreateView(0x00000001);
+pub const CV_CHECK_OPTION: CreateView = CreateView(0x00000002);
+pub const CV_CASCADED: CreateView = CreateView(0x00000004);
+pub const CV_LOCAL: CreateView = CreateView(0x00000008);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct DropDomain;
-pub const SQL_DD_DROP_DOMAIN: DropDomain = DropDomain(0x00000001);
-pub const SQL_DD_RESTRICT: DropDomain = DropDomain(0x00000002);
-pub const SQL_DD_CASCADE: DropDomain = DropDomain(0x00000004);
+odbc_bitmask!(UINTEGER, pub struct DropAssertion);
+pub const DA_DROP_ASSERTION: DropAssertion = DropAssertion(0x00000001);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct DropSchema;
-pub const SQL_DS_DROP_SCHEMA: DropSchema = DropSchema(0x00000001);
-pub const SQL_DS_RESTRICT: DropSchema = DropSchema(0x00000002);
-pub const SQL_DS_CASCADE: DropSchema = DropSchema(0x00000004);
+odbc_bitmask!(UINTEGER, pub struct Conversion);
+pub const CVT_CHAR: Conversion = Conversion(0x00000001);
+pub const CVT_NUMERIC: Conversion = Conversion(0x00000002);
+pub const CVT_DECIMAL: Conversion = Conversion(0x00000004);
+pub const CVT_INTEGER: Conversion = Conversion(0x00000008);
+pub const CVT_SMALLINT: Conversion = Conversion(0x00000010);
+pub const CVT_FLOAT: Conversion = Conversion(0x00000020);
+pub const CVT_REAL: Conversion = Conversion(0x00000040);
+pub const CVT_DOUBLE: Conversion = Conversion(0x00000080);
+pub const CVT_VARCHAR: Conversion = Conversion(0x00000100);
+pub const CVT_LONGVARCHAR: Conversion = Conversion(0x00000200);
+pub const CVT_BINARY: Conversion = Conversion(0x00000400);
+pub const CVT_VARBINARY: Conversion = Conversion(0x00000800);
+pub const CVT_BIT: Conversion = Conversion(0x00001000);
+pub const CVT_TINYINT: Conversion = Conversion(0x00002000);
+pub const CVT_BIGINT: Conversion = Conversion(0x00004000);
+pub const CVT_DATE: Conversion = Conversion(0x00008000);
+pub const CVT_TIME: Conversion = Conversion(0x00010000);
+pub const CVT_TIMESTAMP: Conversion = Conversion(0x00020000);
+pub const CVT_LONGVARBINARY: Conversion = Conversion(0x00040000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct DropTable;
-pub const SQL_DT_DROP_TABLE: DropTable = DropTable(0x00000001);
-pub const SQL_DT_RESTRICT: DropTable = DropTable(0x00000002);
-pub const SQL_DT_CASCADE: DropTable = DropTable(0x00000004);
+pub const CVT_INTERVAL_YEAR_MONTH: Conversion = Conversion(0x00080000);
+pub const CVT_INTERVAL_DAY_TIME: Conversion = Conversion(0x00100000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct DropTranslation;
-pub const SQL_DTR_DROP_TRANSLATION: DropTranslation = DropTranslation(0x00000001);
+pub const CVT_GUID: Conversion = Conversion(0x01000000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct DropView;
-pub const SQL_DV_DROP_VIEW: DropView = DropView(0x00000001);
-pub const SQL_DV_RESTRICT: DropView = DropView(0x00000002);
-pub const SQL_DV_CASCADE: DropView = DropView(0x00000004);
+odbc_bitmask!(UINTEGER, pub struct DropCharacterSet);
+pub const DCS_DROP_CHARACTER_SET: DropCharacterSet = DropCharacterSet(0x00000001);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct IndexKeywords;
-pub const SQL_IK_NONE: IndexKeywords = IndexKeywords(0x00000000);
-pub const SQL_IK_ASC: IndexKeywords = IndexKeywords(0x00000001);
-pub const SQL_IK_DESC: IndexKeywords = IndexKeywords(0x00000002);
-pub const SQL_IK_ALL: IndexKeywords = IndexKeywords(SQL_IK_ASC.0 | SQL_IK_DESC.0);
+odbc_bitmask!(UINTEGER, pub struct DropCollation);
+pub const DC_DROP_COLLATION: DropCollation = DropCollation(0x00000001);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct InsertStatement;
-pub const SQL_IS_INSERT_LITERALS: InsertStatement = InsertStatement(0x00000001);
-pub const SQL_IS_INSERT_SEARCHED: InsertStatement = InsertStatement(0x00000002);
-pub const SQL_IS_SELECT_INTO: InsertStatement = InsertStatement(0x00000004);
+odbc_bitmask!(UINTEGER, pub struct DropDomain);
+pub const DD_DROP_DOMAIN: DropDomain = DropDomain(0x00000001);
+pub const DD_RESTRICT: DropDomain = DropDomain(0x00000002);
+pub const DD_CASCADE: DropDomain = DropDomain(0x00000004);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct OjCapabilities;
-pub const SQL_OJ_LEFT: OjCapabilities = OjCapabilities(0x00000001);
-pub const SQL_OJ_RIGHT: OjCapabilities = OjCapabilities(0x00000002);
-pub const SQL_OJ_FULL: OjCapabilities = OjCapabilities(0x00000004);
-pub const SQL_OJ_NESTED: OjCapabilities = OjCapabilities(0x00000008);
-pub const SQL_OJ_NOT_ORDERED: OjCapabilities = OjCapabilities(0x00000010);
-pub const SQL_OJ_INNER: OjCapabilities = OjCapabilities(0x00000020);
-pub const SQL_OJ_ALL_COMPARISON_OPS: OjCapabilities = OjCapabilities(0x00000040);
+odbc_bitmask!(UINTEGER, pub struct DropSchema);
+pub const DS_DROP_SCHEMA: DropSchema = DropSchema(0x00000001);
+pub const DS_RESTRICT: DropSchema = DropSchema(0x00000002);
+pub const DS_CASCADE: DropSchema = DropSchema(0x00000004);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct OuterJoins;
+odbc_bitmask!(UINTEGER, pub struct DropTable);
+pub const DT_DROP_TABLE: DropTable = DropTable(0x00000001);
+pub const DT_RESTRICT: DropTable = DropTable(0x00000002);
+pub const DT_CASCADE: DropTable = DropTable(0x00000004);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct SchemaUsage;
-pub const SQL_SU_DML_STATEMENTS: SchemaUsage = SchemaUsage(0x00000001);
-pub const SQL_SU_PROCEDURE_INVOCATION: SchemaUsage = SchemaUsage(0x00000002);
-pub const SQL_SU_TABLE_DEFINITION: SchemaUsage = SchemaUsage(0x00000004);
-pub const SQL_SU_INDEX_DEFINITION: SchemaUsage = SchemaUsage(0x00000008);
-pub const SQL_SU_PRIVILEGE_DEFINITION: SchemaUsage = SchemaUsage(0x00000010);
+odbc_bitmask!(UINTEGER, pub struct DropTranslation);
+pub const DTR_DROP_TRANSLATION: DropTranslation = DropTranslation(0x00000001);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct Subqueries;
-pub const SQL_SQ_COMPARISON: Subqueries = Subqueries(0x00000001);
-pub const SQL_SQ_EXISTS: Subqueries = Subqueries(0x00000002);
-pub const SQL_SQ_IN: Subqueries = Subqueries(0x00000004);
-pub const SQL_SQ_QUANTIFIED: Subqueries = Subqueries(0x00000008);
-pub const SQL_SQ_CORRELATED_SUBQUERIES: Subqueries = Subqueries(0x00000010);
+odbc_bitmask!(UINTEGER, pub struct DropView);
+pub const DV_DROP_VIEW: DropView = DropView(0x00000001);
+pub const DV_RESTRICT: DropView = DropView(0x00000002);
+pub const DV_CASCADE: DropView = DropView(0x00000004);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct Union;
-pub const SQL_U_UNION: Union = Union(0x00000001);
-pub const SQL_U_UNION_ALL: Union = Union(0x00000002);
+odbc_bitmask!(UINTEGER, pub struct IndexKeywords);
+pub const IK_NONE: IndexKeywords = IndexKeywords(0x00000000);
+pub const IK_ASC: IndexKeywords = IndexKeywords(0x00000001);
+pub const IK_DESC: IndexKeywords = IndexKeywords(0x00000002);
+pub const IK_ALL: IndexKeywords = IndexKeywords(IK_ASC.0 | IK_DESC.0);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct ConvertFunctions;
-pub const SQL_FN_CVT_CONVERT: ConvertFunctions = ConvertFunctions(0x00000001);
-pub const SQL_FN_CVT_CAST: ConvertFunctions = ConvertFunctions(0x00000002);
+odbc_bitmask!(UINTEGER, pub struct InsertStatement);
+pub const IS_INSERT_LITERALS: InsertStatement = InsertStatement(0x00000001);
+pub const IS_INSERT_SEARCHED: InsertStatement = InsertStatement(0x00000002);
+pub const IS_SELECT_INTO: InsertStatement = InsertStatement(0x00000004);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct NumericFunctions;
-pub const SQL_FN_NUM_ABS: NumericFunctions = NumericFunctions(0x00000001);
-pub const SQL_FN_NUM_ACOS: NumericFunctions = NumericFunctions(0x00000002);
-pub const SQL_FN_NUM_ASIN: NumericFunctions = NumericFunctions(0x00000004);
-pub const SQL_FN_NUM_ATAN: NumericFunctions = NumericFunctions(0x00000008);
-pub const SQL_FN_NUM_ATAN2: NumericFunctions = NumericFunctions(0x00000010);
-pub const SQL_FN_NUM_CEILING: NumericFunctions = NumericFunctions(0x00000020);
-pub const SQL_FN_NUM_COS: NumericFunctions = NumericFunctions(0x00000040);
-pub const SQL_FN_NUM_COT: NumericFunctions = NumericFunctions(0x00000080);
-pub const SQL_FN_NUM_EXP: NumericFunctions = NumericFunctions(0x00000100);
-pub const SQL_FN_NUM_FLOOR: NumericFunctions = NumericFunctions(0x00000200);
-pub const SQL_FN_NUM_LOG: NumericFunctions = NumericFunctions(0x00000400);
-pub const SQL_FN_NUM_MOD: NumericFunctions = NumericFunctions(0x00000800);
-pub const SQL_FN_NUM_SIGN: NumericFunctions = NumericFunctions(0x00001000);
-pub const SQL_FN_NUM_SIN: NumericFunctions = NumericFunctions(0x00002000);
-pub const SQL_FN_NUM_SQRT: NumericFunctions = NumericFunctions(0x00004000);
-pub const SQL_FN_NUM_TAN: NumericFunctions = NumericFunctions(0x00008000);
-pub const SQL_FN_NUM_PI: NumericFunctions = NumericFunctions(0x00010000);
-pub const SQL_FN_NUM_RAND: NumericFunctions = NumericFunctions(0x00020000);
-pub const SQL_FN_NUM_DEGREES: NumericFunctions = NumericFunctions(0x00040000);
-pub const SQL_FN_NUM_LOG10: NumericFunctions = NumericFunctions(0x00080000);
-pub const SQL_FN_NUM_POWER: NumericFunctions = NumericFunctions(0x00100000);
-pub const SQL_FN_NUM_RADIANS: NumericFunctions = NumericFunctions(0x00200000);
-pub const SQL_FN_NUM_ROUND: NumericFunctions = NumericFunctions(0x00400000);
-pub const SQL_FN_NUM_TRUNCATE: NumericFunctions = NumericFunctions(0x00800000);
+odbc_bitmask!(UINTEGER, pub struct OjCapabilities);
+pub const OJ_LEFT: OjCapabilities = OjCapabilities(0x00000001);
+pub const OJ_RIGHT: OjCapabilities = OjCapabilities(0x00000002);
+pub const OJ_FULL: OjCapabilities = OjCapabilities(0x00000004);
+pub const OJ_NESTED: OjCapabilities = OjCapabilities(0x00000008);
+pub const OJ_NOT_ORDERED: OjCapabilities = OjCapabilities(0x00000010);
+pub const OJ_INNER: OjCapabilities = OjCapabilities(0x00000020);
+pub const OJ_ALL_COMPARISON_OPS: OjCapabilities = OjCapabilities(0x00000040);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct StringFunctions;
-pub const SQL_FN_STR_CONCAT: StringFunctions = StringFunctions(0x00000001);
-pub const SQL_FN_STR_INSERT: StringFunctions = StringFunctions(0x00000002);
-pub const SQL_FN_STR_LEFT: StringFunctions = StringFunctions(0x00000004);
-pub const SQL_FN_STR_LTRIM: StringFunctions = StringFunctions(0x00000008);
-pub const SQL_FN_STR_LENGTH: StringFunctions = StringFunctions(0x00000010);
-pub const SQL_FN_STR_LOCATE: StringFunctions = StringFunctions(0x00000020);
-pub const SQL_FN_STR_LCASE: StringFunctions = StringFunctions(0x00000040);
-pub const SQL_FN_STR_REPEAT: StringFunctions = StringFunctions(0x00000080);
-pub const SQL_FN_STR_REPLACE: StringFunctions = StringFunctions(0x00000100);
-pub const SQL_FN_STR_RIGHT: StringFunctions = StringFunctions(0x00000200);
-pub const SQL_FN_STR_RTRIM: StringFunctions = StringFunctions(0x00000400);
-pub const SQL_FN_STR_SUBSTRING: StringFunctions = StringFunctions(0x00000800);
-pub const SQL_FN_STR_UCASE: StringFunctions = StringFunctions(0x00001000);
-pub const SQL_FN_STR_ASCII: StringFunctions = StringFunctions(0x00002000);
-pub const SQL_FN_STR_CHAR: StringFunctions = StringFunctions(0x00004000);
-pub const SQL_FN_STR_DIFFERENCE: StringFunctions = StringFunctions(0x00008000);
-pub const SQL_FN_STR_LOCATE_2: StringFunctions = StringFunctions(0x00010000);
-pub const SQL_FN_STR_SOUNDEX: StringFunctions = StringFunctions(0x00020000);
-pub const SQL_FN_STR_SPACE: StringFunctions = StringFunctions(0x00040000);
-pub const SQL_FN_STR_BIT_LENGTH: StringFunctions = StringFunctions(0x00080000);
-pub const SQL_FN_STR_CHAR_LENGTH: StringFunctions = StringFunctions(0x00100000);
-pub const SQL_FN_STR_CHARACTER_LENGTH: StringFunctions = StringFunctions(0x00200000);
-pub const SQL_FN_STR_OCTET_LENGTH: StringFunctions = StringFunctions(0x00400000);
-pub const SQL_FN_STR_POSITION: StringFunctions = StringFunctions(0x00800000);
+odbc_bitmask!(UINTEGER, pub struct SchemaUsage);
+pub const SU_DML_STATEMENTS: SchemaUsage = SchemaUsage(0x00000001);
+pub const SU_PROCEDURE_INVOCATION: SchemaUsage = SchemaUsage(0x00000002);
+pub const SU_TABLE_DEFINITION: SchemaUsage = SchemaUsage(0x00000004);
+pub const SU_INDEX_DEFINITION: SchemaUsage = SchemaUsage(0x00000008);
+pub const SU_PRIVILEGE_DEFINITION: SchemaUsage = SchemaUsage(0x00000010);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct SystemFunctions;
-pub const SQL_FN_SYS_USERNAME: SystemFunctions = SystemFunctions(0x00000001);
-pub const SQL_FN_SYS_DBNAME: SystemFunctions = SystemFunctions(0x00000002);
-pub const SQL_FN_SYS_IFNULL: SystemFunctions = SystemFunctions(0x00000004);
+odbc_bitmask!(UINTEGER, pub struct Subqueries);
+pub const SQ_COMPARISON: Subqueries = Subqueries(0x00000001);
+pub const SQ_EXISTS: Subqueries = Subqueries(0x00000002);
+pub const SQ_IN: Subqueries = Subqueries(0x00000004);
+pub const SQ_QUANTIFIED: Subqueries = Subqueries(0x00000008);
+pub const SQ_CORRELATED_SUBQUERIES: Subqueries = Subqueries(0x00000010);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct TimedateIntervals;
-pub const SQL_FN_TSI_FRAC_SECOND: TimedateIntervals = TimedateIntervals(0x00000001);
-pub const SQL_FN_TSI_SECOND: TimedateIntervals = TimedateIntervals(0x00000002);
-pub const SQL_FN_TSI_MINUTE: TimedateIntervals = TimedateIntervals(0x00000004);
-pub const SQL_FN_TSI_HOUR: TimedateIntervals = TimedateIntervals(0x00000008);
-pub const SQL_FN_TSI_DAY: TimedateIntervals = TimedateIntervals(0x00000010);
-pub const SQL_FN_TSI_WEEK: TimedateIntervals = TimedateIntervals(0x00000020);
-pub const SQL_FN_TSI_MONTH: TimedateIntervals = TimedateIntervals(0x00000040);
-pub const SQL_FN_TSI_QUARTER: TimedateIntervals = TimedateIntervals(0x00000080);
-pub const SQL_FN_TSI_YEAR: TimedateIntervals = TimedateIntervals(0x00000100);
+odbc_bitmask!(UINTEGER, pub struct Union);
+pub const U_UNION: Union = Union(0x00000001);
+pub const U_UNION_ALL: Union = Union(0x00000002);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct TimedateFunctions;
-pub const SQL_FN_TD_NOW: TimedateFunctions = TimedateFunctions(0x00000001);
-pub const SQL_FN_TD_CURDATE: TimedateFunctions = TimedateFunctions(0x00000002);
-pub const SQL_FN_TD_DAYOFMONTH: TimedateFunctions = TimedateFunctions(0x00000004);
-pub const SQL_FN_TD_DAYOFWEEK: TimedateFunctions = TimedateFunctions(0x00000008);
-pub const SQL_FN_TD_DAYOFYEAR: TimedateFunctions = TimedateFunctions(0x00000010);
-pub const SQL_FN_TD_MONTH: TimedateFunctions = TimedateFunctions(0x00000020);
-pub const SQL_FN_TD_QUARTER: TimedateFunctions = TimedateFunctions(0x00000040);
-pub const SQL_FN_TD_WEEK: TimedateFunctions = TimedateFunctions(0x00000080);
-pub const SQL_FN_TD_YEAR: TimedateFunctions = TimedateFunctions(0x00000100);
-pub const SQL_FN_TD_CURTIME: TimedateFunctions = TimedateFunctions(0x00000200);
-pub const SQL_FN_TD_HOUR: TimedateFunctions = TimedateFunctions(0x00000400);
-pub const SQL_FN_TD_MINUTE: TimedateFunctions = TimedateFunctions(0x00000800);
-pub const SQL_FN_TD_SECOND: TimedateFunctions = TimedateFunctions(0x00001000);
-pub const SQL_FN_TD_TIMESTAMPADD: TimedateFunctions = TimedateFunctions(0x00002000);
-pub const SQL_FN_TD_TIMESTAMPDIFF: TimedateFunctions = TimedateFunctions(0x00004000);
-pub const SQL_FN_TD_DAYNAME: TimedateFunctions = TimedateFunctions(0x00008000);
-pub const SQL_FN_TD_MONTHNAME: TimedateFunctions = TimedateFunctions(0x00010000);
-pub const SQL_FN_TD_CURRENT_DATE: TimedateFunctions = TimedateFunctions(0x00020000);
-pub const SQL_FN_TD_CURRENT_TIME: TimedateFunctions = TimedateFunctions(0x00040000);
-pub const SQL_FN_TD_CURRENT_TIMESTAMP: TimedateFunctions = TimedateFunctions(0x00080000);
-pub const SQL_FN_TD_EXTRACT: TimedateFunctions = TimedateFunctions(0x00100000);
+odbc_bitmask!(UINTEGER, pub struct ConvertFunctions);
+pub const FN_CVT_CONVERT: ConvertFunctions = ConvertFunctions(0x00000001);
+pub const FN_CVT_CAST: ConvertFunctions = ConvertFunctions(0x00000002);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct DatetimeFunctions;
-pub const SQL_SDF_CURRENT_DATE: DatetimeFunctions = DatetimeFunctions(0x00000001);
-pub const SQL_SDF_CURRENT_TIME: DatetimeFunctions = DatetimeFunctions(0x00000002);
-pub const SQL_SDF_CURRENT_TIMESTAMP: DatetimeFunctions = DatetimeFunctions(0x00000004);
+odbc_bitmask!(UINTEGER, pub struct NumericFunctions);
+pub const FN_NUM_ABS: NumericFunctions = NumericFunctions(0x00000001);
+pub const FN_NUM_ACOS: NumericFunctions = NumericFunctions(0x00000002);
+pub const FN_NUM_ASIN: NumericFunctions = NumericFunctions(0x00000004);
+pub const FN_NUM_ATAN: NumericFunctions = NumericFunctions(0x00000008);
+pub const FN_NUM_ATAN2: NumericFunctions = NumericFunctions(0x00000010);
+pub const FN_NUM_CEILING: NumericFunctions = NumericFunctions(0x00000020);
+pub const FN_NUM_COS: NumericFunctions = NumericFunctions(0x00000040);
+pub const FN_NUM_COT: NumericFunctions = NumericFunctions(0x00000080);
+pub const FN_NUM_EXP: NumericFunctions = NumericFunctions(0x00000100);
+pub const FN_NUM_FLOOR: NumericFunctions = NumericFunctions(0x00000200);
+pub const FN_NUM_LOG: NumericFunctions = NumericFunctions(0x00000400);
+pub const FN_NUM_MOD: NumericFunctions = NumericFunctions(0x00000800);
+pub const FN_NUM_SIGN: NumericFunctions = NumericFunctions(0x00001000);
+pub const FN_NUM_SIN: NumericFunctions = NumericFunctions(0x00002000);
+pub const FN_NUM_SQRT: NumericFunctions = NumericFunctions(0x00004000);
+pub const FN_NUM_TAN: NumericFunctions = NumericFunctions(0x00008000);
+pub const FN_NUM_PI: NumericFunctions = NumericFunctions(0x00010000);
+pub const FN_NUM_RAND: NumericFunctions = NumericFunctions(0x00020000);
+pub const FN_NUM_DEGREES: NumericFunctions = NumericFunctions(0x00040000);
+pub const FN_NUM_LOG10: NumericFunctions = NumericFunctions(0x00080000);
+pub const FN_NUM_POWER: NumericFunctions = NumericFunctions(0x00100000);
+pub const FN_NUM_RADIANS: NumericFunctions = NumericFunctions(0x00200000);
+pub const FN_NUM_ROUND: NumericFunctions = NumericFunctions(0x00400000);
+pub const FN_NUM_TRUNCATE: NumericFunctions = NumericFunctions(0x00800000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct DatetimeLiterals;
-pub const SQL_DL_SQL92_DATE: DatetimeLiterals = DatetimeLiterals(0x00000001);
-pub const SQL_DL_SQL92_TIME: DatetimeLiterals = DatetimeLiterals(0x00000002);
-pub const SQL_DL_SQL92_TIMESTAMP: DatetimeLiterals = DatetimeLiterals(0x00000004);
-pub const SQL_DL_SQL92_INTERVAL_YEAR: DatetimeLiterals = DatetimeLiterals(0x00000008);
-pub const SQL_DL_SQL92_INTERVAL_MONTH: DatetimeLiterals = DatetimeLiterals(0x00000010);
-pub const SQL_DL_SQL92_INTERVAL_DAY: DatetimeLiterals = DatetimeLiterals(0x00000020);
-pub const SQL_DL_SQL92_INTERVAL_HOUR: DatetimeLiterals = DatetimeLiterals(0x00000040);
-pub const SQL_DL_SQL92_INTERVAL_MINUTE: DatetimeLiterals = DatetimeLiterals(0x00000080);
-pub const SQL_DL_SQL92_INTERVAL_SECOND: DatetimeLiterals = DatetimeLiterals(0x00000100);
-pub const SQL_DL_SQL92_INTERVAL_YEAR_TO_MONTH: DatetimeLiterals = DatetimeLiterals(0x00000200);
-pub const SQL_DL_SQL92_INTERVAL_DAY_TO_HOUR: DatetimeLiterals = DatetimeLiterals(0x00000400);
-pub const SQL_DL_SQL92_INTERVAL_DAY_TO_MINUTE: DatetimeLiterals = DatetimeLiterals(0x00000800);
-pub const SQL_DL_SQL92_INTERVAL_DAY_TO_SECOND: DatetimeLiterals = DatetimeLiterals(0x00001000);
-pub const SQL_DL_SQL92_INTERVAL_HOUR_TO_MINUTE: DatetimeLiterals = DatetimeLiterals(0x00002000);
-pub const SQL_DL_SQL92_INTERVAL_HOUR_TO_SECOND: DatetimeLiterals = DatetimeLiterals(0x00004000);
-pub const SQL_DL_SQL92_INTERVAL_MINUTE_TO_SECOND: DatetimeLiterals = DatetimeLiterals(0x00008000);
+odbc_bitmask!(UINTEGER, pub struct StringFunctions);
+pub const FN_STR_CONCAT: StringFunctions = StringFunctions(0x00000001);
+pub const FN_STR_INSERT: StringFunctions = StringFunctions(0x00000002);
+pub const FN_STR_LEFT: StringFunctions = StringFunctions(0x00000004);
+pub const FN_STR_LTRIM: StringFunctions = StringFunctions(0x00000008);
+pub const FN_STR_LENGTH: StringFunctions = StringFunctions(0x00000010);
+pub const FN_STR_LOCATE: StringFunctions = StringFunctions(0x00000020);
+pub const FN_STR_LCASE: StringFunctions = StringFunctions(0x00000040);
+pub const FN_STR_REPEAT: StringFunctions = StringFunctions(0x00000080);
+pub const FN_STR_REPLACE: StringFunctions = StringFunctions(0x00000100);
+pub const FN_STR_RIGHT: StringFunctions = StringFunctions(0x00000200);
+pub const FN_STR_RTRIM: StringFunctions = StringFunctions(0x00000400);
+pub const FN_STR_SUBSTRING: StringFunctions = StringFunctions(0x00000800);
+pub const FN_STR_UCASE: StringFunctions = StringFunctions(0x00001000);
+pub const FN_STR_ASCII: StringFunctions = StringFunctions(0x00002000);
+pub const FN_STR_CHAR: StringFunctions = StringFunctions(0x00004000);
+pub const FN_STR_DIFFERENCE: StringFunctions = StringFunctions(0x00008000);
+pub const FN_STR_LOCATE_2: StringFunctions = StringFunctions(0x00010000);
+pub const FN_STR_SOUNDEX: StringFunctions = StringFunctions(0x00020000);
+pub const FN_STR_SPACE: StringFunctions = StringFunctions(0x00040000);
+pub const FN_STR_BIT_LENGTH: StringFunctions = StringFunctions(0x00080000);
+pub const FN_STR_CHAR_LENGTH: StringFunctions = StringFunctions(0x00100000);
+pub const FN_STR_CHARACTER_LENGTH: StringFunctions = StringFunctions(0x00200000);
+pub const FN_STR_OCTET_LENGTH: StringFunctions = StringFunctions(0x00400000);
+pub const FN_STR_POSITION: StringFunctions = StringFunctions(0x00800000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct ForeignKeyDeleteRule;
-pub const SQL_SFKD_CASCADE: ForeignKeyDeleteRule = ForeignKeyDeleteRule(0x00000001);
-pub const SQL_SFKD_NO_ACTION: ForeignKeyDeleteRule = ForeignKeyDeleteRule(0x00000002);
-pub const SQL_SFKD_SET_DEFAULT: ForeignKeyDeleteRule = ForeignKeyDeleteRule(0x00000004);
-pub const SQL_SFKD_SET_NULL: ForeignKeyDeleteRule = ForeignKeyDeleteRule(0x00000008);
+odbc_bitmask!(UINTEGER, pub struct SystemFunctions);
+pub const FN_SYS_USERNAME: SystemFunctions = SystemFunctions(0x00000001);
+pub const FN_SYS_DBNAME: SystemFunctions = SystemFunctions(0x00000002);
+pub const FN_SYS_IFNULL: SystemFunctions = SystemFunctions(0x00000004);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct ForeignKeyUpdateRule;
-pub const SQL_SFKU_CASCADE: ForeignKeyUpdateRule = ForeignKeyUpdateRule(0x00000001);
-pub const SQL_SFKU_NO_ACTION: ForeignKeyUpdateRule = ForeignKeyUpdateRule(0x00000002);
-pub const SQL_SFKU_SET_DEFAULT: ForeignKeyUpdateRule = ForeignKeyUpdateRule(0x00000004);
-pub const SQL_SFKU_SET_NULL: ForeignKeyUpdateRule = ForeignKeyUpdateRule(0x00000008);
+odbc_bitmask!(UINTEGER, pub struct TimedateIntervals);
+pub const FN_TSI_FRAC_SECOND: TimedateIntervals = TimedateIntervals(0x00000001);
+pub const FN_TSI_SECOND: TimedateIntervals = TimedateIntervals(0x00000002);
+pub const FN_TSI_MINUTE: TimedateIntervals = TimedateIntervals(0x00000004);
+pub const FN_TSI_HOUR: TimedateIntervals = TimedateIntervals(0x00000008);
+pub const FN_TSI_DAY: TimedateIntervals = TimedateIntervals(0x00000010);
+pub const FN_TSI_WEEK: TimedateIntervals = TimedateIntervals(0x00000020);
+pub const FN_TSI_MONTH: TimedateIntervals = TimedateIntervals(0x00000040);
+pub const FN_TSI_QUARTER: TimedateIntervals = TimedateIntervals(0x00000080);
+pub const FN_TSI_YEAR: TimedateIntervals = TimedateIntervals(0x00000100);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct Grant;
-pub const SQL_SG_USAGE_ON_DOMAIN: Grant = Grant(0x00000001);
-pub const SQL_SG_USAGE_ON_CHARACTER_SET: Grant = Grant(0x00000002);
-pub const SQL_SG_USAGE_ON_COLLATION: Grant = Grant(0x00000004);
-pub const SQL_SG_USAGE_ON_TRANSLATION: Grant = Grant(0x00000008);
-pub const SQL_SG_WITH_GRANT_OPTION: Grant = Grant(0x00000010);
-pub const SQL_SG_DELETE_TABLE: Grant = Grant(0x00000020);
-pub const SQL_SG_INSERT_TABLE: Grant = Grant(0x00000040);
-pub const SQL_SG_INSERT_COLUMN: Grant = Grant(0x00000080);
-pub const SQL_SG_REFERENCES_TABLE: Grant = Grant(0x00000100);
-pub const SQL_SG_REFERENCES_COLUMN: Grant = Grant(0x00000200);
-pub const SQL_SG_SELECT_TABLE: Grant = Grant(0x00000400);
-pub const SQL_SG_UPDATE_TABLE: Grant = Grant(0x00000800);
-pub const SQL_SG_UPDATE_COLUMN: Grant = Grant(0x00001000);
+odbc_bitmask!(UINTEGER, pub struct TimedateFunctions);
+pub const FN_TD_NOW: TimedateFunctions = TimedateFunctions(0x00000001);
+pub const FN_TD_CURDATE: TimedateFunctions = TimedateFunctions(0x00000002);
+pub const FN_TD_DAYOFMONTH: TimedateFunctions = TimedateFunctions(0x00000004);
+pub const FN_TD_DAYOFWEEK: TimedateFunctions = TimedateFunctions(0x00000008);
+pub const FN_TD_DAYOFYEAR: TimedateFunctions = TimedateFunctions(0x00000010);
+pub const FN_TD_MONTH: TimedateFunctions = TimedateFunctions(0x00000020);
+pub const FN_TD_QUARTER: TimedateFunctions = TimedateFunctions(0x00000040);
+pub const FN_TD_WEEK: TimedateFunctions = TimedateFunctions(0x00000080);
+pub const FN_TD_YEAR: TimedateFunctions = TimedateFunctions(0x00000100);
+pub const FN_TD_CURTIME: TimedateFunctions = TimedateFunctions(0x00000200);
+pub const FN_TD_HOUR: TimedateFunctions = TimedateFunctions(0x00000400);
+pub const FN_TD_MINUTE: TimedateFunctions = TimedateFunctions(0x00000800);
+pub const FN_TD_SECOND: TimedateFunctions = TimedateFunctions(0x00001000);
+pub const FN_TD_TIMESTAMPADD: TimedateFunctions = TimedateFunctions(0x00002000);
+pub const FN_TD_TIMESTAMPDIFF: TimedateFunctions = TimedateFunctions(0x00004000);
+pub const FN_TD_DAYNAME: TimedateFunctions = TimedateFunctions(0x00008000);
+pub const FN_TD_MONTHNAME: TimedateFunctions = TimedateFunctions(0x00010000);
+pub const FN_TD_CURRENT_DATE: TimedateFunctions = TimedateFunctions(0x00020000);
+pub const FN_TD_CURRENT_TIME: TimedateFunctions = TimedateFunctions(0x00040000);
+pub const FN_TD_CURRENT_TIMESTAMP: TimedateFunctions = TimedateFunctions(0x00080000);
+pub const FN_TD_EXTRACT: TimedateFunctions = TimedateFunctions(0x00100000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct NumericValueFunctions;
-pub const SQL_SNVF_BIT_LENGTH: NumericValueFunctions = NumericValueFunctions(0x00000001);
-pub const SQL_SNVF_CHAR_LENGTH: NumericValueFunctions = NumericValueFunctions(0x00000002);
-pub const SQL_SNVF_CHARACTER_LENGTH: NumericValueFunctions = NumericValueFunctions(0x00000004);
-pub const SQL_SNVF_EXTRACT: NumericValueFunctions = NumericValueFunctions(0x00000008);
-pub const SQL_SNVF_OCTET_LENGTH: NumericValueFunctions = NumericValueFunctions(0x00000010);
-pub const SQL_SNVF_POSITION: NumericValueFunctions = NumericValueFunctions(0x00000020);
+odbc_bitmask!(UINTEGER, pub struct DatetimeFunctions);
+pub const SDF_CURRENT_DATE: DatetimeFunctions = DatetimeFunctions(0x00000001);
+pub const SDF_CURRENT_TIME: DatetimeFunctions = DatetimeFunctions(0x00000002);
+pub const SDF_CURRENT_TIMESTAMP: DatetimeFunctions = DatetimeFunctions(0x00000004);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct Predicates;
-pub const SQL_SP_EXISTS: Predicates = Predicates(0x00000001);
-pub const SQL_SP_ISNOTNULL: Predicates = Predicates(0x00000002);
-pub const SQL_SP_ISNULL: Predicates = Predicates(0x00000004);
-pub const SQL_SP_MATCH_FULL: Predicates = Predicates(0x00000008);
-pub const SQL_SP_MATCH_PARTIAL: Predicates = Predicates(0x00000010);
-pub const SQL_SP_MATCH_UNIQUE_FULL: Predicates = Predicates(0x00000020);
-pub const SQL_SP_MATCH_UNIQUE_PARTIAL: Predicates = Predicates(0x00000040);
-pub const SQL_SP_OVERLAPS: Predicates = Predicates(0x00000080);
-pub const SQL_SP_UNIQUE: Predicates = Predicates(0x00000100);
-pub const SQL_SP_LIKE: Predicates = Predicates(0x00000200);
-pub const SQL_SP_IN: Predicates = Predicates(0x00000400);
-pub const SQL_SP_BETWEEN: Predicates = Predicates(0x00000800);
-pub const SQL_SP_COMPARISON: Predicates = Predicates(0x00001000);
-pub const SQL_SP_QUANTIFIED_COMPARISON: Predicates = Predicates(0x00002000);
+odbc_bitmask!(UINTEGER, pub struct DatetimeLiterals);
+pub const DL_SQL92_DATE: DatetimeLiterals = DatetimeLiterals(0x00000001);
+pub const DL_SQL92_TIME: DatetimeLiterals = DatetimeLiterals(0x00000002);
+pub const DL_SQL92_TIMESTAMP: DatetimeLiterals = DatetimeLiterals(0x00000004);
+pub const DL_SQL92_INTERVAL_YEAR: DatetimeLiterals = DatetimeLiterals(0x00000008);
+pub const DL_SQL92_INTERVAL_MONTH: DatetimeLiterals = DatetimeLiterals(0x00000010);
+pub const DL_SQL92_INTERVAL_DAY: DatetimeLiterals = DatetimeLiterals(0x00000020);
+pub const DL_SQL92_INTERVAL_HOUR: DatetimeLiterals = DatetimeLiterals(0x00000040);
+pub const DL_SQL92_INTERVAL_MINUTE: DatetimeLiterals = DatetimeLiterals(0x00000080);
+pub const DL_SQL92_INTERVAL_SECOND: DatetimeLiterals = DatetimeLiterals(0x00000100);
+pub const DL_SQL92_INTERVAL_YEAR_TO_MONTH: DatetimeLiterals = DatetimeLiterals(0x00000200);
+pub const DL_SQL92_INTERVAL_DAY_TO_HOUR: DatetimeLiterals = DatetimeLiterals(0x00000400);
+pub const DL_SQL92_INTERVAL_DAY_TO_MINUTE: DatetimeLiterals = DatetimeLiterals(0x00000800);
+pub const DL_SQL92_INTERVAL_DAY_TO_SECOND: DatetimeLiterals = DatetimeLiterals(0x00001000);
+pub const DL_SQL92_INTERVAL_HOUR_TO_MINUTE: DatetimeLiterals = DatetimeLiterals(0x00002000);
+pub const DL_SQL92_INTERVAL_HOUR_TO_SECOND: DatetimeLiterals = DatetimeLiterals(0x00004000);
+pub const DL_SQL92_INTERVAL_MINUTE_TO_SECOND: DatetimeLiterals = DatetimeLiterals(0x00008000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct RelationalJoinOperators;
-pub const SQL_SRJO_CORRESPONDING_CLAUSE: RelationalJoinOperators =
-    RelationalJoinOperators(0x00000001);
-pub const SQL_SRJO_CROSS_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000002);
-pub const SQL_SRJO_EXCEPT_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000004);
-pub const SQL_SRJO_FULL_OUTER_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000008);
-pub const SQL_SRJO_INNER_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000010);
-pub const SQL_SRJO_INTERSECT_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000020);
-pub const SQL_SRJO_LEFT_OUTER_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000040);
-pub const SQL_SRJO_NATURAL_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000080);
-pub const SQL_SRJO_RIGHT_OUTER_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000100);
-pub const SQL_SRJO_UNION_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000200);
+odbc_bitmask!(UINTEGER, pub struct ForeignKeyDeleteRule);
+pub const SFKD_CASCADE: ForeignKeyDeleteRule = ForeignKeyDeleteRule(0x00000001);
+pub const SFKD_NO_ACTION: ForeignKeyDeleteRule = ForeignKeyDeleteRule(0x00000002);
+pub const SFKD_SET_DEFAULT: ForeignKeyDeleteRule = ForeignKeyDeleteRule(0x00000004);
+pub const SFKD_SET_NULL: ForeignKeyDeleteRule = ForeignKeyDeleteRule(0x00000008);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct Revoke;
-pub const SQL_SR_USAGE_ON_DOMAIN: Revoke = Revoke(0x00000001);
-pub const SQL_SR_USAGE_ON_CHARACTER_SET: Revoke = Revoke(0x00000002);
-pub const SQL_SR_USAGE_ON_COLLATION: Revoke = Revoke(0x00000004);
-pub const SQL_SR_USAGE_ON_TRANSLATION: Revoke = Revoke(0x00000008);
-pub const SQL_SR_GRANT_OPTION_FOR: Revoke = Revoke(0x00000010);
-pub const SQL_SR_CASCADE: Revoke = Revoke(0x00000020);
-pub const SQL_SR_RESTRICT: Revoke = Revoke(0x00000040);
-pub const SQL_SR_DELETE_TABLE: Revoke = Revoke(0x00000080);
-pub const SQL_SR_INSERT_TABLE: Revoke = Revoke(0x00000100);
-pub const SQL_SR_INSERT_COLUMN: Revoke = Revoke(0x00000200);
-pub const SQL_SR_REFERENCES_TABLE: Revoke = Revoke(0x00000400);
-pub const SQL_SR_REFERENCES_COLUMN: Revoke = Revoke(0x00000800);
-pub const SQL_SR_SELECT_TABLE: Revoke = Revoke(0x00001000);
-pub const SQL_SR_UPDATE_TABLE: Revoke = Revoke(0x00002000);
-pub const SQL_SR_UPDATE_COLUMN: Revoke = Revoke(0x00004000);
+odbc_bitmask!(UINTEGER, pub struct ForeignKeyUpdateRule);
+pub const SFKU_CASCADE: ForeignKeyUpdateRule = ForeignKeyUpdateRule(0x00000001);
+pub const SFKU_NO_ACTION: ForeignKeyUpdateRule = ForeignKeyUpdateRule(0x00000002);
+pub const SFKU_SET_DEFAULT: ForeignKeyUpdateRule = ForeignKeyUpdateRule(0x00000004);
+pub const SFKU_SET_NULL: ForeignKeyUpdateRule = ForeignKeyUpdateRule(0x00000008);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct RowValueConstructor;
-pub const SQL_SRVC_VALUE_EXPRESSION: RowValueConstructor = RowValueConstructor(0x00000001);
-pub const SQL_SRVC_NULL: RowValueConstructor = RowValueConstructor(0x00000002);
-pub const SQL_SRVC_DEFAULT: RowValueConstructor = RowValueConstructor(0x00000004);
-pub const SQL_SRVC_ROW_SUBQUERY: RowValueConstructor = RowValueConstructor(0x00000008);
+odbc_bitmask!(UINTEGER, pub struct Grant);
+pub const SG_USAGE_ON_DOMAIN: Grant = Grant(0x00000001);
+pub const SG_USAGE_ON_CHARACTER_SET: Grant = Grant(0x00000002);
+pub const SG_USAGE_ON_COLLATION: Grant = Grant(0x00000004);
+pub const SG_USAGE_ON_TRANSLATION: Grant = Grant(0x00000008);
+pub const SG_WITH_GRANT_OPTION: Grant = Grant(0x00000010);
+pub const SG_DELETE_TABLE: Grant = Grant(0x00000020);
+pub const SG_INSERT_TABLE: Grant = Grant(0x00000040);
+pub const SG_INSERT_COLUMN: Grant = Grant(0x00000080);
+pub const SG_REFERENCES_TABLE: Grant = Grant(0x00000100);
+pub const SG_REFERENCES_COLUMN: Grant = Grant(0x00000200);
+pub const SG_SELECT_TABLE: Grant = Grant(0x00000400);
+pub const SG_UPDATE_TABLE: Grant = Grant(0x00000800);
+pub const SG_UPDATE_COLUMN: Grant = Grant(0x00001000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct StringScalarFunctions;
-pub const SQL_SSF_CONVERT: StringScalarFunctions = StringScalarFunctions(0x00000001);
-pub const SQL_SSF_LOWER: StringScalarFunctions = StringScalarFunctions(0x00000002);
-pub const SQL_SSF_UPPER: StringScalarFunctions = StringScalarFunctions(0x00000004);
-pub const SQL_SSF_SUBSTRING: StringScalarFunctions = StringScalarFunctions(0x00000008);
-pub const SQL_SSF_TRANSLATE: StringScalarFunctions = StringScalarFunctions(0x00000010);
-pub const SQL_SSF_TRIM_BOTH: StringScalarFunctions = StringScalarFunctions(0x00000020);
-pub const SQL_SSF_TRIM_LEADING: StringScalarFunctions = StringScalarFunctions(0x00000040);
-pub const SQL_SSF_TRIM_TRAILING: StringScalarFunctions = StringScalarFunctions(0x00000080);
-pub const SQL_SSF_OVERLAY: StringScalarFunctions = StringScalarFunctions(0x00000100);
-pub const SQL_SSF_LENGTH: StringScalarFunctions = StringScalarFunctions(0x00000200);
-pub const SQL_SSF_POSITION: StringScalarFunctions = StringScalarFunctions(0x00000400);
-pub const SQL_SSF_CONCAT: StringScalarFunctions = StringScalarFunctions(0x00000800);
+odbc_bitmask!(UINTEGER, pub struct NumericValueFunctions);
+pub const SNVF_BIT_LENGTH: NumericValueFunctions = NumericValueFunctions(0x00000001);
+pub const SNVF_CHAR_LENGTH: NumericValueFunctions = NumericValueFunctions(0x00000002);
+pub const SNVF_CHARACTER_LENGTH: NumericValueFunctions = NumericValueFunctions(0x00000004);
+pub const SNVF_EXTRACT: NumericValueFunctions = NumericValueFunctions(0x00000008);
+pub const SNVF_OCTET_LENGTH: NumericValueFunctions = NumericValueFunctions(0x00000010);
+pub const SNVF_POSITION: NumericValueFunctions = NumericValueFunctions(0x00000020);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct ValueExpressions;
-pub const SQL_SVE_CASE: ValueExpressions = ValueExpressions(0x00000001);
-pub const SQL_SVE_CAST: ValueExpressions = ValueExpressions(0x00000002);
-pub const SQL_SVE_COALESCE: ValueExpressions = ValueExpressions(0x00000004);
-pub const SQL_SVE_NULLIF: ValueExpressions = ValueExpressions(0x00000008);
+odbc_bitmask!(UINTEGER, pub struct Predicates);
+pub const SP_EXISTS: Predicates = Predicates(0x00000001);
+pub const SP_ISNOTNULL: Predicates = Predicates(0x00000002);
+pub const SP_ISNULL: Predicates = Predicates(0x00000004);
+pub const SP_MATCH_FULL: Predicates = Predicates(0x00000008);
+pub const SP_MATCH_PARTIAL: Predicates = Predicates(0x00000010);
+pub const SP_MATCH_UNIQUE_FULL: Predicates = Predicates(0x00000020);
+pub const SP_MATCH_UNIQUE_PARTIAL: Predicates = Predicates(0x00000040);
+pub const SP_OVERLAPS: Predicates = Predicates(0x00000080);
+pub const SP_UNIQUE: Predicates = Predicates(0x00000100);
+pub const SP_LIKE: Predicates = Predicates(0x00000200);
+pub const SP_IN: Predicates = Predicates(0x00000400);
+pub const SP_BETWEEN: Predicates = Predicates(0x00000800);
+pub const SP_COMPARISON: Predicates = Predicates(0x00001000);
+pub const SP_QUANTIFIED_COMPARISON: Predicates = Predicates(0x00002000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct StandardCliConformance;
-pub const SQL_SCC_XOPEN_CLI_VERSION1: StandardCliConformance = StandardCliConformance(0x00000001);
-pub const SQL_SCC_ISO92_CLI: StandardCliConformance = StandardCliConformance(0x00000002);
+odbc_bitmask!(UINTEGER, pub struct RelationalJoinOperators);
+pub const SRJO_CORRESPONDING_CLAUSE: RelationalJoinOperators = RelationalJoinOperators(0x00000001);
+pub const SRJO_CROSS_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000002);
+pub const SRJO_EXCEPT_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000004);
+pub const SRJO_FULL_OUTER_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000008);
+pub const SRJO_INNER_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000010);
+pub const SRJO_INTERSECT_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000020);
+pub const SRJO_LEFT_OUTER_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000040);
+pub const SRJO_NATURAL_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000080);
+pub const SRJO_RIGHT_OUTER_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000100);
+pub const SRJO_UNION_JOIN: RelationalJoinOperators = RelationalJoinOperators(0x00000200);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct BinaryFunctions;
-pub const SQL_FN_BIN_BIT_LENGTH: BinaryFunctions = BinaryFunctions(SQL_FN_STR_BIT_LENGTH.0);
-pub const SQL_FN_BIN_CONCAT: BinaryFunctions = BinaryFunctions(SQL_FN_STR_CONCAT.0);
-pub const SQL_FN_BIN_INSERT: BinaryFunctions = BinaryFunctions(SQL_FN_STR_INSERT.0);
-pub const SQL_FN_BIN_LTRIM: BinaryFunctions = BinaryFunctions(SQL_FN_STR_LTRIM.0);
-pub const SQL_FN_BIN_OCTET_LENGTH: BinaryFunctions = BinaryFunctions(SQL_FN_STR_OCTET_LENGTH.0);
-pub const SQL_FN_BIN_POSITION: BinaryFunctions = BinaryFunctions(SQL_FN_STR_POSITION.0);
-pub const SQL_FN_BIN_RTRIM: BinaryFunctions = BinaryFunctions(SQL_FN_STR_RTRIM.0);
-pub const SQL_FN_BIN_SUBSTRING: BinaryFunctions = BinaryFunctions(SQL_FN_STR_SUBSTRING.0);
+odbc_bitmask!(UINTEGER, pub struct Revoke);
+pub const SR_USAGE_ON_DOMAIN: Revoke = Revoke(0x00000001);
+pub const SR_USAGE_ON_CHARACTER_SET: Revoke = Revoke(0x00000002);
+pub const SR_USAGE_ON_COLLATION: Revoke = Revoke(0x00000004);
+pub const SR_USAGE_ON_TRANSLATION: Revoke = Revoke(0x00000008);
+pub const SR_GRANT_OPTION_FOR: Revoke = Revoke(0x00000010);
+pub const SR_CASCADE: Revoke = Revoke(0x00000020);
+pub const SR_RESTRICT: Revoke = Revoke(0x00000040);
+pub const SR_DELETE_TABLE: Revoke = Revoke(0x00000080);
+pub const SR_INSERT_TABLE: Revoke = Revoke(0x00000100);
+pub const SR_INSERT_COLUMN: Revoke = Revoke(0x00000200);
+pub const SR_REFERENCES_TABLE: Revoke = Revoke(0x00000400);
+pub const SR_REFERENCES_COLUMN: Revoke = Revoke(0x00000800);
+pub const SR_SELECT_TABLE: Revoke = Revoke(0x00001000);
+pub const SR_UPDATE_TABLE: Revoke = Revoke(0x00002000);
+pub const SR_UPDATE_COLUMN: Revoke = Revoke(0x00004000);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct IsoBinaryFunctions;
-pub const SQL_SBF_CONVERT: IsoBinaryFunctions = IsoBinaryFunctions(SQL_SSF_CONVERT.0);
-pub const SQL_SBF_SUBSTRING: IsoBinaryFunctions = IsoBinaryFunctions(SQL_SSF_SUBSTRING.0);
-pub const SQL_SBF_TRIM_BOTH: IsoBinaryFunctions = IsoBinaryFunctions(SQL_SSF_TRIM_BOTH.0);
-pub const SQL_SBF_TRIM_LEADING: IsoBinaryFunctions = IsoBinaryFunctions(SQL_SSF_TRIM_LEADING.0);
-pub const SQL_SBF_TRIM_TRAILING: IsoBinaryFunctions = IsoBinaryFunctions(SQL_SSF_TRIM_TRAILING.0);
-pub const SQL_SBF_OVERLAY: IsoBinaryFunctions = IsoBinaryFunctions(SQL_SSF_OVERLAY.0);
-pub const SQL_SBF_POSITION: IsoBinaryFunctions = IsoBinaryFunctions(SQL_SSF_POSITION.0);
-pub const SQL_SBF_CONCAT: IsoBinaryFunctions = IsoBinaryFunctions(SQL_SSF_CONCAT.0);
+odbc_bitmask!(UINTEGER, pub struct RowValueConstructor);
+pub const SRVC_VALUE_EXPRESSION: RowValueConstructor = RowValueConstructor(0x00000001);
+pub const SRVC_NULL: RowValueConstructor = RowValueConstructor(0x00000002);
+pub const SRVC_DEFAULT: RowValueConstructor = RowValueConstructor(0x00000004);
+pub const SRVC_ROW_SUBQUERY: RowValueConstructor = RowValueConstructor(0x00000008);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct LimitEscapeClause;
-pub const SQL_LC_NONE: LimitEscapeClause = LimitEscapeClause(0x00000000);
-pub const SQL_LC_TAKE: LimitEscapeClause = LimitEscapeClause(0x00000001);
-pub const SQL_LC_SKIP: LimitEscapeClause = LimitEscapeClause(0x00000003);
+odbc_bitmask!(UINTEGER, pub struct StringScalarFunctions);
+pub const SSF_CONVERT: StringScalarFunctions = StringScalarFunctions(0x00000001);
+pub const SSF_LOWER: StringScalarFunctions = StringScalarFunctions(0x00000002);
+pub const SSF_UPPER: StringScalarFunctions = StringScalarFunctions(0x00000004);
+pub const SSF_SUBSTRING: StringScalarFunctions = StringScalarFunctions(0x00000008);
+pub const SSF_TRANSLATE: StringScalarFunctions = StringScalarFunctions(0x00000010);
+pub const SSF_TRIM_BOTH: StringScalarFunctions = StringScalarFunctions(0x00000020);
+pub const SSF_TRIM_LEADING: StringScalarFunctions = StringScalarFunctions(0x00000040);
+pub const SSF_TRIM_TRAILING: StringScalarFunctions = StringScalarFunctions(0x00000080);
+pub const SSF_OVERLAY: StringScalarFunctions = StringScalarFunctions(0x00000100);
+pub const SSF_LENGTH: StringScalarFunctions = StringScalarFunctions(0x00000200);
+pub const SSF_POSITION: StringScalarFunctions = StringScalarFunctions(0x00000400);
+pub const SSF_CONCAT: StringScalarFunctions = StringScalarFunctions(0x00000800);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct ReturnEscapeClause;
-pub const SQL_RC_NONE: ReturnEscapeClause = ReturnEscapeClause(0x00000000);
-pub const SQL_RC_INSERT_SINGLE_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000001);
-pub const SQL_RC_INSERT_SINGLE_ANY: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000002 | SQL_RC_INSERT_SINGLE_ROWID.0);
-pub const SQL_RC_INSERT_MULTIPLE_ROWID: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000004 | SQL_RC_INSERT_SINGLE_ROWID.0);
-pub const SQL_RC_INSERT_MULTIPLE_ANY: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000008 | SQL_RC_INSERT_MULTIPLE_ROWID.0 | SQL_RC_INSERT_SINGLE_ANY.0);
-pub const SQL_RC_INSERT_SELECT_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000010);
-pub const SQL_RC_INSERT_SELECT_ANY: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000020 | SQL_RC_INSERT_SELECT_ROWID.0);
-pub const SQL_RC_UPDATE_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000040);
-pub const SQL_RC_UPDATE_ANY: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000080 | SQL_RC_UPDATE_ROWID.0);
-pub const SQL_RC_DELETE_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000100);
-pub const SQL_RC_DELETE_ANY: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000200 | SQL_RC_DELETE_ROWID.0);
-pub const SQL_RC_SELECT_INTO_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000400);
-pub const SQL_RC_SELECT_INTO_ANY: ReturnEscapeClause =
-    ReturnEscapeClause(0x00000800 | SQL_RC_SELECT_INTO_ROWID.0);
+odbc_bitmask!(UINTEGER, pub struct ValueExpressions);
+pub const SVE_CASE: ValueExpressions = ValueExpressions(0x00000001);
+pub const SVE_CAST: ValueExpressions = ValueExpressions(0x00000002);
+pub const SVE_COALESCE: ValueExpressions = ValueExpressions(0x00000004);
+pub const SVE_NULLIF: ValueExpressions = ValueExpressions(0x00000008);
 
-#[odbc_bitmask(SQLUINTEGER)]
-pub struct FormatEscapeClause;
-pub const SQL_FC_NONE: FormatEscapeClause = FormatEscapeClause(0x00000000);
-pub const SQL_FC_JSON: FormatEscapeClause = FormatEscapeClause(0x00000001);
-pub const SQL_FC_JSON_BINARY: FormatEscapeClause = FormatEscapeClause(0x00000002);
+odbc_bitmask!(UINTEGER, pub struct StandardCliConformance);
+pub const SCC_XOPEN_CLI_VERSION1: StandardCliConformance = StandardCliConformance(0x00000001);
+pub const SCC_ISO92_CLI: StandardCliConformance = StandardCliConformance(0x00000002);
+
+odbc_bitmask!(UINTEGER, pub struct BinaryFunctions);
+pub const FN_BIN_BIT_LENGTH: BinaryFunctions = BinaryFunctions(FN_STR_BIT_LENGTH.0);
+pub const FN_BIN_CONCAT: BinaryFunctions = BinaryFunctions(FN_STR_CONCAT.0);
+pub const FN_BIN_INSERT: BinaryFunctions = BinaryFunctions(FN_STR_INSERT.0);
+pub const FN_BIN_LTRIM: BinaryFunctions = BinaryFunctions(FN_STR_LTRIM.0);
+pub const FN_BIN_OCTET_LENGTH: BinaryFunctions = BinaryFunctions(FN_STR_OCTET_LENGTH.0);
+pub const FN_BIN_POSITION: BinaryFunctions = BinaryFunctions(FN_STR_POSITION.0);
+pub const FN_BIN_RTRIM: BinaryFunctions = BinaryFunctions(FN_STR_RTRIM.0);
+pub const FN_BIN_SUBSTRING: BinaryFunctions = BinaryFunctions(FN_STR_SUBSTRING.0);
+
+odbc_bitmask!(UINTEGER, pub struct IsoBinaryFunctions);
+pub const SBF_CONVERT: IsoBinaryFunctions = IsoBinaryFunctions(SSF_CONVERT.0);
+pub const SBF_SUBSTRING: IsoBinaryFunctions = IsoBinaryFunctions(SSF_SUBSTRING.0);
+pub const SBF_TRIM_BOTH: IsoBinaryFunctions = IsoBinaryFunctions(SSF_TRIM_BOTH.0);
+pub const SBF_TRIM_LEADING: IsoBinaryFunctions = IsoBinaryFunctions(SSF_TRIM_LEADING.0);
+pub const SBF_TRIM_TRAILING: IsoBinaryFunctions = IsoBinaryFunctions(SSF_TRIM_TRAILING.0);
+pub const SBF_OVERLAY: IsoBinaryFunctions = IsoBinaryFunctions(SSF_OVERLAY.0);
+pub const SBF_POSITION: IsoBinaryFunctions = IsoBinaryFunctions(SSF_POSITION.0);
+pub const SBF_CONCAT: IsoBinaryFunctions = IsoBinaryFunctions(SSF_CONCAT.0);
+
+odbc_bitmask!(UINTEGER, pub struct LimitEscapeClause);
+pub const LC_NONE: LimitEscapeClause = LimitEscapeClause(0x00000000);
+pub const LC_TAKE: LimitEscapeClause = LimitEscapeClause(0x00000001);
+pub const LC_SKIP: LimitEscapeClause = LimitEscapeClause(0x00000003);
+
+odbc_bitmask!(UINTEGER, pub struct ReturnEscapeClause);
+pub const RC_NONE: ReturnEscapeClause = ReturnEscapeClause(0x00000000);
+pub const RC_INSERT_SINGLE_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000001);
+pub const RC_INSERT_SINGLE_ANY: ReturnEscapeClause =
+    ReturnEscapeClause(0x00000002 | RC_INSERT_SINGLE_ROWID.0);
+pub const RC_INSERT_MULTIPLE_ROWID: ReturnEscapeClause =
+    ReturnEscapeClause(0x00000004 | RC_INSERT_SINGLE_ROWID.0);
+pub const RC_INSERT_MULTIPLE_ANY: ReturnEscapeClause =
+    ReturnEscapeClause(0x00000008 | RC_INSERT_MULTIPLE_ROWID.0 | RC_INSERT_SINGLE_ANY.0);
+pub const RC_INSERT_SELECT_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000010);
+pub const RC_INSERT_SELECT_ANY: ReturnEscapeClause =
+    ReturnEscapeClause(0x00000020 | RC_INSERT_SELECT_ROWID.0);
+pub const RC_UPDATE_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000040);
+pub const RC_UPDATE_ANY: ReturnEscapeClause = ReturnEscapeClause(0x00000080 | RC_UPDATE_ROWID.0);
+pub const RC_DELETE_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000100);
+pub const RC_DELETE_ANY: ReturnEscapeClause = ReturnEscapeClause(0x00000200 | RC_DELETE_ROWID.0);
+pub const RC_SELECT_INTO_ROWID: ReturnEscapeClause = ReturnEscapeClause(0x00000400);
+pub const RC_SELECT_INTO_ANY: ReturnEscapeClause =
+    ReturnEscapeClause(0x00000800 | RC_SELECT_INTO_ROWID.0);
+
+odbc_bitmask!(UINTEGER, pub struct FormatEscapeClause);
+pub const FC_NONE: FormatEscapeClause = FormatEscapeClause(0x00000000);
+pub const FC_JSON: FormatEscapeClause = FormatEscapeClause(0x00000001);
+pub const FC_JSON_BINARY: FormatEscapeClause = FormatEscapeClause(0x00000002);

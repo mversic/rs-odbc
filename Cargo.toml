@@ -7,14 +7,17 @@ repository="https://github.com/mversic/rs-odbc"
 license = "Apache-2.0"
 edition = "2024"
 
+[dependencies]
+rust-spec = "0.1.0"
+co3 = "0.1.0"
+
+mockall_double = "0.3.1"
+sealed = "0.7.0"
+
 [dev-dependencies]
 trybuild = "1.0.114"
 mockall = "0.14.0"
 # TODO: use miri eventually
-
-[dependencies]
-rs-odbc_derive = "0.1.0"
-mockall_double = "0.3.1"
 
 [features]
 default = ["std"]

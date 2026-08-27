@@ -1,0 +1,9 @@
+Still intentionally unresolved:
+
+  - The SQLULEN staging workaround for connection integer getters, which you explicitly deferred.
+  - Pointer and descriptor-handle attributes whose aliasing/lifetimes require a deliberate API design.
+  - Runtime state restrictions such as “before connection,” “no open transaction,” and “not after statement preparation.”
+  - ATTR_SAMPLE_SIZE, because it appears in the ODBC 4 header but lacks sufficiently clear semantics in the accompanying specification.
+  - cargo check --all-targets still hits the pre-existing co3 UnsafeCell<OdbcStr<_>> encoding failure in read_from_table; that is unrelated to these attribute changes.
+
+

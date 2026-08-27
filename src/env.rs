@@ -1,151 +1,142 @@
-use crate::attr::{Attr, AttrGet, AttrLen, AttrSet};
-use crate::str::{OdbcChar, OdbcStr};
-use crate::{Ident, OdbcDefined, SQLCHAR, SQLINTEGER, SQLUINTEGER, SQLWCHAR, Scalar};
-use core::mem::MaybeUninit;
-use rs_odbc_derive::{Ident, odbc_type};
+use co3::ReprC;
+use rust_spec::RustSpec;
 
-pub trait EnvAttr<A: Ident, V: OdbcVersion>:
-    Attr<A, DefinedBy = OdbcDefined> + AttrLen<OdbcDefined, SQLINTEGER>
-{
-}
+use crate::{Defined, OdbcDefined, attr::*};
 
-// Implement EnvAttr for all versions of environment attributes
-impl<A: Ident, T: Scalar> EnvAttr<A, SQL_OV_ODBC3_80> for T where
-    T: EnvAttr<A, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
-{
-}
-impl<A: Ident, T: Scalar> EnvAttr<A, SQL_OV_ODBC4> for T where
-    T: EnvAttr<A, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
-{
-}
-impl<A: Ident, T: Scalar> EnvAttr<A, SQL_OV_ODBC3_80> for [T] where
-    [T]: EnvAttr<A, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
-{
-}
-impl<A: Ident, T: Scalar> EnvAttr<A, SQL_OV_ODBC4> for [T] where
-    [T]: EnvAttr<A, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
-{
-}
-impl<A: Ident, CH: OdbcChar> EnvAttr<A, SQL_OV_ODBC3_80> for OdbcStr<CH> where
-    OdbcStr<CH>: EnvAttr<A, <SQL_OV_ODBC3_80 as OdbcVersion>::PrevVersion>
-{
-}
-impl<A: Ident, CH: OdbcChar> EnvAttr<A, SQL_OV_ODBC4> for OdbcStr<CH> where
-    OdbcStr<CH>: EnvAttr<A, <SQL_OV_ODBC4 as OdbcVersion>::PrevVersion>
-{
+/// Marks an environment attribute whose value can be retrieved.
+///
+/// # Safety
+/// `Buffer` must have the representation and initialization requirements prescribed by ODBC.
+#[sealed::sealed]
+pub unsafe trait EnvAttrGet<V: OdbcVersion>: Defined<By = OdbcDefined> {
+    type Buffer<C: crate::str::OdbcChar>: ?Sized;
 }
 
-// Implement EnvAttr for uninitialized environment attributes
-impl<A: Ident, T: Scalar, V: OdbcVersion> EnvAttr<A, V> for MaybeUninit<T>
-where
-    T: EnvAttr<A, V> + AttrGet<A>,
-    Self: AttrLen<OdbcDefined, SQLINTEGER>,
-{
-}
-impl<A: Ident, T: Scalar, V: OdbcVersion> EnvAttr<A, V> for [MaybeUninit<T>]
-where
-    [T]: EnvAttr<A, V> + AttrGet<A>,
-    Self: AttrLen<OdbcDefined, SQLINTEGER>,
-{
-}
-impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for OdbcStr<MaybeUninit<SQLCHAR>> where
-    OdbcStr<SQLCHAR>: EnvAttr<A, V> + AttrGet<A>
-{
-}
-impl<A: Ident, V: OdbcVersion> EnvAttr<A, V> for OdbcStr<MaybeUninit<SQLWCHAR>> where
-    OdbcStr<SQLWCHAR>: EnvAttr<A, V> + AttrGet<A>
-{
+/// Marks an environment attribute whose value can be supplied.
+///
+/// # Safety
+/// `Value` must lower to the representation prescribed by ODBC.
+#[sealed::sealed]
+pub unsafe trait EnvAttrSet<V: OdbcVersion>: Defined<By = OdbcDefined> {
+    type Value<'a, C: crate::str::OdbcChar + 'a>;
 }
 
-// Implement EnvAttr for references to unsized (used by AttrSet)
-impl<A: Ident, T: Scalar, V: OdbcVersion> EnvAttr<A, V> for &[T]
-where
-    [T]: EnvAttr<A, V>,
-    Self: AttrSet<A>,
-{
+macro_rules! inherit_env_attr {
+    (get $from:ty => $to:ty) => {
+        #[sealed::sealed]
+        unsafe impl<T: EnvAttrGet<$from>> EnvAttrGet<$to> for T {
+            type Buffer<C: crate::str::OdbcChar> = <T as EnvAttrGet<$from>>::Buffer<C>;
+        }
+    };
+    (set $from:ty => $to:ty) => {
+        #[sealed::sealed]
+        unsafe impl<T: EnvAttrSet<$from>> EnvAttrSet<$to> for T {
+            type Value<'a, C: crate::str::OdbcChar + 'a> = <T as EnvAttrSet<$from>>::Value<'a, C>;
+        }
+    };
 }
-impl<A: Ident, CH: OdbcChar, V: OdbcVersion> EnvAttr<A, V> for &OdbcStr<CH>
-where
-    OdbcStr<CH>: EnvAttr<A, V>,
-    Self: AttrSet<A>,
-{
+
+inherit_env_attr!(get OV_ODBC3 => OV_ODBC3_80);
+inherit_env_attr!(get OV_ODBC3_80 => OV_ODBC4);
+inherit_env_attr!(set OV_ODBC3 => OV_ODBC3_80);
+inherit_env_attr!(set OV_ODBC3_80 => OV_ODBC4);
+
+#[derive(RustSpec, ReprC)]
+#[reprC(identity)]
+#[repr(transparent)]
+pub(crate) struct VersionValue(pub(crate) u32);
+
+impl_attr!(Env, set, OV_ODBC3, ODBC_VERSION => VersionValue);
+impl_attr!(Env, get set, OV_ODBC3, CP_MATCH => CpMatch);
+impl_attr!(Env, get set, OV_ODBC3_80, CONNECTION_POOLING => ConnectionPooling);
+
+macro_rules! impl_env_scalar_attr_unpack {
+    ($($value:ty => $repr:ty),+ $(,)?) => {$(
+        impl co3::slice::Unpack2<
+            <$crate::data::POINTER as co3::ExternC>::CType,
+            $crate::data::INTEGER,
+        > for $value {
+            type Error = core::convert::Infallible;
+
+            fn unpack(value: Self::CType) -> Result<(
+                <$crate::data::POINTER as co3::ExternC>::CType,
+                $crate::data::INTEGER,
+            ), Self::Error> {
+                const {
+                    assert!(core::mem::size_of::<<$value as co3::ExternC>::CType>()
+                        == core::mem::size_of::<$repr>());
+                }
+                let value: $repr = unsafe { core::mem::transmute_copy(&value) };
+                Ok((co3::encode($crate::data::POINTER::from(value)), $crate::data::INTEGER::new(0)))
+            }
+        }
+    )+};
 }
+
+impl_env_scalar_attr_unpack!(
+    VersionValue => u32,
+    CpMatch => u32,
+    ConnectionPooling => u32,
+);
 
 //=====================================================================================//
 //-------------------------------------Attributes--------------------------------------//
 
 // TODO: Consider using const generics for OdbcVersion once it's available on stable,
 // otherwise don't expose this attribute unless there is a valid use-case
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 200)]
-#[expect(non_camel_case_types)]
-// This is read-only attribute because
-// it's handled by the type system
-pub(crate) struct SQL_ATTR_ODBC_VERSION;
-//unsafe impl Attr<SQL_ATTR_ODBC_VERSION> for OdbcVersion {
-//    type DefinedBy = OdbcDefined;
-//}
-//impl EnvAttr<SQL_ATTR_ODBC_VERSION, SQL_OV_ODBC3> for OdbcVersion {}
-//unsafe impl AttrGet<SQL_ATTR_ODBC_VERSION> for OdbcVersion {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 202)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ATTR_CP_MATCH;
-unsafe impl Attr<SQL_ATTR_CP_MATCH> for CpMatch {
-    type DefinedBy = OdbcDefined;
-}
-impl EnvAttr<SQL_ATTR_CP_MATCH, SQL_OV_ODBC3> for CpMatch {}
-unsafe impl AttrGet<SQL_ATTR_CP_MATCH> for CpMatch {}
-unsafe impl AttrSet<SQL_ATTR_CP_MATCH> for CpMatch {}
-
-#[derive(Ident)]
-#[identifier(SQLINTEGER, 201)]
-#[expect(non_camel_case_types)]
-pub struct SQL_ATTR_CONNECTION_POOLING;
-unsafe impl Attr<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {
-    type DefinedBy = OdbcDefined;
-}
-impl EnvAttr<SQL_ATTR_CONNECTION_POOLING, SQL_OV_ODBC3_80> for ConnectionPooling {}
-unsafe impl AttrGet<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {}
-unsafe impl AttrSet<SQL_ATTR_CONNECTION_POOLING> for ConnectionPooling {}
-
 //=====================================================================================//
 
+#[sealed::sealed]
 pub trait OdbcVersion {
-    type PrevVersion: OdbcVersion;
-    const IDENTIFIER: SQLUINTEGER;
+    const ID: u32;
 }
 #[derive(Debug)]
 #[expect(non_camel_case_types)]
-pub enum SQL_OV_ODBC3 {}
-impl OdbcVersion for SQL_OV_ODBC3 {
-    type PrevVersion = SQL_OV_ODBC3;
-    const IDENTIFIER: SQLUINTEGER = 3;
+pub enum OV_ODBC3 {}
+#[sealed::sealed]
+impl OdbcVersion for OV_ODBC3 {
+    const ID: u32 = 3;
 }
 #[derive(Debug)]
 #[expect(non_camel_case_types)]
-pub enum SQL_OV_ODBC3_80 {}
-impl OdbcVersion for SQL_OV_ODBC3_80 {
-    type PrevVersion = SQL_OV_ODBC3;
-    const IDENTIFIER: SQLUINTEGER = 380;
+pub enum OV_ODBC3_80 {}
+#[sealed::sealed]
+impl OdbcVersion for OV_ODBC3_80 {
+    const ID: u32 = 380;
 }
 #[derive(Debug)]
 #[expect(non_camel_case_types)]
-pub enum SQL_OV_ODBC4 {}
-impl OdbcVersion for SQL_OV_ODBC4 {
-    type PrevVersion = SQL_OV_ODBC3_80;
-    const IDENTIFIER: SQLUINTEGER = 400;
+pub enum OV_ODBC4 {}
+#[sealed::sealed]
+impl OdbcVersion for OV_ODBC4 {
+    const ID: u32 = 400;
 }
 
-#[odbc_type(SQLUINTEGER)]
-pub struct CpMatch;
-pub const SQL_CP_STRICT_MATCH: CpMatch = CpMatch(0);
-pub const SQL_CP_RELAXED_MATCH: CpMatch = CpMatch(1);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, rust_spec::RustSpec, co3::ReprC)]
+#[expect(non_camel_case_types)]
+#[repr(u32)]
+pub enum CpMatch {
+    CP_STRICT_MATCH,
+    CP_RELAXED_MATCH,
+}
 
-#[odbc_type(SQLUINTEGER)]
-pub struct ConnectionPooling;
-pub const SQL_CP_OFF: ConnectionPooling = ConnectionPooling(0);
-pub const SQL_CP_ONE_PER_DRIVER: ConnectionPooling = ConnectionPooling(1);
-pub const SQL_CP_ONE_PER_HENV: ConnectionPooling = ConnectionPooling(2);
-pub const SQL_CP_DRIVER_AWARE: ConnectionPooling = ConnectionPooling(3);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, rust_spec::RustSpec, co3::ReprC)]
+#[expect(non_camel_case_types)]
+#[repr(u32)]
+pub enum ConnectionPooling {
+    CP_OFF,
+    CP_ONE_PER_DRIVER,
+    CP_ONE_PER_HENV,
+    CP_DRIVER_AWARE,
+}
+
+/// Selects where `SQLDataSources` starts or continues enumerating data sources.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, rust_spec::RustSpec, co3::ReprC)]
+#[expect(non_camel_case_types)]
+#[repr(u16)]
+pub enum DataSourceDirection {
+    FETCH_NEXT = 1,
+    FETCH_FIRST = 2,
+    FETCH_FIRST_USER = 31,
+    FETCH_FIRST_SYSTEM = 32,
+}

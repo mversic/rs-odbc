@@ -1,12 +1,12 @@
 error[E0505]: cannot move out of `val` because it is borrowed
-  --> tests/ui_fail/bind_col.rs:38:10
+  --> tests/ui_fail/bind_col.rs:29:10
    |
-35 |     let val = UnsafeCell::new(12i32);
+26 |     let val = UnsafeCell::new(MaybeUninit::new(12i32));
    |         --- binding `val` declared here
-36 |     stmt.SQLBindCol(1, SQL_C_SLONG, Some(&val), None);
-   |                                          ---- borrow of `val` occurs here
-37 |
-38 |     drop(val);
+27 |     stmt.bind_col::<c_type::SLONG>(1, Some(&val), None);
+   |                                            ---- borrow of `val` occurs here
+28 |
+29 |     drop(val);
    |          ^^^ move out of `val` occurs here
-39 |     stmt.SQLFreeHandle();
-   |     ---- borrow later used here
+30 |     drop(stmt);
+   |          ---- borrow later used here

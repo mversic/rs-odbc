@@ -47,12 +47,11 @@ should provide both `libodbc.a` and `libltdl.a` under this path. **Static linkin
 
 # API differences
 
-1. ODBC functions are implemented as methods or associated functions on handles. Therefore,
-providing handle identifier(e.g. `SQL_HANDLE_STMT`) as an argument becomes unnecessary
+1. ODBC functions are implemented as methods or associated functions on handles:
 
 <table>
 <tr>
-<th>C ODBC eample</th>
+<th>C ODBC example</th>
 <th>Rust ODBC example</th>
 </tr>
 <tr>
@@ -76,27 +75,27 @@ if (SQL_SUCCEEDED(ret1)) {
 <td>
 
 ```rust
-let (hstmt, ret1) = SQLHSTMT::SQLAllocHandle(&hdbc);
-if SQL_SUCCEEDED(ret1) {
-    let hstmt = hstmt.unwrap();
-    let ret2 = hstmt.SQLCancelHandle();
-}
+use rs_odbc::handle::HSTMT;
+
+let hstmt = HSTMT::alloc_handle(&hdbc).unwrap();
+let ret = hstmt.cancel_handle();
 ```
 
 </td>
 </tr>
 </table>
 
-2. Most of the ODBC handle methods return `SQLRETURN` as per standard, but some will return a tuple
-`(Result<<succ_handle_type>, <err_handle_type>>, SQLRETURN)`(e.g. SQLDriverConnect). Returning
-handles makes it possible to implement the ODBC state transition FSM inside the Rust's type system
+2. Most ODBC handle methods return `sqlreturn::RETURN`, as specified by ODBC. Operations that
+change a handle's state return a dedicated outcome enum containing the correctly typed handle
+(for example, `DriverConnectResult`). Returning handles makes it possible to implement the ODBC
+state transition FSM in Rust's type system.
 
 3. ODBC functions which take pointer and it's length take reference to a slice instead. Slice references
 prevent the possibility of the application writer to write/read past the end of the allocation unit.
 
 <table>
 <tr>
-<th>C ODBC eample</th>
+<th>C ODBC example</th>
 <th>Rust ODBC example</th>
 </tr>
 <tr>
@@ -115,11 +114,10 @@ int ret = SQLSetConnAttr(
 <td>
 
 ```rust
+use rs_odbc::{attr::CURRENT_CATALOG, data::CHAR};
+
 let catalog_name = "rs_odbc";
-let ret = hdbc.SQLSetConnAttr(
-    SQL_ATTR_CURRENT_CATALOG,
-    catalog_name.as_ref()
-);
+let ret = hdbc.set_attr::<CURRENT_CATALOG, CHAR>(catalog_name.as_ref());
 ```
 
 </td>
@@ -131,7 +129,7 @@ should be the first step in your ODBC application but in Rust it is handled by t
 
 <table>
 <tr>
-<th>C ODBC eample</th>
+<th>C ODBC example</th>
 <th>Rust ODBC example</th>
 </tr>
 <tr>
@@ -157,10 +155,9 @@ if (SQL_SUCCEEDED(ret1)) {
 <td>
 
 ```rust
-let (env, ret1) = SQLHENV::SQLAllocHandle(&SQL_NULL_HANDLE);
-if (SQL_SUCCEEDED(ret1)) {
-    let env: SQLHENV<SQL_OV_ODBC3_80> = env.unwrap();
-}
+use rs_odbc::{env::OV_ODBC3_80, handle::HENV};
+
+let env = HENV::<OV_ODBC3_80>::alloc_handle().unwrap();
 ```
 
 </td>
@@ -171,52 +168,11 @@ if (SQL_SUCCEEDED(ret1)) {
 
 # Uninitialized variables
 
-When using ODBC functions(such as `SQLGetEnvAttr`) that take mutable references which are written to, but are never read from
-by the driver or the DM, it is unnecessary to initialize those variables since they will be initialized during the call to the
-ODBC function in question. To circumvent the unnecessary initialization, many of the ODBC functions exposed through Rust allow
-for the usage of both initialized and uninitialized variables (via `MaybeUninit`).
-
-```rust
-use core::mem::MaybeUninit;
-use rs_odbc::api::Allocate;
-use rs_odbc::env::{self, SQL_ATTR_CONNECTION_POOLING, SQL_OV_ODBC3_80};
-use rs_odbc::handle::{SQLHENV, SQL_NULL_HANDLE};
-
-fn main() {
-  let mut value = env::SQL_CP_ONE_PER_HENV;     // Initialized to default value
-  let _ = SQL_NULL_HANDLE.SQLSetEnvAttr(SQL_ATTR_CONNECTION_POOLING, Some(&mut value), None);
-
-  let (env, _) = SQLHENV::SQLAllocHandle(&SQL_NULL_HANDLE);
-  let env: SQLHENV<SQL_OV_ODBC3_80> = env.unwrap();
-
-  let _ = env.SQLGetEnvAttr(SQL_ATTR_CONNECTION_POOLING, Some(&mut value), None);
-
-  // Confirm value was modified by the driver
-  assert_ne!(env::SQL_CP_ONE_PER_HENV, value);
-
-  let mut value = MaybeUninit::uninit();        // Variable is uninitialized
-  let _ = env.SQLGetEnvAttr(SQL_ATTR_CONNECTION_POOLING, Some(&mut value), None);
-
-  // Value initialized by the driver
-  match unsafe { value.assume_init() } {
-      env::SQL_CP_ONE_PER_DRIVER => println!("SQL_CP_ONE_PER_DRIVER"),
-      env::SQL_CP_ONE_PER_HENV => println!("SQL_CP_ONE_PER_HENV"),
-      env::SQL_CP_DRIVER_AWARE => println!("SQL_CP_DRIVER_AWARE"),
-      env::SQL_CP_OFF => println!("SQL_CP_OFF"),
-
-      _ => panic!("Driver returned unknown value"),
-  }
-}
-```
-
-The **use of uninitialized variables is highly discouraged** because their use is usually a micro optimization that will have no measurable
-effect on the performance of your code and introduce a potential for unexpected UB if not careful(such as partially initialized variables).
-If some ODBC function is only able to receive uninitialized arguments, **users are encouraged to use `MaybeUninit::new` or `MaybeUninit::zeroed`**
-to minimize the risk of UB.
+When a sensible fallback exists, prefer `MaybeUninit::new(value)` so as to avoid the UB.
 
 # Thread safety
 
-**All handles are `Send`**, however, at the moment, **only `SQLHENV` is `Sync`** since sharing references to other handles across threads is considered to be an anti-pattern.
+Environment handles are `Send + Sync`, and connection handles are `Send` but not `Sync`. Statement and descriptor handles must remain on the thread where they are used.
 Obviously, to cancel a function running on a connection or statement handle on another thread one must be able to share a handle reference across threads.
 Since the operation of **canceling is defined by the ODBC standard to always be a thread safe operation**, for this specific scenario, from your original handle,
 you can derive a handle that implements the `Sync` trait such as `WeakSQLHSTMT` or `RefSQLHSTMT`. Handles prefixed with `Ref` are allocated from a reference
