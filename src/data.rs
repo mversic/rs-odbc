@@ -8,7 +8,7 @@ use rust_spec::RustSpec;
 macro_rules! odbc_integer {
     ($name:ident, $rust:ty) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, RustSpec, ReprC)]
-        #[reprC(identity)]
+        #[repr_c(identity)]
         #[repr(transparent)]
         pub struct $name($rust);
 
@@ -67,7 +67,7 @@ impl TryFrom<usize> for INTEGER {
 macro_rules! odbc_float {
     ($name:ident, $rust:ty) => {
         #[derive(Debug, Clone, Copy, PartialEq, RustSpec, ReprC)]
-        #[reprC(identity)]
+        #[repr_c(identity)]
         #[repr(transparent)]
         pub struct $name($rust);
 
@@ -112,7 +112,7 @@ pub type SETPOSIROW = u64;
 // TODO: Is this type required?
 //type UWORD = u16;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
-#[reprC(identity)]
+#[repr_c(identity)]
 #[repr(transparent)]
 pub struct POINTER(*mut c_void);
 

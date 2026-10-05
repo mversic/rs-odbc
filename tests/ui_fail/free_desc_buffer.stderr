@@ -1,7 +1,7 @@
 error[E0505]: cannot move out of `octet_length` because it is borrowed
   --> tests/ui_fail/free_desc_buffer.rs:29:10
    |
-25 |     let octet_length = UnsafeCell::new(MaybeUninit::<isize>::uninit());
+25 |     let octet_length = UnsafeCell::new(MaybeUninit::new(isize::default()));
    |         ------------ binding `octet_length` declared here
 26 |
 27 |     desc.set_desc_field::<OCTET_LENGTH_PTR, u8>(1, Some(&octet_length));

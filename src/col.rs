@@ -23,7 +23,7 @@ pub unsafe trait ColAttrGet<V: OdbcVersion>: Defined {
 /// Its private field prevents safe callers from constructing a value for that channel.
 #[doc(hidden)]
 #[derive(RustSpec, ReprC)]
-#[reprC(identity)]
+#[repr_c(identity)]
 #[repr(transparent)]
 pub struct Unavailable<T>(T);
 

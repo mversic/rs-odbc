@@ -1,6 +1,6 @@
 use core::{cell::UnsafeCell, marker::PhantomData, mem::MaybeUninit};
 
-use co3::{ExternC, ReprC, slice::Unpack2};
+use co3::{ReprC, slice::Unpack2};
 use rust_spec::RustSpec;
 
 use crate::{
@@ -254,7 +254,7 @@ macro_rules! inherit_attr {
 pub(crate) use inherit_attr;
 
 #[derive(RustSpec, ReprC)]
-#[reprC(identity)]
+#[repr_c(identity)]
 #[repr(transparent)]
 pub struct AttrLen<D: Definition, L>(L, PhantomData<fn() -> D>);
 
@@ -290,7 +290,7 @@ pub enum AttrLenError {
 macro_rules! impl_string_attr_unpack {
     ($defined_by:ty, $character:ty, $length:ty) => {
         impl<'a>
-            Unpack2<<POINTER as ExternC>::CType, <AttrLen<$defined_by, $length> as ExternC>::CType>
+            Unpack2<<POINTER as ReprC>::CType, <AttrLen<$defined_by, $length> as ReprC>::CType>
             for &'a OdbcStr<$character>
         {
             type Error = AttrLenError;
@@ -299,8 +299,8 @@ macro_rules! impl_string_attr_unpack {
                 value: Self::CType,
             ) -> Result<
                 (
-                    <POINTER as ExternC>::CType,
-                    <AttrLen<$defined_by, $length> as ExternC>::CType,
+                    <POINTER as ReprC>::CType,
+                    <AttrLen<$defined_by, $length> as ReprC>::CType,
                 ),
                 Self::Error,
             > {
@@ -318,7 +318,7 @@ macro_rules! impl_string_attr_unpack {
         }
 
         impl<'a>
-            Unpack2<<POINTER as ExternC>::CType, <AttrLen<$defined_by, $length> as ExternC>::CType>
+            Unpack2<<POINTER as ReprC>::CType, <AttrLen<$defined_by, $length> as ReprC>::CType>
             for &'a mut OdbcStr<MaybeUninit<$character>>
         {
             type Error = AttrLenError;
@@ -327,8 +327,8 @@ macro_rules! impl_string_attr_unpack {
                 value: Self::CType,
             ) -> Result<
                 (
-                    <POINTER as ExternC>::CType,
-                    <AttrLen<$defined_by, $length> as ExternC>::CType,
+                    <POINTER as ReprC>::CType,
+                    <AttrLen<$defined_by, $length> as ReprC>::CType,
                 ),
                 Self::Error,
             > {
@@ -362,7 +362,7 @@ impl_string_attr_unpack!(DriverDefined, WCHAR, i16);
 macro_rules! impl_odbc_binary_attr_unpack {
     ($length:ty) => {
         impl<'a>
-            Unpack2<<POINTER as ExternC>::CType, <AttrLen<OdbcDefined, $length> as ExternC>::CType>
+            Unpack2<<POINTER as ReprC>::CType, <AttrLen<OdbcDefined, $length> as ReprC>::CType>
             for &'a [u8]
         {
             type Error = AttrLenError;
@@ -371,8 +371,8 @@ macro_rules! impl_odbc_binary_attr_unpack {
                 value: Self::CType,
             ) -> Result<
                 (
-                    <POINTER as ExternC>::CType,
-                    <AttrLen<OdbcDefined, $length> as ExternC>::CType,
+                    <POINTER as ReprC>::CType,
+                    <AttrLen<OdbcDefined, $length> as ReprC>::CType,
                 ),
                 Self::Error,
             > {
@@ -386,7 +386,7 @@ macro_rules! impl_odbc_binary_attr_unpack {
         }
 
         impl<'a>
-            Unpack2<<POINTER as ExternC>::CType, <AttrLen<OdbcDefined, $length> as ExternC>::CType>
+            Unpack2<<POINTER as ReprC>::CType, <AttrLen<OdbcDefined, $length> as ReprC>::CType>
             for &'a mut [MaybeUninit<u8>]
         {
             type Error = AttrLenError;
@@ -395,8 +395,8 @@ macro_rules! impl_odbc_binary_attr_unpack {
                 value: Self::CType,
             ) -> Result<
                 (
-                    <POINTER as ExternC>::CType,
-                    <AttrLen<OdbcDefined, $length> as ExternC>::CType,
+                    <POINTER as ReprC>::CType,
+                    <AttrLen<OdbcDefined, $length> as ReprC>::CType,
                 ),
                 Self::Error,
             > {
@@ -417,8 +417,8 @@ macro_rules! impl_driver_binary_attr_unpack {
     ($length:ty) => {
         impl<'a>
             Unpack2<
-                <POINTER as ExternC>::CType,
-                <AttrLen<DriverDefined, $length> as ExternC>::CType,
+                <POINTER as ReprC>::CType,
+                <AttrLen<DriverDefined, $length> as ReprC>::CType,
             > for &'a [u8]
         {
             type Error = AttrLenError;
@@ -427,8 +427,8 @@ macro_rules! impl_driver_binary_attr_unpack {
                 value: Self::CType,
             ) -> Result<
                 (
-                    <POINTER as ExternC>::CType,
-                    <AttrLen<DriverDefined, $length> as ExternC>::CType,
+                    <POINTER as ReprC>::CType,
+                    <AttrLen<DriverDefined, $length> as ReprC>::CType,
                 ),
                 Self::Error,
             > {
@@ -448,8 +448,8 @@ macro_rules! impl_driver_binary_attr_unpack {
 
         impl<'a>
             Unpack2<
-                <POINTER as ExternC>::CType,
-                <AttrLen<DriverDefined, $length> as ExternC>::CType,
+                <POINTER as ReprC>::CType,
+                <AttrLen<DriverDefined, $length> as ReprC>::CType,
             > for &'a mut [MaybeUninit<u8>]
         {
             type Error = AttrLenError;
@@ -458,8 +458,8 @@ macro_rules! impl_driver_binary_attr_unpack {
                 value: Self::CType,
             ) -> Result<
                 (
-                    <POINTER as ExternC>::CType,
-                    <AttrLen<DriverDefined, $length> as ExternC>::CType,
+                    <POINTER as ReprC>::CType,
+                    <AttrLen<DriverDefined, $length> as ReprC>::CType,
                 ),
                 Self::Error,
             > {
@@ -489,10 +489,10 @@ impl_driver_binary_attr_unpack!(i16);
 macro_rules! impl_scalar_output_attr_unpack {
     ($length:ty) => {
         impl<'a, T>
-            Unpack2<<POINTER as ExternC>::CType, <AttrLen<OdbcDefined, $length> as ExternC>::CType>
+            Unpack2<<POINTER as ReprC>::CType, <AttrLen<OdbcDefined, $length> as ReprC>::CType>
             for &'a mut MaybeUninit<T>
         where
-            Self: ExternC<CType: Sized>,
+            Self: ReprC<CType: Sized>,
             POINTER: From<Self::CType>,
         {
             type Error = core::convert::Infallible;
@@ -501,8 +501,8 @@ macro_rules! impl_scalar_output_attr_unpack {
                 value: Self::CType,
             ) -> Result<
                 (
-                    <POINTER as ExternC>::CType,
-                    <AttrLen<OdbcDefined, $length> as ExternC>::CType,
+                    <POINTER as ReprC>::CType,
+                    <AttrLen<OdbcDefined, $length> as ReprC>::CType,
                 ),
                 Self::Error,
             > {
@@ -522,8 +522,8 @@ macro_rules! impl_driver_scalar_attr_unpack {
     ($value:ty, $marker:expr, $length:ty) => {
         impl
             Unpack2<
-                <POINTER as ExternC>::CType,
-                <AttrLen<DriverDefined, $length> as ExternC>::CType,
+                <POINTER as ReprC>::CType,
+                <AttrLen<DriverDefined, $length> as ReprC>::CType,
             > for $value
         {
             type Error = core::convert::Infallible;
@@ -532,8 +532,8 @@ macro_rules! impl_driver_scalar_attr_unpack {
                 value: Self::CType,
             ) -> Result<
                 (
-                    <POINTER as ExternC>::CType,
-                    <AttrLen<DriverDefined, $length> as ExternC>::CType,
+                    <POINTER as ReprC>::CType,
+                    <AttrLen<DriverDefined, $length> as ReprC>::CType,
                 ),
                 Self::Error,
             > {
@@ -546,8 +546,8 @@ macro_rules! impl_driver_scalar_attr_unpack {
 
         impl<'a>
             Unpack2<
-                <POINTER as ExternC>::CType,
-                <AttrLen<DriverDefined, $length> as ExternC>::CType,
+                <POINTER as ReprC>::CType,
+                <AttrLen<DriverDefined, $length> as ReprC>::CType,
             > for &'a mut MaybeUninit<$value>
         {
             type Error = core::convert::Infallible;
@@ -556,8 +556,8 @@ macro_rules! impl_driver_scalar_attr_unpack {
                 value: Self::CType,
             ) -> Result<
                 (
-                    <POINTER as ExternC>::CType,
-                    <AttrLen<DriverDefined, $length> as ExternC>::CType,
+                    <POINTER as ReprC>::CType,
+                    <AttrLen<DriverDefined, $length> as ReprC>::CType,
                 ),
                 Self::Error,
             > {
@@ -581,14 +581,14 @@ impl_driver_scalar_attr_unpack!(u16, IS_USMALLINT, i16);
 
 macro_rules! impl_info_string_pointer_unpack {
     ($character:ty) => {
-        impl<'a> Unpack2<<POINTER as ExternC>::CType, SMALLINT>
+        impl<'a> Unpack2<<POINTER as ReprC>::CType, SMALLINT>
             for &'a mut OdbcStr<MaybeUninit<$character>>
         {
             type Error = AttrLenError;
 
             fn unpack(
                 value: Self::CType,
-            ) -> Result<(<POINTER as ExternC>::CType, SMALLINT), Self::Error> {
+            ) -> Result<(<POINTER as ReprC>::CType, SMALLINT), Self::Error> {
                 let (data, elements) = <&mut [MaybeUninit<$character>] as Unpack2<
                     *mut MaybeUninit<$character>,
                     usize,
@@ -609,14 +609,14 @@ impl_info_string_pointer_unpack!(WCHAR);
 
 macro_rules! impl_bind_col_string_unpack {
     ($character:ty) => {
-        impl<'a> Unpack2<<POINTER as ExternC>::CType, <LEN as ExternC>::CType>
+        impl<'a> Unpack2<<POINTER as ReprC>::CType, <LEN as ReprC>::CType>
             for &'a UnsafeCell<OdbcStr<MaybeUninit<$character>>>
         {
             type Error = AttrLenError;
 
             fn unpack(
                 value: Self::CType,
-            ) -> Result<(<POINTER as ExternC>::CType, <LEN as ExternC>::CType), Self::Error> {
+            ) -> Result<(<POINTER as ReprC>::CType, <LEN as ReprC>::CType), Self::Error> {
                 let (data, elements) = <&UnsafeCell<OdbcStr<MaybeUninit<$character>>> as Unpack2<
                     *mut MaybeUninit<$character>,
                     usize,
@@ -638,25 +638,25 @@ macro_rules! impl_bind_col_string_unpack {
 impl_bind_col_string_unpack!(CHAR);
 impl_bind_col_string_unpack!(WCHAR);
 
-impl<T> Unpack2<<POINTER as ExternC>::CType, <LEN as ExternC>::CType>
+impl<T> Unpack2<<POINTER as ReprC>::CType, <LEN as ReprC>::CType>
     for &UnsafeCell<MaybeUninit<T>>
 where
-    Self: ExternC<CType: Sized>,
+    Self: ReprC<CType: Sized>,
     POINTER: From<Self::CType>,
 {
     type Error = core::convert::Infallible;
 
     fn unpack(
         value: Self::CType,
-    ) -> Result<(<POINTER as ExternC>::CType, <LEN as ExternC>::CType), Self::Error> {
+    ) -> Result<(<POINTER as ReprC>::CType, <LEN as ReprC>::CType), Self::Error> {
         Ok((co3::encode(POINTER::from(value)), co3::encode(LEN::new(0))))
     }
 }
 
-impl<T> Unpack2<<POINTER as ExternC>::CType, <AttrLen<OdbcDefined, i32> as ExternC>::CType>
+impl<T> Unpack2<<POINTER as ReprC>::CType, <AttrLen<OdbcDefined, i32> as ReprC>::CType>
     for &UnsafeCell<MaybeUninit<T>>
 where
-    Self: ExternC<CType: Sized>,
+    Self: ReprC<CType: Sized>,
     POINTER: From<Self::CType>,
 {
     type Error = core::convert::Infallible;
@@ -665,8 +665,8 @@ where
         value: Self::CType,
     ) -> Result<
         (
-            <POINTER as ExternC>::CType,
-            <AttrLen<OdbcDefined, i32> as ExternC>::CType,
+            <POINTER as ReprC>::CType,
+            <AttrLen<OdbcDefined, i32> as ReprC>::CType,
         ),
         Self::Error,
     > {
@@ -677,14 +677,14 @@ where
     }
 }
 
-impl<T> Unpack2<<POINTER as ExternC>::CType, SMALLINT> for &mut MaybeUninit<T>
+impl<T> Unpack2<<POINTER as ReprC>::CType, SMALLINT> for &mut MaybeUninit<T>
 where
-    Self: ExternC<CType: Sized>,
+    Self: ReprC<CType: Sized>,
     POINTER: From<Self::CType>,
 {
     type Error = core::convert::Infallible;
 
-    fn unpack(value: Self::CType) -> Result<(<POINTER as ExternC>::CType, SMALLINT), Self::Error> {
+    fn unpack(value: Self::CType) -> Result<(<POINTER as ReprC>::CType, SMALLINT), Self::Error> {
         Ok((co3::encode(POINTER::from(value)), SMALLINT::new(0)))
     }
 }
@@ -692,19 +692,19 @@ where
 macro_rules! impl_odbc_scalar_attr_unpack {
     ($($value:ty => $repr:ty),+ $(,)?) => {$(
         impl co3::slice::Unpack2<
-            <$crate::data::POINTER as co3::ExternC>::CType,
+            <$crate::data::POINTER as co3::ReprC>::CType,
             <$crate::attr::AttrLen<$crate::OdbcDefined, i32>
-                as co3::ExternC>::CType,
+                as co3::ReprC>::CType,
         > for $value {
             type Error = core::convert::Infallible;
 
             fn unpack(value: Self::CType) -> Result<(
-                <$crate::data::POINTER as co3::ExternC>::CType,
+                <$crate::data::POINTER as co3::ReprC>::CType,
                 <$crate::attr::AttrLen<$crate::OdbcDefined, i32>
-                    as co3::ExternC>::CType,
+                    as co3::ReprC>::CType,
             ), Self::Error> {
                 const {
-                    assert!(core::mem::size_of::<<$value as co3::ExternC>::CType>()
+                    assert!(core::mem::size_of::<<$value as co3::ReprC>::CType>()
                         == core::mem::size_of::<$repr>());
                 }
                 let value: $repr = unsafe { core::mem::transmute_copy(&value) };
@@ -720,14 +720,14 @@ macro_rules! impl_odbc_scalar_attr_unpack {
 }
 pub(crate) use impl_odbc_scalar_attr_unpack;
 
-impl<T> Unpack2<<POINTER as ExternC>::CType, <INTEGER as ExternC>::CType> for &mut MaybeUninit<T>
+impl<T> Unpack2<<POINTER as ReprC>::CType, <INTEGER as ReprC>::CType> for &mut MaybeUninit<T>
 where
-    Self: ExternC<CType: Sized>,
+    Self: ReprC<CType: Sized>,
     POINTER: From<Self::CType>,
 {
     type Error = core::convert::Infallible;
 
-    fn unpack(value: Self::CType) -> Result<(<POINTER as ExternC>::CType, INTEGER), Self::Error> {
+    fn unpack(value: Self::CType) -> Result<(<POINTER as ReprC>::CType, INTEGER), Self::Error> {
         Ok((co3::encode(POINTER::from(value)), INTEGER::new(0)))
     }
 }
@@ -735,16 +735,16 @@ where
 macro_rules! impl_odbc_primitive_attr_unpack {
     ($($value:ty),+ $(,)?) => {$(
         impl co3::slice::Unpack2<
-            <$crate::data::POINTER as co3::ExternC>::CType,
+            <$crate::data::POINTER as co3::ReprC>::CType,
             <$crate::attr::AttrLen<$crate::OdbcDefined, i32>
-                as co3::ExternC>::CType,
+                as co3::ReprC>::CType,
         > for $value {
             type Error = core::convert::Infallible;
 
             fn unpack(value: Self::CType) -> Result<(
-                <$crate::data::POINTER as co3::ExternC>::CType,
+                <$crate::data::POINTER as co3::ReprC>::CType,
                 <$crate::attr::AttrLen<$crate::OdbcDefined, i32>
-                    as co3::ExternC>::CType,
+                    as co3::ReprC>::CType,
             ), Self::Error> {
                 Ok((
                     co3::encode($crate::data::POINTER::from(value)),
@@ -763,10 +763,10 @@ impl_odbc_primitive_attr_unpack!(u32, usize);
 mod unpack_tests {
     use super::*;
 
-    type PointerPart = <POINTER as ExternC>::CType;
-    type OdbcIntegerLength = <AttrLen<OdbcDefined, i32> as ExternC>::CType;
-    type DriverIntegerLength = <AttrLen<DriverDefined, i32> as ExternC>::CType;
-    type DriverSmallIntLength = <AttrLen<DriverDefined, i16> as ExternC>::CType;
+    type PointerPart = <POINTER as ReprC>::CType;
+    type OdbcIntegerLength = <AttrLen<OdbcDefined, i32> as ReprC>::CType;
+    type DriverIntegerLength = <AttrLen<DriverDefined, i32> as ReprC>::CType;
+    type DriverSmallIntLength = <AttrLen<DriverDefined, i16> as ReprC>::CType;
 
     fn odbc_length(value: OdbcIntegerLength) -> i32 {
         unsafe { co3::decode::<AttrLen<OdbcDefined, i32>>(value) }

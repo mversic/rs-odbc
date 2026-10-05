@@ -51,7 +51,7 @@ macro_rules! impl_info_type {
 macro_rules! odbc_bitmask_impl {
     ($vis:vis struct $name:ident, $rust:ty) => {
         #[derive(Debug, Clone, Copy, RustSpec, ReprC)]
-        #[reprC(identity)]
+        #[repr_c(identity)]
         #[repr(transparent)]
         $vis struct $name($rust);
 
@@ -1151,7 +1151,7 @@ info_enum!(CursorSensitivity, u32, {
 });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
-#[reprC(identity)]
+#[repr_c(identity)]
 #[repr(transparent)]
 pub struct DdlIndex(pub(crate) u32);
 pub const DI_CREATE_INDEX: DdlIndex = DdlIndex(0x00000001);
@@ -1166,7 +1166,7 @@ info_enum!(TxnCapable, u16, {
 });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
-#[reprC(NICHE_VALUE = CSqlConformance(0))]
+#[repr_c(NICHE_VALUE = CSqlConformance(0))]
 #[rust_spec(with_custom_niche)]
 #[repr(transparent)]
 pub struct SqlConformance(pub(crate) u32);
@@ -1333,7 +1333,7 @@ pub const SO_MIXED: ScrollOptions = ScrollOptions(0x00000008);
 pub const SO_STATIC: ScrollOptions = ScrollOptions(0x00000010);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
-#[reprC(NICHE_VALUE = CTxnIsolation(0))]
+#[repr_c(NICHE_VALUE = CTxnIsolation(0))]
 #[rust_spec(with_custom_niche)]
 #[repr(transparent)]
 pub struct TxnIsolation(u32);

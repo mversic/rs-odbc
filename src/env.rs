@@ -42,7 +42,7 @@ inherit_env_attr!(set OV_ODBC3 => OV_ODBC3_80);
 inherit_env_attr!(set OV_ODBC3_80 => OV_ODBC4);
 
 #[derive(RustSpec, ReprC)]
-#[reprC(identity)]
+#[repr_c(identity)]
 #[repr(transparent)]
 pub(crate) struct VersionValue(pub(crate) u32);
 
@@ -53,17 +53,17 @@ impl_attr!(Env, get set, OV_ODBC3_80, CONNECTION_POOLING => ConnectionPooling);
 macro_rules! impl_env_scalar_attr_unpack {
     ($($value:ty => $repr:ty),+ $(,)?) => {$(
         impl co3::slice::Unpack2<
-            <$crate::data::POINTER as co3::ExternC>::CType,
+            <$crate::data::POINTER as co3::ReprC>::CType,
             $crate::data::INTEGER,
         > for $value {
             type Error = core::convert::Infallible;
 
             fn unpack(value: Self::CType) -> Result<(
-                <$crate::data::POINTER as co3::ExternC>::CType,
+                <$crate::data::POINTER as co3::ReprC>::CType,
                 $crate::data::INTEGER,
             ), Self::Error> {
                 const {
-                    assert!(core::mem::size_of::<<$value as co3::ExternC>::CType>()
+                    assert!(core::mem::size_of::<<$value as co3::ReprC>::CType>()
                         == core::mem::size_of::<$repr>());
                 }
                 let value: $repr = unsafe { core::mem::transmute_copy(&value) };

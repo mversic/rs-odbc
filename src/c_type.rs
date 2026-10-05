@@ -19,7 +19,7 @@ use crate::{
 /// runtime. The value is intentionally open-ended so extension identifiers
 /// remain representable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, RustSpec, ReprC)]
-#[reprC(identity)]
+#[repr_c(identity)]
 #[repr(transparent)]
 pub struct CTypeCode(i16);
 

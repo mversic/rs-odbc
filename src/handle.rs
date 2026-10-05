@@ -344,7 +344,6 @@ impl<'conn, V: OdbcVersion, DT: DescType> ToOwnedHandle for HDESC<'conn, V, DT> 
     all(not(windows), not(feature = "static")),
     link(name = "odbc", kind = "dylib")
 )]
-#[expect(clippy::duplicated_attributes)]
 unsafe extern "system" {}
 
 co3::ffi! {
@@ -389,7 +388,7 @@ co3::ffi! {
     /// # Documentation
     /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/connection-handles
     #[tag(i16, unsafe(2))]
-    #[unsafe(covariant('env))]
+    #[covariant('env)]
     pub type HDBC<'env, V: OdbcVersion = OV_ODBC3_80, C: conn::ConnState>;
 
     /// Statement handle consists of all of the information associated with a SQL statement,
@@ -415,7 +414,7 @@ co3::ffi! {
     /// # Documentation
     /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/statement-handles
     #[tag(i16, unsafe(3))]
-    #[unsafe(covariant('conn, 'desc, 'buf))]
+    #[covariant('conn, 'desc, 'buf)]
     pub type HSTMT<'conn, 'desc, 'buf, V: OdbcVersion = OV_ODBC3_80>;
 
     /// A descriptor is a collection of metadata that describes the parameters of an SQL
@@ -441,7 +440,7 @@ co3::ffi! {
     /// # Documentation
     /// https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/descriptor-handles
     #[tag(i16, unsafe(4))]
-    #[unsafe(covariant('conn))]
+    #[covariant('conn)]
     pub type HDESC<'conn, V: OdbcVersion = OV_ODBC3_80, DT: DescType>;
 
     impl<V: OdbcVersion> Drop for dyn HENV<V> {
@@ -516,7 +515,7 @@ co3::ffi! {
     //pub fn set_attr<'a, dyn(i32) A: EnvAttrSet<OV_ODBC3_80>>(
     //    attribute: <dyn A>::TAG,
     //    #[unpack(POINTER, INTEGER)]
-    //    move value: <A as EnvAttrSet<OV_ODBC3_80>>::Value<'a, CHAR>,
+    //    value: <A as EnvAttrSet<OV_ODBC3_80>>::Value<'a, CHAR>,
     //) -> RETURN
     //where
     //    use<A> @ <CONNECTION_POOLING>;
@@ -533,7 +532,7 @@ co3::ffi! {
             &mut self,
             attribute: <dyn A>::TAG,
             #[unpack(POINTER, INTEGER)]
-            move value: <A as EnvAttrSet<V>>::Value<'a, CHAR>,
+            value: move <A as EnvAttrSet<V>>::Value<'a, CHAR>,
         ) -> RETURN
         where
             use<A> @ (<ODBC_VERSION> | <CP_MATCH> | <CONNECTION_POOLING>);
@@ -565,7 +564,7 @@ co3::ffi! {
         #[symbol_name = "SQLDataSources{C}"]
         pub fn data_sources<C>(
             &self,
-            move direction: DataSourceDirection,
+            direction: move DataSourceDirection,
             #[unpack(_, SMALLINT)]
             server_name: Option<&mut OdbcStr<MaybeUninit<C>>>,
             name_length1: Option<&mut MaybeUninit<i16>>,
@@ -609,7 +608,7 @@ co3::ffi! {
             &mut self,
             attribute: <dyn A>::TAG,
             #[unpack(POINTER, AttrLen<<A as Defined>::By, i32> => INTEGER)]
-            move value: <A as ConnAttrSet<V, S>>::Value<'a, C>,
+            value: move <A as ConnAttrSet<V, S>>::Value<'a, C>,
         ) -> RETURN
         where
             use<C> @ (<CHAR> | <WCHAR>);
@@ -720,11 +719,11 @@ co3::ffi! {
         fn driver_connect<C>(
             &mut self,
             // TODO: This is a raw pointer, yet it's nullable
-            move window_handle: POINTER,
+            window_handle: move POINTER,
             #[unpack(_, SMALLINT)] in_connection_string: &OdbcStr<C>,
             #[unpack(_, SMALLINT)] out_connection_string: Option<&mut OdbcStr<MaybeUninit<C>>>,
             string_length2: Option<&mut MaybeUninit<i16>>,
-            move driver_completion: DriverCompletion,
+            driver_completion: move DriverCompletion,
         ) -> RETURN
         where
             use<C> @ (<CHAR> | <WCHAR>);
@@ -753,7 +752,7 @@ co3::ffi! {
             &mut self,
             attribute: <dyn A>::TAG,
             #[unpack(POINTER, AttrLen<<A as Defined>::By, i32> => INTEGER)]
-            move value: <A as StmtAttrSet<V>>::Value<'a, C>,
+            value: move <A as StmtAttrSet<V>>::Value<'a, C>,
         ) -> RETURN
         where
             use<C> @ (<CHAR> | <WCHAR>);
@@ -943,7 +942,7 @@ co3::ffi! {
         /// # Returns
         /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_NEED_DATA, SQL_STILL_EXECUTING, SQL_ERROR, or SQL_INVALID_HANDLE.
         #[symbol_name = "SQLBulkOperations"]
-        pub fn bulk_operations(&mut self, move operation: BulkOperation) -> RETURN;
+        pub fn bulk_operations(&mut self, operation: move BulkOperation) -> RETURN;
 
         /// Stops processing associated with a specific statement, closes any open cursors associated with the statement, discards pending results, or, optionally, frees all resources associated with the statement handle.
         ///
@@ -952,7 +951,7 @@ co3::ffi! {
         /// # Returns
         /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, or SQL_INVALID_HANDLE.
         #[symbol_name = "SQLFreeStmt"]
-        pub fn free_stmt(&mut self, move option: FreeStmtOption) -> RETURN;
+        pub fn free_stmt(&mut self, option: move FreeStmtOption) -> RETURN;
 
         //#[symbol_name = "SQLGetTypeInfo{C}"]
         //pub fn get_type_info<C>(&self, data_type: DataType) -> RETURN
@@ -1105,8 +1104,8 @@ co3::ffi! {
         pub fn set_pos(
             &mut self,
             row_number: SETPOSIROW,
-            move operation: Operation,
-            move lock_type: LockType,
+            operation: move Operation,
+            lock_type: move LockType,
         ) -> RETURN;
 
         /// Returns a list of tables and the privileges associated with each table. The driver returns the information as a result set on the specified statement.
@@ -1188,7 +1187,7 @@ co3::ffi! {
             rec_number: i16,
             field_identifier: <dyn F>::TAG,
             #[unpack(POINTER, AttrLen<<F as Defined>::By, i32> => INTEGER)]
-            move value: <F as DescFieldSet<V, DT>>::Value<C>,
+            value: move <F as DescFieldSet<V, DT>>::Value<C>,
         ) -> RETURN
         where
             use<C> @ (<CHAR> | <WCHAR>);
@@ -1267,7 +1266,7 @@ co3::ffi! {
         /// # Returns
         /// SQL_SUCCESS, SQL_SUCCESS_WITH_INFO, SQL_ERROR, SQL_INVALID_HANDLE, or SQL_STILL_EXECUTING.
         #[symbol_name = "SQLEndTran"]
-        pub fn end_tran(&mut self, move completion_type: CompletionType) -> RETURN;
+        pub fn end_tran(&mut self, completion_type: move CompletionType) -> RETURN;
     }
 
     impl<'buf, V: OdbcVersion> HSTMT<'_, '_, 'buf, V> {
@@ -1282,7 +1281,7 @@ co3::ffi! {
         pub fn bind_parameter<dyn(i16) TT: CType<V>, dyn(i16) PT: SqlType<V>>(
             &mut self,
             parameter_number: u16,
-            move input_output_type: IOType,
+            input_output_type: move IOType,
             value_type: <dyn TT>::TAG,
             parameter_type: <dyn PT>::TAG,
             column_size: usize,

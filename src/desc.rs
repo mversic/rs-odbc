@@ -322,7 +322,7 @@ pub enum AllocType {
 
 // TODO: May be i32?
 #[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
-#[reprC(identity)]
+#[repr_c(identity)]
 #[repr(transparent)]
 pub struct BindType(pub u32);
 

@@ -186,7 +186,7 @@ impl<H> DiagField<H> for SQLSTATE {
 //=====================================================================================//
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
-#[reprC(identity)]
+#[repr_c(identity)]
 #[repr(transparent)]
 pub struct DiagDynamicFunctionCode(pub(crate) i32);
 pub const ALTER_DOMAIN: DiagDynamicFunctionCode = DiagDynamicFunctionCode(3);
@@ -221,14 +221,14 @@ pub const UPDATE_WHERE: DiagDynamicFunctionCode = DiagDynamicFunctionCode(82);
 pub const UNKNOWN_STATEMENT: DiagDynamicFunctionCode = DiagDynamicFunctionCode(0);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
-#[reprC(identity)]
+#[repr_c(identity)]
 #[repr(transparent)]
 pub struct DiagColumnNumber(pub(crate) i32);
 pub const NO_COLUMN_NUMBER: DiagColumnNumber = DiagColumnNumber(-1);
 pub const COLUMN_NUMBER_UNKNOWN: DiagColumnNumber = DiagColumnNumber(-2);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
-#[reprC(identity)]
+#[repr_c(identity)]
 #[repr(transparent)]
 pub struct DiagRowNumber(pub(crate) isize);
 pub const NO_ROW_NUMBER: DiagRowNumber = DiagRowNumber(-1);

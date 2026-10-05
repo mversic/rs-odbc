@@ -9,7 +9,7 @@ use crate::env::{OV_ODBC3_80, OV_ODBC4, OdbcVersion};
 /// runtime by the driver. The value is intentionally open-ended because
 /// drivers may return implementation-defined type identifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, RustSpec, ReprC)]
-#[reprC(identity)]
+#[repr_c(identity)]
 #[repr(transparent)]
 pub struct SqlTypeCode(i16);
 
