@@ -1,7 +1,6 @@
 use core::mem::MaybeUninit;
 
-use co3::{ReprC, tag::Tagged};
-use rust_spec::RustSpec;
+use co3::{ReprC, rust_spec::RustSpec, tag::Tagged};
 
 use crate::{
     data::{

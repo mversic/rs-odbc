@@ -1,5 +1,4 @@
-use co3::ReprC;
-use rust_spec::RustSpec;
+use co3::{ReprC, rust_spec::RustSpec};
 
 use crate::{Defined, OdbcDefined, attr::*};
 
@@ -112,7 +111,7 @@ impl OdbcVersion for OV_ODBC4 {
     const ID: u32 = 400;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, rust_spec::RustSpec, co3::ReprC)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, co3::rust_spec::RustSpec, co3::ReprC)]
 #[expect(non_camel_case_types)]
 #[repr(u32)]
 pub enum CpMatch {
@@ -120,7 +119,7 @@ pub enum CpMatch {
     CP_RELAXED_MATCH,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, rust_spec::RustSpec, co3::ReprC)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, co3::rust_spec::RustSpec, co3::ReprC)]
 #[expect(non_camel_case_types)]
 #[repr(u32)]
 pub enum ConnectionPooling {
@@ -131,7 +130,7 @@ pub enum ConnectionPooling {
 }
 
 /// Selects where `SQLDataSources` starts or continues enumerating data sources.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, rust_spec::RustSpec, co3::ReprC)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, co3::rust_spec::RustSpec, co3::ReprC)]
 #[expect(non_camel_case_types)]
 #[repr(u16)]
 pub enum DataSourceDirection {

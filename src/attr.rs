@@ -1,7 +1,6 @@
 use core::{cell::UnsafeCell, marker::PhantomData, mem::MaybeUninit};
 
-use co3::{ReprC, slice::Unpack2};
-use rust_spec::RustSpec;
+use co3::{ReprC, rust_spec::RustSpec, slice::Unpack2};
 
 use crate::{
     Definition, DriverDefined, OdbcDefined,
@@ -289,8 +288,7 @@ pub enum AttrLenError {
 
 macro_rules! impl_string_attr_unpack {
     ($defined_by:ty, $character:ty, $length:ty) => {
-        impl<'a>
-            Unpack2<<POINTER as ReprC>::CType, <AttrLen<$defined_by, $length> as ReprC>::CType>
+        impl<'a> Unpack2<<POINTER as ReprC>::CType, <AttrLen<$defined_by, $length> as ReprC>::CType>
             for &'a OdbcStr<$character>
         {
             type Error = AttrLenError;
@@ -317,8 +315,7 @@ macro_rules! impl_string_attr_unpack {
             }
         }
 
-        impl<'a>
-            Unpack2<<POINTER as ReprC>::CType, <AttrLen<$defined_by, $length> as ReprC>::CType>
+        impl<'a> Unpack2<<POINTER as ReprC>::CType, <AttrLen<$defined_by, $length> as ReprC>::CType>
             for &'a mut OdbcStr<MaybeUninit<$character>>
         {
             type Error = AttrLenError;
@@ -361,8 +358,7 @@ impl_string_attr_unpack!(DriverDefined, WCHAR, i16);
 
 macro_rules! impl_odbc_binary_attr_unpack {
     ($length:ty) => {
-        impl<'a>
-            Unpack2<<POINTER as ReprC>::CType, <AttrLen<OdbcDefined, $length> as ReprC>::CType>
+        impl<'a> Unpack2<<POINTER as ReprC>::CType, <AttrLen<OdbcDefined, $length> as ReprC>::CType>
             for &'a [u8]
         {
             type Error = AttrLenError;
@@ -385,8 +381,7 @@ macro_rules! impl_odbc_binary_attr_unpack {
             }
         }
 
-        impl<'a>
-            Unpack2<<POINTER as ReprC>::CType, <AttrLen<OdbcDefined, $length> as ReprC>::CType>
+        impl<'a> Unpack2<<POINTER as ReprC>::CType, <AttrLen<OdbcDefined, $length> as ReprC>::CType>
             for &'a mut [MaybeUninit<u8>]
         {
             type Error = AttrLenError;
@@ -416,10 +411,8 @@ macro_rules! impl_odbc_binary_attr_unpack {
 macro_rules! impl_driver_binary_attr_unpack {
     ($length:ty) => {
         impl<'a>
-            Unpack2<
-                <POINTER as ReprC>::CType,
-                <AttrLen<DriverDefined, $length> as ReprC>::CType,
-            > for &'a [u8]
+            Unpack2<<POINTER as ReprC>::CType, <AttrLen<DriverDefined, $length> as ReprC>::CType>
+            for &'a [u8]
         {
             type Error = AttrLenError;
 
@@ -447,10 +440,8 @@ macro_rules! impl_driver_binary_attr_unpack {
         }
 
         impl<'a>
-            Unpack2<
-                <POINTER as ReprC>::CType,
-                <AttrLen<DriverDefined, $length> as ReprC>::CType,
-            > for &'a mut [MaybeUninit<u8>]
+            Unpack2<<POINTER as ReprC>::CType, <AttrLen<DriverDefined, $length> as ReprC>::CType>
+            for &'a mut [MaybeUninit<u8>]
         {
             type Error = AttrLenError;
 
@@ -520,11 +511,8 @@ impl_scalar_output_attr_unpack!(i16);
 
 macro_rules! impl_driver_scalar_attr_unpack {
     ($value:ty, $marker:expr, $length:ty) => {
-        impl
-            Unpack2<
-                <POINTER as ReprC>::CType,
-                <AttrLen<DriverDefined, $length> as ReprC>::CType,
-            > for $value
+        impl Unpack2<<POINTER as ReprC>::CType, <AttrLen<DriverDefined, $length> as ReprC>::CType>
+            for $value
         {
             type Error = core::convert::Infallible;
 
@@ -545,10 +533,8 @@ macro_rules! impl_driver_scalar_attr_unpack {
         }
 
         impl<'a>
-            Unpack2<
-                <POINTER as ReprC>::CType,
-                <AttrLen<DriverDefined, $length> as ReprC>::CType,
-            > for &'a mut MaybeUninit<$value>
+            Unpack2<<POINTER as ReprC>::CType, <AttrLen<DriverDefined, $length> as ReprC>::CType>
+            for &'a mut MaybeUninit<$value>
         {
             type Error = core::convert::Infallible;
 
@@ -562,7 +548,7 @@ macro_rules! impl_driver_scalar_attr_unpack {
                 Self::Error,
             > {
                 Ok((
-                    co3::encode(POINTER::from(value)),
+                    co3::encode(POINTER::from(value.as_ptr())),
                     co3::encode(AttrLen::new($marker as $length)),
                 ))
             }
@@ -638,8 +624,7 @@ macro_rules! impl_bind_col_string_unpack {
 impl_bind_col_string_unpack!(CHAR);
 impl_bind_col_string_unpack!(WCHAR);
 
-impl<T> Unpack2<<POINTER as ReprC>::CType, <LEN as ReprC>::CType>
-    for &UnsafeCell<MaybeUninit<T>>
+impl<T> Unpack2<<POINTER as ReprC>::CType, <LEN as ReprC>::CType> for &UnsafeCell<MaybeUninit<T>>
 where
     Self: ReprC<CType: Sized>,
     POINTER: From<Self::CType>,

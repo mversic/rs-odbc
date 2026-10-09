@@ -1,7 +1,6 @@
 use core::{cell::UnsafeCell, marker::PhantomData, mem::MaybeUninit};
 
-use co3::{ReprC, Tag};
-use rust_spec::RustSpec;
+use co3::{ReprC, Tag, reference::CRefMut, rust_spec::RustSpec};
 
 use crate::{
     Defined, OdbcDefined,
@@ -142,7 +141,11 @@ macro_rules! desc_fields {
     )+};
 }
 
-type RowsProcessedPtr = *mut usize;
+// Microsoft's SQLSetDescField prose calls the IPD pointer SQLUINTEGER*, but
+// its field table and the corresponding SQLSetStmtAttr attributes use SQLULEN*.
+// https://learn.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetdescfield-function
+// https://learn.microsoft.com/en-us/sql/odbc/reference/syntax/sqlsetstmtattr-function
+type RowsProcessedPtr = CRefMut<usize, false>;
 
 desc_fields! {
     ALLOC_TYPE {

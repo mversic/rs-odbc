@@ -2,8 +2,7 @@
 
 use core::mem::MaybeUninit;
 
-use co3::{ReprC, Tag};
-use rust_spec::RustSpec;
+use co3::{ReprC, Tag, rust_spec::RustSpec};
 
 use crate::{
     env::{OV_ODBC3, OV_ODBC3_80, OV_ODBC4, OdbcVersion},
@@ -1166,8 +1165,8 @@ info_enum!(TxnCapable, u16, {
 });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
-#[repr_c(NICHE_VALUE = CSqlConformance(0))]
-#[rust_spec(with_custom_niche)]
+#[repr_c(NICHE = CSqlConformance(0))]
+#[rust_spec(custom_niche)]
 #[repr(transparent)]
 pub struct SqlConformance(pub(crate) u32);
 pub const SC_SQL92_ENTRY: SqlConformance = SqlConformance(0x00000001);
@@ -1333,8 +1332,8 @@ pub const SO_MIXED: ScrollOptions = ScrollOptions(0x00000008);
 pub const SO_STATIC: ScrollOptions = ScrollOptions(0x00000010);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, RustSpec, ReprC)]
-#[repr_c(NICHE_VALUE = CTxnIsolation(0))]
-#[rust_spec(with_custom_niche)]
+#[repr_c(NICHE = CTxnIsolation(0))]
+#[rust_spec(custom_niche)]
 #[repr(transparent)]
 pub struct TxnIsolation(u32);
 pub const TXN_READ_UNCOMMITTED: TxnIsolation = TxnIsolation(0x00000001);

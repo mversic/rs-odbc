@@ -1,5 +1,4 @@
-use co3::{Error, ReprC};
-use rust_spec::RustSpec;
+use co3::{Error, ReprC, rust_spec::RustSpec};
 
 /// Each function in ODBC returns a code, known as its return code, which indicates the
 /// overall success or failure of the function. Program logic is generally based on return

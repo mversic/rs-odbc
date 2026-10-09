@@ -4,18 +4,19 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use co3::ReprC;
-use rust_spec::RustSpec;
+use co3::{
+    ReprC,
+    rust_spec::{self, RustSpec},
+    transmute::CheckedTransmute,
+};
 
 use crate::data::{CHAR, WCHAR};
 
 #[sealed::sealed]
-pub trait OdbcChar:
-    RustSpec<Layout = rust_spec::Stable> + co3::transmute::CheckedTransmute<CType: Sized>
-{
-}
+pub trait OdbcChar: RustSpec<Layout = rust_spec::Stable> + CheckedTransmute<CType: Sized> {}
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, RustSpec, ReprC)]
+#[repr_c(transparent)]
 #[repr(transparent)]
 pub struct OdbcStr<T>([T]);
 

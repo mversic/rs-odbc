@@ -1,7 +1,6 @@
 use core::ffi::c_void;
 
-use co3::ReprC;
-use rust_spec::RustSpec;
+use co3::{ReprC, reference::CRefMut, rust_spec::RustSpec};
 
 // TODO: Add support for mingw-x64 on x86 platform
 
@@ -121,6 +120,12 @@ impl POINTER {
 
     const fn from_usize(value: usize) -> Self {
         Self(value as *mut c_void)
+    }
+}
+
+impl<T, const RESTRICTED: bool> From<CRefMut<T, RESTRICTED>> for POINTER {
+    fn from(value: CRefMut<T, RESTRICTED>) -> Self {
+        Self(value.as_ptr().cast())
     }
 }
 

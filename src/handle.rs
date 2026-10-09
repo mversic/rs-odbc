@@ -337,13 +337,13 @@ impl<'conn, V: OdbcVersion, DT: DescType> ToOwnedHandle for HDESC<'conn, V, DT> 
     link(name = "odbc", kind = "static")
 )]
 #[cfg_attr(
-    all(not(windows), feature = "static"),
-    link(name = "ltdl", kind = "static")
-)]
-#[cfg_attr(
     all(not(windows), not(feature = "static")),
     link(name = "odbc", kind = "dylib")
 )]
+unsafe extern "system" {}
+
+#[cfg(all(not(windows), feature = "static"))]
+#[link(name = "ltdl", kind = "static")]
 unsafe extern "system" {}
 
 co3::ffi! {

@@ -8,8 +8,7 @@ license = "Apache-2.0"
 edition = "2024"
 
 [dependencies]
-rust-spec = "0.4.1"
-co3 = "0.6.0"
+co3 = { version = "0.7.0" }
 
 mockall_double = "0.3.1"
 sealed = "0.7.0"

@@ -1,5 +1,4 @@
-use co3::ReprC;
-use rust_spec::RustSpec;
+use co3::{ReprC, rust_spec::RustSpec};
 
 use crate::env::{OV_ODBC3_80, OV_ODBC4, OdbcVersion};
 
